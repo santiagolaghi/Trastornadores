@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0b0d12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>TNT · Trastornadores</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+<style>
+:root{--bg:#0b0d12;--panel:#121722;--panel2:#171e2b;--ink:#f7f8fb;--muted:#969dac;--line:#ffffff14;--accent:#ff6a35;--soft:#ffffff0b;--shadow:0 20px 60px #0007;--r:24px;--safe:max(12px,env(safe-area-inset-bottom))}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}button{font:inherit;color:inherit}.app{height:100dvh;display:grid;grid-template-rows:auto auto minmax(0,1fr);background:radial-gradient(circle at 85% 4%,#ff6a351e,transparent 26rem),var(--bg)}
+.top{position:relative;display:flex;align-items:center;gap:12px;padding:calc(12px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid var(--line);background:#0b0d12e8;backdrop-filter:blur(20px);z-index:20}.brand{display:flex;align-items:center;gap:10px;min-width:0}.mark{width:40px;height:40px;border-radius:14px;background:linear-gradient(145deg,#ff6a35,#ff8b60);display:grid;place-items:center;font-weight:1000;box-shadow:0 10px 26px #ff6a3530}.brand b{display:block;font-size:14px;letter-spacing:.02em}.brand small{display:block;color:var(--muted);font-size:9px;margin-top:1px}.grow{flex:1}.homeBtn,.installBtn{height:40px;border:1px solid var(--line);background:var(--soft);border-radius:13px;padding:0 12px;font-size:10px;font-weight:900}.installBtn{background:#fff;color:#111;border-color:#fff;display:none}
+.tabsbar{min-height:54px;display:flex;align-items:center;gap:7px;padding:7px 10px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line);background:#0f141d}.tabsbar::-webkit-scrollbar{display:none}.tab{height:39px;max-width:180px;display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:#ffffff08;border-radius:12px;padding:0 9px 0 11px;white-space:nowrap;font-size:10px;font-weight:850;color:#aeb4c1}.tab.on{background:#fff;color:#111;border-color:#fff}.tab span{overflow:hidden;text-overflow:ellipsis}.tab .x{width:24px;height:24px;border:0;border-radius:8px;background:#0000000e;color:inherit;padding:0}.addtab{height:39px;min-width:39px;border:1px dashed #ffffff2b;background:transparent;border-radius:12px;color:#9ba2b1;font-size:18px}
+.workspace{position:relative;min-height:0;overflow:hidden}.view{position:absolute;inset:0;visibility:hidden;pointer-events:none}.view.on{visibility:visible;pointer-events:auto}.home{overflow:auto;padding:20px 16px calc(28px + var(--safe));background:radial-gradient(circle at 8% 16%,#714dff18,transparent 24rem),radial-gradient(circle at 92% 76%,#ff6a3513,transparent 24rem),var(--bg)}.homeInner{width:min(920px,100%);margin:auto}.eyebrow{color:var(--accent);font-size:10px;font-weight:1000;letter-spacing:.18em;text-transform:uppercase}.hero{padding:8px 2px 18px}.hero h1{font-size:clamp(30px,8vw,52px);line-height:.95;letter-spacing:-.055em;margin:10px 0 9px;max-width:720px}.hero p{margin:0;color:var(--muted);font-size:12px;line-height:1.6;max-width:650px}.modules{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-top:14px}.module{min-height:150px;border:1px solid var(--line);border-radius:22px;padding:16px;text-align:left;background:linear-gradient(155deg,#161c28,#10151e);box-shadow:0 10px 30px #0002;position:relative;overflow:hidden}.module:after{content:"";position:absolute;width:110px;height:110px;border-radius:50%;right:-45px;top:-45px;background:var(--mc,#ffffff0a)}.module .ico{width:42px;height:42px;border-radius:14px;background:#ffffff0d;display:grid;place-items:center;font-size:21px;position:relative;z-index:1}.module h3{margin:19px 0 4px;font-size:15px;position:relative;z-index:1}.module p{margin:0;color:var(--muted);font-size:9px;line-height:1.45;position:relative;z-index:1}.module .open{position:absolute;right:13px;bottom:13px;width:33px;height:33px;border-radius:11px;background:#fff;color:#111;display:grid;place-items:center;font-weight:1000;z-index:2}.hint{margin-top:18px;padding:13px 14px;border:1px solid var(--line);border-radius:17px;background:#ffffff06;color:#aeb4c1;font-size:9px;line-height:1.5}.frame{background:#fff}.frame iframe{width:100%;height:100%;border:0;background:#fff;display:block}.loading{position:absolute;inset:0;background:#0b0d12;display:grid;place-items:center;z-index:2;transition:.2s}.loading.hide{opacity:0;visibility:hidden}.loader{text-align:center;color:#aab1bf;font-size:10px}.loader i{display:block;width:28px;height:28px;border:3px solid #ffffff18;border-top-color:var(--accent);border-radius:50%;margin:0 auto 10px;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+@media(min-width:720px){.top{padding-left:20px;padding-right:20px}.tabsbar{padding-left:16px;padding-right:16px}.home{padding:32px}.modules{grid-template-columns:repeat(3,minmax(0,1fr))}.module{min-height:170px}.hero{padding-top:20px}}
+@media(max-width:410px){.brand small{display:none}.homeBtn{padding:0 10px}.modules{grid-template-columns:1fr 1fr}.module{min-height:142px;padding:14px}.module h3{font-size:14px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top"><div class="brand"><div class="mark">T</div><div><b>TNT</b><small>Trastornadores</small></div></div><div class="grow"></div><button class="homeBtn" id="homeBtn" type="button">⌂ Inicio</button><button class="installBtn" id="installBtn">Instalar</button></header>
+<div class="tabsbar" id="tabs"><button class="tab on" data-id="home"><span>Inicio</span></button><button class="addtab" id="addTab" title="Abrir otra app">＋</button></div>
+<main class="workspace" id="workspace">
+<section class="view home on" id="view-home"><div class="homeInner"><div class="hero"><div class="eyebrow">Ministerio TNT</div><h1>¿Qué vamos a usar hoy?</h1><p>Abrí las herramientas que necesites. Podés dejar Buffet, Sábados, EFE y las demás abiertas al mismo tiempo y cambiar de pestaña sin perder lo que estabas haciendo.</p></div><div class="modules" id="modules"></div></div></section>
+<div id="frames"></div>
+</main>
+</div>
+<script>
+const MODULES=[
+{id:'organizacion',name:'Organización',icon:'🗓️',desc:'Sábados, eventos, equipos y responsabilidades.',url:'/organizacion/',color:'#ff6a3530'},
+{id:'campamento',name:'Campamento',icon:'🏕️',desc:'Inscripciones, pagos, personas y organización.',url:'/campamento/',color:'#8f7cff33'},
+{id:'glosario',name:'Prédicas & Glosario',icon:'📖',desc:'Biblioteca, prédicas y recursos bíblicos.',url:'/glosario/',color:'#ffb45b30'},
+{id:'sabados',name:'Lista Sábados',icon:'✅',desc:'Asistencia, historial y seguimiento.',url:'/lista-sabados/',color:'#b6f36b28'},
+{id:'efe',name:'EFE',icon:'👥',desc:'Equipos, asistencia y acompañamiento.',url:'/efe/',color:'#ff6a3530'},
+{id:'buffet',name:'Buffet',icon:'☕',desc:'Caja, ventas, pedidos y preparación.',url:'/buffet/',color:'#ffd34b28'}
+];
+const $=s=>document.querySelector(s), tabs=$('#tabs'),frames=$('#frames'),mods=$('#modules');
+let active='home', installEvent=null;
+const byId=id=>MODULES.find(m=>m.id===id);
+function save(){const open=MODULES.filter(m=>$('#view-'+m.id)).map(m=>m.id);localStorage.setItem('tnt-open-tabs',JSON.stringify(open));localStorage.setItem('tnt-active-tab',active)}
+function renderCards(){mods.innerHTML=MODULES.map(m=>`<button class="module" data-open="${m.id}" style="--mc:${m.color}"><span class="ico">${m.icon}</span><h3>${m.name}</h3><p>${m.desc}</p><span class="open">↗</span></button>`).join('');mods.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openModule(b.dataset.open,true))}
+function openModule(id,focus=true){const m=byId(id);if(!m)return;if(!$('#view-'+id)){
+ const v=document.createElement('section');v.className='view frame';v.id='view-'+id;v.innerHTML=`<div class="loading"><div class="loader"><i></i>Abriendo ${m.name}…</div></div><iframe src="${m.url}" title="${m.name}" allow="clipboard-read; clipboard-write; notifications" referrerpolicy="strict-origin-when-cross-origin"></iframe>`;frames.appendChild(v);const f=v.querySelector('iframe'),l=v.querySelector('.loading');f.addEventListener('load',()=>l.classList.add('hide'));
+ const t=document.createElement('button');t.className='tab';t.dataset.id=id;t.innerHTML=`<span>${m.icon} ${m.name}</span><span class="x" role="button" aria-label="Cerrar">×</span>`;tabs.insertBefore(t,$('#addTab'));t.onclick=e=>{if(e.target.closest('.x'))closeTab(id);else activate(id)};
+ }
+ if(focus)activate(id);save()}
+function activate(id){if(id!=='home'&&!$('#view-'+id))return openModule(id,true);active=id;document.querySelectorAll('.view').forEach(v=>{const on=v.id==='view-'+id;v.classList.toggle('on',on);v.style.visibility=on?'visible':'hidden';v.style.pointerEvents=on?'auto':'none'});document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.id===id));save()}
+function goHome(){active='home';document.querySelectorAll('.view').forEach(v=>{v.classList.remove('on');v.style.visibility='hidden';v.style.pointerEvents='none'});const h=$('#view-home');if(h){h.classList.add('on');h.style.visibility='visible';h.style.pointerEvents='auto';h.scrollTop=0}document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.id==='home'));save()}
+function closeTab(id){const was=active===id;$('#view-'+id)?.remove();tabs.querySelector(`.tab[data-id="${id}"]`)?.remove();if(was){const candidates=[...tabs.querySelectorAll('.tab')].filter(t=>t.dataset.id!=='home');activate(candidates.at(-1)?.dataset.id||'home')}else save()}
+$('#homeBtn').addEventListener('click',goHome);$('#homeBtn').addEventListener('pointerup',e=>{if(e.pointerType==='touch')goHome()});tabs.querySelector('.tab[data-id=\"home\"]').onclick=goHome;$('#addTab').onclick=goHome;renderCards();
+try{const open=JSON.parse(localStorage.getItem('tnt-open-tabs')||'[]').filter(id=>byId(id));open.forEach(id=>openModule(id,false));const wanted=new URLSearchParams(location.search).get('open')||localStorage.getItem('tnt-active-tab')||'home';if(wanted!=='home'&&byId(wanted))openModule(wanted,true);else activate('home')}catch{activate('home')}
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvent=e;$('#installBtn').style.display='block'});$('#installBtn').onclick=async()=>{if(!installEvent)return;installEvent.prompt();await installEvent.userChoice;installEvent=null;$('#installBtn').style.display='none'};window.addEventListener('appinstalled',()=>$('#installBtn').style.display='none');
+if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(console.error));
+</script>
+</body></html>
