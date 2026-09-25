@@ -62,6 +62,8 @@ async function boot(){loading();let {data:{session}}=await sb.auth.getSession();
 sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT'){S.session=null;S.account=null;S.person=null;renderLogin()}else if(session&&!S.session){S.session=session;setTimeout(initAuthed,0)}});
 
 async function initAuthed(){loading();try{
+  const ensured=await sb.rpc('tnt_ensure_account');
+  if(ensured.error)throw ensured.error;
   for(let n=0;n<5;n++){
     let {data,error}=await sb.from('tnt_accounts').select('*').eq('auth_user_id',S.session.user.id).maybeSingle();if(error)throw error;if(data){S.account=data;break}await new Promise(r=>setTimeout(r,350));
   }
