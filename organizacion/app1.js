@@ -53,9 +53,9 @@ function sheetHead(title,sub=''){return `<div class="sheetHead"><div><h2>${esc(t
 function empty(title,text,button='',action=''){return `<div class="empty"><b>${esc(title)}</b>${text?`<div>${esc(text)}</div>`:''}${button?`<div style="margin-top:14px"><button class="btn primary" data-action="${esc(action)}">${esc(button)}</button></div>`:''}</div>`}
 
 async function signInGoogle(){
-  const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+'/organizacion/'}}); if(error)toast('Google todavía no está habilitado en Supabase. Podés entrar por email mientras tanto.');
+  const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+'/'}}); if(error)toast('Google todavía no está habilitado en Supabase. Podés entrar por email mientras tanto.');
 }
-async function magicLink(){let email=$('#loginEmail')?.value.trim();if(!email)return toast('Escribí tu email');let {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+'/organizacion/'}});toast(error?errMsg(error):'Te enviamos un enlace de ingreso')}
+async function magicLink(){let email=$('#loginEmail')?.value.trim();if(!email)return toast('Escribí tu email');let {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+'/'}});toast(error?errMsg(error):'Te enviamos un enlace de ingreso')}
 function renderLogin(){document.getElementById('app').innerHTML=`<main class="login"><section class="loginCard"><div class="loginLogo">T</div><h1>TNT Organización</h1><p>Equipos, eventos, responsabilidades y ejecución del ministerio en un solo lugar.</p><button class="google" id="googleLogin">Continuar con Google</button><div class="divider">o por email</div><input id="loginEmail" type="email" placeholder="tu@email.com"><button class="btn" id="magicLogin">Enviar enlace de acceso</button><p class="tiny" style="margin-top:16px">El Admin inicial se asigna de forma segura por email. Después puede otorgar Admin a otras personas desde la aplicación.</p></section></main>`;$('#googleLogin').onclick=signInGoogle;$('#magicLogin').onclick=magicLink}
 
 async function boot(){loading();let {data:{session}}=await sb.auth.getSession();S.session=session;if(!session){renderLogin();return}await initAuthed()}
