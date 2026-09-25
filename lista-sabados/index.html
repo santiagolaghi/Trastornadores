@@ -12,7 +12,7 @@
 @media(min-width:760px){.sheet{align-self:center;border-radius:31px;max-height:88vh}.modalwrap{padding:22px;align-items:center}.quickgrid{grid-template-columns:repeat(4,1fr)}.quick{min-height:125px}.peoplelist{grid-template-columns:1fr 1fr}}
 @media(max-width:520px){.attendance-tools{grid-template-columns:1fr 1fr}.attendance-tools input{grid-column:1/-1}.copybar{align-items:flex-start;flex-direction:column}.copybar button{width:100%}}
 </style>
-</head>
+<link rel="stylesheet" href="/assets/tnt-ui.css?v=10"></head>
 <body><div id="app"></div><div id="toast-root"></div>
 <script>
 window.addEventListener('error',e=>{setTimeout(()=>{const a=document.querySelector('#app');if(a&&!a.children.length)a.innerHTML='<div style="padding:40px;font-family:system-ui"><h2>No pude iniciar la app</h2><p>'+String(e.message).replace(/[<>&]/g,'')+'</p><button onclick="location.reload()">Reintentar</button></div>'},0)});
@@ -119,4 +119,4 @@ function toast(msg){const r=document.querySelector('#toast-root');r.innerHTML=`<
 function escapeHtml(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function escapeAttr(s=''){return escapeHtml(s)}
 </script>
-</body></html>
+<script src="/supabase-lite.js?v=3"></script><script src="/assets/tnt-core.js?v=10" data-module="lista-sabados" data-label="Lista Sábados"></script></body></html>
