@@ -1,5 +1,5 @@
-const CACHE='tnt-unificado-v4-global-auth';
-const CORE=['/','/index.html','/manifest.webmanifest','/icons/icon.svg','/supabase-lite.js?v=2','/organizacion/','/campamento/','/glosario/','/lista-sabados/','/efe/','/buffet/'];
+const CACHE='tnt-v10-global-platform';
+const CORE=['/','/index.html','/manifest.webmanifest','/icons/icon.svg','/supabase-lite.js?v=3','/assets/tnt-ui.css?v=10','/assets/tnt-core.js?v=10','/assets/tnt-module-theme.css?v=10','/organizacion/','/campamento/','/glosario/','/lista-sabados/','/efe/','/buffet/','/chat/','/admin/'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).catch(()=>{}).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{
