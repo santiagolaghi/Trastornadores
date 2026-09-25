@@ -1,1 +1,309 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TNT · Trastornadores</title></head><body style="margin:0;background:#0b0d12;color:white;font-family:system-ui"><div id="boot" style="min-height:100vh;display:grid;place-items:center">Cargando TNT…</div><script>Promise.all(['c0.txt','c1.txt','c2.txt','c3.txt','c4.txt','c5.txt'].map(x=>fetch(x).then(r=>{if(!r.ok)throw Error(x);return r.text()}))).then(a=>{let z=atob(a.join('').trim()),u=new Uint8Array(z.length);for(let i=0;i<z.length;i++)u[i]=z.charCodeAt(i);let h=new TextDecoder().decode(u);document.open();document.write(h);document.close()}).catch(e=>{document.getElementById('boot').textContent='No se pudo cargar TNT. Recargá la página.';console.error(e)})</script></body></html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<title>TNT · Trastornadores</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f4ef;--card:#fff;--card2:#faf8f3;--text:#17181d;--muted:#747884;--line:#15182014;
+  --accent:#ff5a36;--accent2:#795cff;--success:#1ca875;--warn:#e4a13a;--danger:#df4d57;
+  --shadow:0 18px 55px #24283312;--fs:16px;--nav:78px;
+}
+html[data-theme=dark]{--bg:#0b0d12;--card:#141821;--card2:#191e29;--text:#f7f7f4;--muted:#9da2ae;--line:#ffffff16;--shadow:0 18px 55px #0006}
+*{box-sizing:border-box}html{font-size:var(--fs);scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font-family:'DM Sans',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+button,input,textarea,select{font:inherit}.orb{position:fixed;border-radius:50%;filter:blur(90px);opacity:.14;pointer-events:none}.orb-a{width:320px;height:320px;right:-170px;top:-140px;background:var(--accent)}.orb-b{width:300px;height:300px;left:-180px;bottom:13%;background:var(--accent2)}
+.shell{position:relative;z-index:1;width:min(100%,780px);margin:auto;padding:18px 15px calc(var(--nav) + 74px + env(safe-area-inset-bottom))}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 0 18px}.brand{display:flex;gap:10px;align-items:center}.mark{width:44px;height:44px;border-radius:15px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#fff;font:900 14px Manrope;box-shadow:0 10px 32px #ff5a3630}.brand strong{display:block;font-family:Manrope}.brand small{display:block;color:var(--muted);font-size:.72rem}
+.icon,.btn,.chip{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:14px;min-height:44px;padding:0 14px}.icon{width:44px;padding:0}.primary{border:0;background:var(--accent);color:#fff;border-radius:15px;min-height:50px;padding:0 17px;font-weight:800}.ghost{border:1px solid var(--line);background:transparent;color:var(--text);border-radius:15px;min-height:48px;padding:0 15px;font-weight:700}
+.hero{padding:28px 2px 15px}.eyebrow{color:var(--accent);font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.14em}.hero h1{font:800 clamp(2.65rem,11vw,5.2rem)/.94 Manrope;margin:9px 0 13px;letter-spacing:-.06em}.hero p,.muted{color:var(--muted)}
+.search{display:flex;gap:7px;border:1px solid var(--line);background:var(--card);padding:7px;border-radius:19px;box-shadow:var(--shadow)}.search input{border:0;background:transparent;outline:0;min-width:0;flex:1;color:var(--text);padding:0 9px}.search button{border:0;background:var(--accent);color:#fff;border-radius:13px;padding:0 13px;font-weight:800}
+.quick{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.quick button{border:1px solid var(--line);background:var(--card2);color:var(--muted);border-radius:999px;padding:7px 10px;font-size:.68rem}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:14px 0}.stat{background:var(--card);border:1px solid var(--line);border-radius:19px;padding:12px 10px;box-shadow:var(--shadow)}.stat b{font:800 1.32rem Manrope;display:block}.stat span{color:var(--muted);font-size:.66rem}
+.bookmap{width:100%;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;border:1px solid var(--line);background:linear-gradient(135deg,var(--card),var(--card2));color:var(--text);border-radius:22px;padding:15px;text-align:left;box-shadow:var(--shadow)}.bookmap>span{font-size:1.7rem}.bookmap b{display:block;font-family:Manrope}.bookmap small{display:block;color:var(--muted);line-height:1.3;margin-top:3px}.bookmap i{font-style:normal;color:var(--accent);font-size:1.3rem}
+.section{display:flex;align-items:end;justify-content:space-between;gap:10px;margin:23px 2px 11px}.section h2{font:800 1.08rem Manrope;margin:0}.section span{font-size:.73rem;color:var(--muted)}
+.groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.group{border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:14px;min-height:42px;padding:8px 10px;font-size:.72rem;font-weight:800;text-align:left}.group.on{color:var(--text);border-color:#ff5a3660;background:color-mix(in srgb,var(--accent) 10%,var(--card))}
+.topics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.topic{--tc:var(--accent);min-height:151px;border:1px solid var(--line);background:linear-gradient(150deg,var(--card),var(--card2));color:var(--text);border-radius:23px;padding:15px;text-align:left;position:relative;overflow:hidden;transition:.22s transform,.22s border-color,.22s box-shadow}.topic:before{content:'';position:absolute;width:95px;height:95px;border-radius:50%;background:var(--tc);opacity:.11;right:-35px;top:-32px}.topic:active{transform:scale(.975)}.topic i{font-style:normal;font-size:1.6rem;display:block;margin-bottom:18px}.topic b{display:block;font-family:Manrope;position:relative}.topic small{display:block;color:var(--muted);line-height:1.3;margin-top:4px;position:relative}.topic em{display:block;color:var(--tc);font-style:normal;font-size:.65rem;font-weight:800;margin-top:8px;position:relative}
+.nav{position:fixed;z-index:30;left:50%;transform:translateX(-50%);bottom:max(10px,env(safe-area-inset-bottom));width:min(94%,730px);display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:7px;background:color-mix(in srgb,var(--card) 89%,transparent);border:1px solid var(--line);backdrop-filter:blur(20px);border-radius:25px;box-shadow:0 16px 50px #0002}.nav button{border:0;background:transparent;color:var(--muted);border-radius:18px;min-height:58px;font-size:.73rem}.nav button.on{background:var(--text);color:var(--bg);font-weight:800}
+.page{animation:in .28s ease}@keyframes in{from{opacity:0;transform:translateY(8px)}}.card{border:1px solid var(--line);background:var(--card);border-radius:22px;padding:16px;margin-bottom:10px;box-shadow:var(--shadow)}.card h3{font:800 1.05rem Manrope;margin:8px 0 5px}.badge{display:inline-flex;border-radius:999px;padding:6px 9px;font-size:.66rem;font-weight:800}.draft{background:#eba52d1b;color:#d89524}.finalized{background:#765cff1d;color:#826cf1}.published{background:#1daa761c;color:#1daa76}
+.library-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0 16px}.chip{width:100%;white-space:normal;font-size:.73rem;font-weight:800;padding:8px;min-height:43px}.chip.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+.field{margin-bottom:12px}.field label{display:block;font-size:.72rem;font-weight:800;margin:0 0 6px 3px}.field input,.field textarea,.field select{width:100%;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:16px;padding:13px;outline:0}.field textarea{min-height:250px;resize:vertical;line-height:1.55}.upload{position:relative;border:1.5px dashed #8887;background:var(--card);border-radius:21px;padding:22px;text-align:center;margin-bottom:13px}.upload input{position:absolute;inset:0;width:100%;opacity:0}
+.styles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.style{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:18px;padding:11px;text-align:left}.style.on{outline:2px solid var(--accent)}.swatch{height:27px;border-radius:9px;margin-bottom:7px}
+.preview{border:1px solid var(--line);border-radius:25px;overflow:hidden;margin-top:14px;background:#fff;box-shadow:var(--shadow)}.p-head,.p-body{padding:30px}.preview.modern .p-head{background:#10131a;color:#fff;min-height:180px;padding-top:42px;padding-bottom:36px}.preview.modern .p-body{background:#fbfaf7;color:#191919;min-height:260px;padding-top:32px}.preview.friendly{background:#fff3e9;color:#281f1c}.preview.minimal{background:#fff;color:#181818}.preview.ancient{background:#efe2c7;color:#3f3020;font-family:Georgia,serif}.preview:not(.modern) .p-head{padding-bottom:8px}.preview:not(.modern) .p-body{padding-top:4px}.p-kicker{font-size:.67rem;letter-spacing:.12em;text-transform:uppercase;opacity:.65}.p-title{font:800 clamp(2.1rem,8vw,3.7rem)/.98 Manrope;margin:8px 0 0;letter-spacing:-.05em;overflow-wrap:anywhere}.ancient .p-title{font-family:Playfair Display,serif}.p-sub{margin:9px 0 0;opacity:.72}.p-body{white-space:pre-wrap;line-height:1.65}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0 8px}.actions .wide{grid-column:1/-1}.statusline{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:11px}.statusline small{color:var(--muted)}
+.back{position:fixed;z-index:60;inset:0;background:#0009;padding:8px;display:flex;align-items:flex-end;animation:fade .18s ease}@keyframes fade{from{opacity:0}}.sheet{width:min(100%,740px);max-height:92vh;overflow:auto;margin:auto;background:var(--bg);border-radius:29px 29px 20px 20px;padding:18px 18px calc(18px + env(safe-area-inset-bottom));scrollbar-width:none;animation:sheet .28s ease}@keyframes sheet{from{transform:translateY(24px);opacity:.55}}.sheet::-webkit-scrollbar{display:none}.sheethead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:var(--bg);padding:18px 0 10px;z-index:5}.sheet h2{font:800 1.7rem/1.05 Manrope;margin:5px 0}.story-search{width:100%;min-height:46px;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:15px;padding:0 13px;outline:0;margin:5px 0 9px}
+.topic-tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:8px 0 12px}.topic-tabs button{min-height:44px;border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:14px;font-weight:800}.topic-tabs button.on{background:var(--text);color:var(--bg)}
+.guide{display:grid;gap:10px}.guide-card{border:1px solid var(--line);background:var(--card);border-radius:19px;padding:14px}.guide-card h3{font:800 .92rem Manrope;margin:0 0 7px}.guide-card p{margin:0;color:var(--muted);line-height:1.5}.guide-list{margin:0;padding-left:18px;color:var(--muted)}.guide-list li{margin:7px 0;line-height:1.42}.anchor-row,.related{display:flex;gap:6px;flex-wrap:wrap}.anchor-row span,.related span{font-size:.64rem;padding:5px 8px;border-radius:999px;background:var(--card2);color:var(--muted);border:1px solid var(--line)}
+.story{border:1px solid var(--line);background:var(--card);border-radius:20px;padding:14px;margin:10px 0;box-shadow:0 10px 30px #00000008}.story-top{display:flex;align-items:flex-start;justify-content:space-between;gap:9px}.story b{display:block;font-family:Manrope}.ref{color:var(--accent);font-size:.74rem;font-weight:800;margin:4px 0}.story p{margin:5px 0;line-height:1.46;color:var(--muted)}.story-open{border:0;background:var(--card2);color:var(--text);border-radius:12px;min-width:38px;height:38px;font-size:1rem;transition:.2s transform}.story-open.on{transform:rotate(45deg)}
+.story-deep{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);animation:deep .22s ease}@keyframes deep{from{opacity:0;transform:translateY(-5px)}}.deep-grid{display:grid;gap:8px}.deep{border-radius:15px;padding:11px 12px;background:var(--card2)}.deep h4{font:800 .76rem Manrope;margin:0 0 5px;color:var(--text)}.deep p{margin:0;color:var(--muted);font-size:.82rem;line-height:1.45}.deep ul{margin:0;padding-left:17px;color:var(--muted);font-size:.8rem}.deep li{margin:5px 0;line-height:1.4}.takeaway{border-left:3px solid var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--card));border-radius:0 15px 15px 0;padding:12px;margin-top:8px}.takeaway b{font-size:.72rem;color:var(--accent)}.takeaway p{margin:5px 0 0;color:var(--text);font-weight:600}
+.warningbox{border:1px solid color-mix(in srgb,var(--warn) 35%,var(--line));background:color-mix(in srgb,var(--warn) 8%,var(--card));border-radius:15px;padding:11px}.warningbox b{font-size:.73rem}.warningbox ul{margin:6px 0 0;padding-left:17px;color:var(--muted);font-size:.79rem}
+.sticky{position:sticky;bottom:0;width:100%;box-shadow:0 -16px 34px var(--bg);margin-top:12px}.book-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.book{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:16px;padding:12px;text-align:left;min-height:91px}.book b{display:block;font-family:Manrope}.book small{display:block;color:var(--muted);font-size:.65rem;margin:3px 0 9px}.book em{font-style:normal;color:var(--accent);font-size:.65rem;font-weight:800}
+.auth{width:min(100%,470px);margin:7vh auto;padding:18px;position:relative;z-index:2}.authbox{background:var(--card);border:1px solid var(--line);border-radius:27px;padding:21px;box-shadow:var(--shadow)}.auth h1{font:800 2.35rem/1 Manrope;margin:15px 0 8px}.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:17px 0}.msg{min-height:20px;color:var(--muted);font-size:.76rem;margin-top:9px}.settings .row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}.settings .row:last-child{border:0}.empty{text-align:center;color:var(--muted);padding:35px 14px}.toast{position:fixed;z-index:90;left:50%;bottom:95px;transform:translateX(-50%);background:#111;color:#fff;border-radius:999px;padding:10px 14px;font-size:.76rem;box-shadow:0 12px 40px #0005;max-width:90%;text-align:center}
+@media(min-width:600px){.stats{grid-template-columns:repeat(4,1fr)}.book-grid{grid-template-columns:repeat(3,1fr)}.topics{grid-template-columns:repeat(3,1fr)}.groups{grid-template-columns:repeat(4,1fr)}.styles{grid-template-columns:repeat(4,1fr)}.library-filters{grid-template-columns:repeat(5,1fr)}.deep-grid{grid-template-columns:1fr 1fr}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body data-build="v4-deep-20260906">
+<div class="orb orb-a"></div><div class="orb orb-b"></div>
+<div id="app"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<script src="/supabase-lite.js?v=2"></script><script>const {createClient}=supabase;
+
+const db=createClient('https://oeodnnomgiddkblnlzay.supabase.co','sb_publishable_X06jWDKqV6jgKbaa1PrrbQ_zto1XeTJ',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=(v='')=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+const norm=(v='')=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const statusN={draft:'Borrador',finalized:'Finalizada',published:'Publicada'};const BUILD='v4-deep-20260906';
+const arr=v=>Array.isArray(v)?v.filter(Boolean):[];
+
+let S={session:null,profile:null,tab:'home',topics:[],stories:[],links:[],books:[],sermons:[],group:'Todos',q:'',filter:'all',theme:localStorage.getItem('tnt-theme')||'dark',font:+localStorage.getItem('tnt-font')||16,edit:null};
+const fresh=()=>({id:null,title:'',subtitle:'',topic:'',text:'',style:'modern',status:'draft',file:null,source_type:'text',source_filename:null,finalized_at:null});
+S.edit=fresh();
+
+function apply(){document.documentElement.dataset.theme=S.theme;document.documentElement.style.setProperty('--fs',S.font+'px')}
+function toast(t){$('.toast')?.remove();let e=document.createElement('div');e.className='toast';e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),2700)}
+function topic(slug){return S.topics.find(t=>t.slug===slug)}
+function story(id){return S.stories.find(s=>s.id===id)}
+function linksForTopic(id){return S.links.filter(l=>l.topic_id===id)}
+function topicNamesForStory(id,exclude){return S.links.filter(l=>l.story_id===id&&l.topic_id!==exclude).map(l=>S.topics.find(t=>t.id===l.topic_id)?.name).filter(Boolean).slice(0,7)}
+function bookName(id){return S.books.find(b=>b.id===id)?.name||''}
+
+async function fetchAll(table,select,order){
+  let out=[],from=0,size=1000;
+  while(true){
+    let q=db.from(table).select(select).range(from,from+size-1);
+    if(order)q=q.order(order);
+    let {data,error}=await q;
+    if(error)throw error;
+    out.push(...(data||[]));
+    if(!data||data.length<size)break;
+    from+=size;
+  }
+  return out;
+}
+async function load(){
+  try{
+    let uid=S.session.user.id;
+    let[p,t,st,l,bk,se]=await Promise.all([
+      db.from('profiles').select('*').eq('id',uid).maybeSingle(),
+      fetchAll('topics','id,slug,name,icon,description,category,color,sort_order,active,core_truth,biblical_tension,misconceptions,sermon_questions,youth_scenarios,suggested_structures,anchor_passages,avoid_cliches,related_topics,keywords','sort_order'),
+      fetchAll('bible_stories','id,title,reference,summary,context,key_question,search_terms,sort_order,book_start,story_type,people,tension,god_revelation,human_revelation,gospel_connection,youth_applications,preaching_angles,group_questions,cross_references,key_verses,historical_context,literary_context,warnings,hope_points,takeaway,depth_score','sort_order'),
+      fetchAll('topic_story_links','topic_id,story_id,angle,relevance',null),
+      fetchAll('bible_books','id,name,slug,testament,category','id'),
+      db.from('sermons').select('*').order('updated_at',{ascending:false})
+    ]);
+    S.profile=p.data;S.topics=t.filter(x=>x.active!==false);S.stories=st;S.links=l;S.books=bk;S.sermons=se.data||[];
+    render();
+  }catch(e){console.error(e);toast('Error cargando datos. Probá recargar.')}
+}
+async function init(){
+  apply();S.session=(await db.auth.getSession()).data.session;
+  db.auth.onAuthStateChange((_e,s)=>{S.session=s;if(s)load();else{S.profile=null;render()}});
+  S.session?await load():render();
+}
+
+function top(){return`<div class="top"><div class="brand"><div class="mark">TNT</div><div><strong>Trastornadores</strong><small>Centro de prédicas</small></div></div><button class="icon" id="theme">${S.theme==='dark'?'☀':'◐'}</button></div>`}
+function nav(){return`<nav class="nav">${[['home','⌂ Inicio'],['create','✦ Predicar'],['library','▤ Biblioteca'],['settings','⚙ Ajustes']].map(x=>`<button data-nav="${x[0]}" class="${S.tab===x[0]?'on':''}">${x[1]}</button>`).join('')}</nav>`}
+function auth(){return`<main class="auth"><div class="brand"><div class="mark">TNT</div><div><strong>Trastornadores</strong><small>Centro de prédicas</small></div></div><section class="authbox"><div class="eyebrow">Ministerio de jóvenes</div><h1>Predicá con profundidad.</h1><p class="muted">Tus borradores son privados. Solo lo publicado entra a la biblioteca del equipo.</p><div class="auth-tabs"><button class="btn on" data-mode="login">Entrar</button><button class="btn" data-mode="signup">Crear cuenta</button></div><form id="auth"><div class="field name" hidden><label>Tu nombre</label><input id="name"></div><div class="field"><label>Email</label><input id="email" type="email" required></div><div class="field"><label>Contraseña</label><input id="pass" type="password" minlength="8" required></div><button class="primary" style="width:100%" id="authbtn">Entrar</button><div class="msg" id="msg"></div></form></section></main>`}
+
+function searchableTopic(t){
+  let stories=linksForTopic(t.id).map(l=>story(l.story_id)).filter(Boolean);
+  return norm([t.name,t.description,t.category,t.core_truth,...arr(t.keywords),...arr(t.youth_scenarios),...stories.flatMap(s=>[s.title,s.reference,s.summary,s.tension,s.takeaway,...arr(s.youth_applications)])].join(' '));
+}
+function home(){
+  let groups=['Todos',...new Set(S.topics.map(t=>t.category).filter(Boolean))],q=norm(S.q);
+  let filtered=S.topics.filter(t=>(S.group==='Todos'||t.category===S.group)&&(!q||searchableTopic(t).includes(q)));
+  let quick=['Me traicionaron','Estoy agotado','Me comparo','Tengo miedo','No sé qué decidir','Presión de grupo','Dinero y ambición','Sexualidad e integridad'];
+  return`<main class="page">
+    <section class="hero"><div class="eyebrow">Inspiración bíblica</div><h1>¿No sabés qué predicar?</h1><p>Entrá por una emoción, una crisis, una situación juvenil o un libro de la Biblia. TNT te devuelve rutas con contexto, tensión, aplicaciones y ángulos para construir el mensaje.</p>
+      <form class="search" id="search"><input id="q" value="${esc(S.q)}" placeholder="Ansiedad, rechazo, agotamiento, llamado…"><button>Buscar</button></form>
+      <div class="quick">${quick.map(x=>`<button data-quick="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+    </section>
+    <section class="stats"><div class="stat"><b>${S.topics.length}</b><span>temas</span></div><div class="stat"><b>${S.stories.length}</b><span>historias/pasajes</span></div><div class="stat"><b>${S.links.length}</b><span>conexiones temáticas</span></div><div class="stat"><b>${new Set(S.stories.map(s=>s.book_start).filter(Boolean)).size}/66</b><span>libros cubiertos</span></div></section>
+    <button class="bookmap" id="books"><span>📚</span><div><b>Mapa de los 66 libros</b><small>Explorá cada libro y abrí fichas profundas de sus rutas.</small></div><i>→</i></button>
+    <div class="section"><h2>Familias temáticas</h2><span>${groups.length-1} familias</span></div>
+    <div class="groups">${groups.map(g=>`<button class="group ${S.group===g?'on':''}" data-group="${esc(g)}">${esc(g)}</button>`).join('')}</div>
+    <div class="section"><h2>Explorá el glosario</h2><span>${filtered.length} resultados</span></div>
+    <div class="topics">${filtered.map(t=>`<button class="topic" style="--tc:${t.color||'var(--accent)'}" data-topic="${t.slug}"><i>${t.icon||'✦'}</i><b>${esc(t.name)}</b><small>${esc(t.description)}</small><em>${linksForTopic(t.id).length} rutas ·%20guía%20de%20prédica</em></button>`).join('')}</div>
+    ${!filtered.length?'<div class="empty">No encontré esa búsqueda. Probá describiendo la situación con otras palabras.</div>':''}
+    <div class="actions"><button class="btn wide" id="random">🎲 Sorprendeme con una historia</button></div>
+  </main>`;
+}
+
+function preview(e){
+  let t=topic(e.topic);
+  return`<article class="preview ${e.style}"><header class="p-head"><div class="p-kicker">TNT · ${esc(t?.name||'Mensaje')}</div><h2 class="p-title">${esc(e.title||'Tu prédica')}</h2>${e.subtitle?`<p class="p-sub">${esc(e.subtitle)}</p>`:''}</header><div class="p-body">${esc(e.text||'La vista previa aparece acá…')}</div></article>`
+}
+function create(){
+  let e=S.edit;
+  return`<main class="page"><section class="hero"><div class="eyebrow">${e.id?'Editar':'Nueva'} prédica</div><h1 style="font-size:3.05rem">Tu mensaje. Sin perder una palabra.</h1><p>Subí el material, elegí el tema y TNT conserva íntegro el contenido original.</p></section>
+  <div class="upload"><input id="file" type="file" accept=".pdf,.doc,.docx,.txt,.md"><b>⇧ PDF · Word · TXT · Markdown</b><div class="muted" style="font-size:.72rem;margin-top:5px">PDF y DOCX extraen el texto automáticamente.</div></div>
+  <div class="field"><label>Título</label><input id="title" value="${esc(e.title)}"></div>
+  <div class="field"><label>Subtítulo</label><input id="subtitle" value="${esc(e.subtitle)}"></div>
+  <div class="field"><label>Tema principal</label><select id="topic"><option value="">Sin tema</option>${S.topics.map(t=>`<option value="${t.slug}" ${e.topic===t.slug?'selected':''}>${t.icon||'✦'} ${esc(t.name)}</option>`).join('')}</select></div>
+  <div class="field"><label>Contenido original</label><textarea id="text" placeholder="Pegá o escribí la prédica completa…">${esc(e.text)}</textarea></div>
+  <div class="section"><h2>Estilo visual</h2><span>el contenido no cambia</span></div>
+  <div class="styles">${[['modern','Moderno','linear-gradient(90deg,#111722,#ff5a36)'],['friendly','Amigable','linear-gradient(90deg,#ffe2cf,#ff7353)'],['minimal','Minimalista','linear-gradient(90deg,#fff,#bbb)'],['ancient','Antiguo','linear-gradient(90deg,#ead9b5,#8d6d47)']].map(x=>`<button class="style ${e.style===x[0]?'on':''}" data-style="${x[0]}"><div class="swatch" style="background:${x[2]}"></div><b>${x[1]}</b></button>`).join('')}</div>
+  <div id="pv">${preview(e)}</div>
+  <div class="statusline"><span class="badge ${e.status}">${statusN[e.status]}</span><small>Borrador → Finalizada → Publicada</small></div>
+  <div class="actions"><button class="btn" data-save="draft">Guardar borrador</button><button class="btn" data-save="finalized">Finalizar</button><button class="primary wide" data-save="published" ${e.status==='draft'?'disabled style="opacity:.45"':''}>Publicar al equipo</button><button class="btn wide" id="export">Exportar HTML</button></div>
+  </main>`;
+}
+function library(){
+  let a=S.sermons.filter(s=>S.filter==='all'||S.filter==='mine'&&s.author_id===S.session.user.id||s.status===S.filter);
+  return`<main class="page"><section class="hero"><div class="eyebrow">Biblioteca TNT</div><h1 style="font-size:3.1rem">Mensajes que quedan.</h1><p>Tus borradores son solo tuyos. Las publicadas se comparten con el equipo.</p></section>
+  <div class="library-filters">${[['all','Todo'],['published','Publicadas'],['mine','Mías'],['draft','Borradores'],['finalized','Finalizadas']].map(x=>`<button class="chip ${S.filter===x[0]?'on':''}" data-filter="${x[0]}">${x[1]}</button>`).join('')}</div>
+  ${a.map(s=>{let t=S.topics.find(x=>x.id===s.topic_id);return`<article class="card" data-sermon="${s.id}"><span class="badge ${s.status}">${statusN[s.status]}</span><h3>${esc(s.title)}</h3><p class="muted">${t?`${t.icon||'✦'} ${esc(t.name)}`:'Sin tema'} · ${new Date(s.updated_at).toLocaleDateString('es-AR')}</p></article>`}).join('')||'<div class="empty">Todavía no hay prédicas en esta vista.</div>'}</main>`
+}
+function settings(){
+  return`<main class="page settings"><section class="hero"><div class="eyebrow">Ajustes</div><h1 style="font-size:3rem">Que se sienta tuya.</h1></section><div class="card">
+  <div class="row"><div><b>Apariencia</b><small class="muted" style="display:block">Claro / oscuro</small></div><button class="btn" id="theme2">Cambiar</button></div>
+  <div class="row"><div><b>Tamaño de letra</b><small class="muted" style="display:block">${S.font}px</small></div><div>${[15,17,19].map(n=>`<button class="btn" data-font="${n}">${n}</button>`).join(' ')}</div></div>
+  <div class="row"><div><b>Glosario profundo</b><small class="muted" style="display:block">${S.stories.length} fichas · ${S.links.length} conexiones · ${S.topics.length} temas · ${BUILD}</small></div><span class="badge published">Online</span></div>
+  <div class="row"><div><b>${esc(S.profile?.display_name||S.session.user.email)}</b><small class="muted" style="display:block">Cuenta de líder</small></div><button class="btn" id="logout">Salir</button></div>
+  </div></main>`
+}
+function render(){
+  apply();let root=$('#app');
+  if(!S.session){root.innerHTML=auth();bindAuth();return}
+  root.innerHTML=`<div class="shell">${top()}${S.tab==='home'?home():S.tab==='create'?create():S.tab==='library'?library():settings()}${nav()}</div>`;bind()
+}
+
+function bindAuth(){
+  let mode='login';
+  $$('[data-mode]').forEach(b=>b.onclick=()=>{mode=b.dataset.mode;$$('[data-mode]').forEach(x=>x.classList.toggle('on',x===b));$('.name').hidden=mode!=='signup';$('#authbtn').textContent=mode==='signup'?'Crear cuenta':'Entrar'});
+  $('#auth').onsubmit=async e=>{e.preventDefault();let email=$('#email').value.trim(),password=$('#pass').value,name=$('#name').value.trim(),m=$('#msg');m.textContent='Procesando…';let r=mode==='signup'?await db.auth.signUp({email,password,options:{data:{display_name:name||email.split('@')[0]}}}):await db.auth.signInWithPassword({email,password});if(r.error){m.textContent=r.error.message;return}m.textContent=mode==='signup'&&!r.data.session?'Cuenta creada. Revisá tu email para confirmarla.':'Listo.'}
+}
+function capture(){if(!$('#title'))return;S.edit.title=$('#title').value.trim();S.edit.subtitle=$('#subtitle').value.trim();S.edit.topic=$('#topic').value;S.edit.text=$('#text').value}
+function bind(){
+  $$('[data-nav]').forEach(b=>b.onclick=()=>{if(S.tab==='create')capture();S.tab=b.dataset.nav;render();scrollTo(0,0)});
+  $('#theme')?.addEventListener('click',toggle);$('#theme2')?.addEventListener('click',toggle);
+  $$('[data-group]').forEach(b=>b.onclick=()=>{S.group=b.dataset.group;render()});
+  $$('[data-topic]').forEach(b=>b.onclick=()=>openTopic(b.dataset.topic));
+  $$('[data-quick]').forEach(b=>b.onclick=()=>{S.q=b.dataset.quick;S.group='Todos';render()});
+  $('#search')?.addEventListener('submit',e=>{e.preventDefault();S.q=$('#q').value;render()});
+  $('#books')?.addEventListener('click',openBooks);
+  $('#random')?.addEventListener('click',()=>{let s=S.stories[Math.floor(Math.random()*S.stories.length)],l=S.links.find(x=>x.story_id===s.id),t=S.topics.find(x=>x.id===l?.topic_id);if(t)openTopic(t.slug,s.id)});
+  $$('[data-style]').forEach(b=>b.onclick=()=>{capture();S.edit.style=b.dataset.style;render()});
+  ['title','subtitle','text','topic'].forEach(id=>$('#'+id)?.addEventListener('input',()=>{capture();$('#pv').innerHTML=preview(S.edit)}));
+  $('#file')?.addEventListener('change',filePick);
+  $$('[data-save]').forEach(b=>b.onclick=()=>save(b.dataset.save));
+  $('#export')?.addEventListener('click',()=>{capture();download(buildHtml(S.edit),S.edit.title||'predica-tnt')});
+  $$('[data-filter]').forEach(b=>b.onclick=()=>{S.filter=b.dataset.filter;render()});
+  $$('[data-sermon]').forEach(c=>c.onclick=()=>openSermon(c.dataset.sermon));
+  $$('[data-font]').forEach(b=>b.onclick=()=>{S.font=+b.dataset.font;localStorage.setItem('tnt-font',S.font);render()});
+  $('#logout')?.addEventListener('click',()=>db.auth.signOut());
+}
+function toggle(){S.theme=S.theme==='dark'?'light':'dark';localStorage.setItem('tnt-theme',S.theme);render()}
+
+async function filePick(e){
+  let f=e.target.files[0];if(!f)return;S.edit.file=f;S.edit.source_filename=f.name;let ext=f.name.split('.').pop().toLowerCase();S.edit.source_type=ext;
+  try{
+    if(['txt','md'].includes(ext))S.edit.text=await f.text();
+    else if(ext==='docx')S.edit.text=(await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()})).value.trim();
+    else if(ext==='pdf'){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';let pdf=await pdfjsLib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise,out=[];for(let i=1;i<=pdf.numPages;i++){let c=await(await pdf.getPage(i)).getTextContent();out.push(c.items.map(x=>x.str).join(' '))}S.edit.text=out.join('\n\n')}
+    else toast('DOC antiguo: guardo el archivo, pero pegá el texto para conservarlo exacto.');
+    toast('Archivo cargado ✓')
+  }catch{toast('No pude extraer ese archivo. Podés pegar el texto manualmente.')}
+  render()
+}
+async function save(status){
+  capture();if(!S.edit.text.trim())return toast('Falta el contenido de la prédica.');if(status==='published'&&S.edit.status==='draft')return toast('Primero finalizá la prédica.');if(!S.edit.title)S.edit.title='Sin título';
+  let tid=topic(S.edit.topic)?.id||null,now=new Date().toISOString(),row={author_id:S.session.user.id,title:S.edit.title,subtitle:S.edit.subtitle,topic_id:tid,status,original_text:S.edit.text,source_type:S.edit.source_type||'text',source_filename:S.edit.source_filename,visual_style:S.edit.style,visual_variant:1,generated_html:buildHtml(S.edit),updated_at:now,finalized_at:status!=='draft'?(S.edit.finalized_at||now):null,published_at:status==='published'?now:null};
+  let r=S.edit.id?await db.from('sermons').update(row).eq('id',S.edit.id).select().single():await db.from('sermons').insert(row).select().single();
+  if(r.error)return toast('Error: '+r.error.message);
+  S.edit.id=r.data.id;S.edit.status=status;S.edit.finalized_at=r.data.finalized_at;
+  if(S.edit.file){let safe=S.edit.file.name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]/g,'-'),path=`${S.session.user.id}/${S.edit.id}/${Date.now()}-${safe}`,up=await db.storage.from('sermon-files').upload(path,S.edit.file);if(!up.error)await db.from('sermon_files').insert({sermon_id:S.edit.id,uploader_id:S.session.user.id,storage_path:path,original_name:S.edit.file.name,mime_type:S.edit.file.type,size_bytes:S.edit.file.size});S.edit.file=null}
+  toast(status==='published'?'Publicada para TNT ✓':status==='finalized'?'Prédica finalizada ✓':'Borrador guardado ✓');await load();S.tab='create';render()
+}
+
+const listHtml=(xs)=>arr(xs).length?`<ul>${arr(xs).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p>Sin datos adicionales.</p>';
+function storyDeep(s){
+  let people=arr(s.people),refs=arr(s.cross_references),hope=arr(s.hope_points),warnings=arr(s.warnings);
+  return`<div class="story-deep">
+    <div class="takeaway"><b>IDEA CENTRAL</b><p>${esc(s.takeaway||s.summary)}</p></div>
+    <div class="deep-grid" style="margin-top:8px">
+      <div class="deep"><h4>⚡ Tensión central</h4><p>${esc(s.tension)}</p></div>
+      <div class="deep"><h4>👑 Qué revela de Dios</h4><p>${esc(s.god_revelation)}</p></div>
+      <div class="deep"><h4>🪞 Qué revela de nosotros</h4><p>${esc(s.human_revelation)}</p></div>
+      <div class="deep"><h4>✝️ Jesús / Evangelio</h4><p>${esc(s.gospel_connection)}</p></div>
+      <div class="deep"><h4>🏺 Contexto histórico</h4><p>${esc(s.historical_context)}</p></div>
+      <div class="deep"><h4>📖 Cómo leer el pasaje</h4><p>${esc(s.literary_context)}</p></div>
+    </div>
+    ${people.length?`<div class="guide-card" style="margin-top:8px"><h3>👥 Personajes detectados</h3><div class="anchor-row">${people.map(x=>`<span>${esc(x)}</span>`).join('')}</div></div>`:''}
+    <div class="guide-card" style="margin-top:8px"><h3>🎯 Aplicaciones para TNT</h3>${listHtml(s.youth_applications)}</div>
+    <div class="guide-card" style="margin-top:8px"><h3>🎙️ Ángulos de prédica</h3>${listHtml(s.preaching_angles)}</div>
+    <div class="guide-card" style="margin-top:8px"><h3>💬 Preguntas para grupo / cierre</h3>${listHtml(s.group_questions)}</div>
+    ${hope.length?`<div class="guide-card" style="margin-top:8px"><h3>🌱 Puntos de esperanza</h3>${listHtml(hope)}</div>`:''}
+    ${refs.length?`<div class="guide-card" style="margin-top:8px"><h3>🔗 Conexiones bíblicas</h3><div class="anchor-row">${refs.map(x=>`<span>${esc(x)}</span>`).join('')}</div></div>`:''}
+    ${warnings.length?`<div class="warningbox" style="margin-top:8px"><b>⚠️ Cuidado al predicarlo</b>${listHtml(warnings)}</div>`:''}
+    <div class="guide-card" style="margin-top:8px"><h3>❓ Pregunta clave</h3><p>${esc(s.key_question)}</p></div>
+  </div>`;
+}
+function storyCard(s,topicId){
+  let rel=topicNamesForStory(s.id,topicId);
+  return`<article class="story" data-story-id="${s.id}"><div class="story-top"><div><b>${esc(s.title)}</b><div class="ref">${esc(s.reference)} · ${esc(bookName(s.book_start))}</div></div><button class="story-open" data-expand="${s.id}" aria-label="Abrir ficha">＋</button></div><p>${esc(s.summary)}</p>${rel.length?`<div class="related">${rel.map(x=>`<span>${esc(x)}</span>`).join('')}</div>`:''}<div class="deep-slot"></div></article>`
+}
+function bindStoryExpand(root=document){
+  $$('[data-expand]',root).forEach(b=>b.onclick=()=>{let card=b.closest('.story'),slot=$('.deep-slot',card),s=story(b.dataset.expand);if(!s)return;let open=!!slot.innerHTML;slot.innerHTML=open?'':storyDeep(s);b.classList.toggle('on',!open);b.textContent=open?'＋':'×'})
+}
+function topicGuide(t){
+  return`<div class="guide">
+    <div class="guide-card"><h3>🧭 Verdad central</h3><p>${esc(t.core_truth)}</p></div>
+    <div class="guide-card"><h3>⚡ Tensión bíblica</h3><p>${esc(t.biblical_tension)}</p></div>
+    <div class="guide-card"><h3>📌 Pasajes ancla</h3><div class="anchor-row">${arr(t.anchor_passages).map(x=>`<span>${esc(x)}</span>`).join('')}</div></div>
+    <div class="guide-card"><h3>🚫 Errores comunes</h3>${listHtml(t.misconceptions)}</div>
+    <div class="guide-card"><h3>🧑‍🤝‍🧑 Situaciones juveniles</h3>${listHtml(t.youth_scenarios)}</div>
+    <div class="guide-card"><h3>🎙️ Preguntas para construir la prédica</h3>${listHtml(t.sermon_questions)}</div>
+    <div class="guide-card"><h3>🧱 Estructuras posibles</h3>${listHtml(t.suggested_structures)}</div>
+    <div class="guide-card"><h3>⚠️ Evitá estos clichés</h3>${listHtml(t.avoid_cliches)}</div>
+    <div class="guide-card"><h3>🔗 Temas relacionados</h3><div class="anchor-row">${arr(t.related_topics).map(x=>`<span>${esc(x)}</span>`).join('')}</div></div>
+  </div>`
+}
+function openTopic(slug,focus){
+  let t=topic(slug);if(!t)return;let ls=linksForTopic(t.id).sort((a,b)=>b.relevance-a.relevance),stories=ls.map(l=>story(l.story_id)).filter(Boolean);
+  document.body.insertAdjacentHTML('beforeend',`<div class="back" id="modal"><section class="sheet"><div class="sheethead"><div><div class="eyebrow">${esc(t.category)}</div><h2>${t.icon||'✦'} ${esc(t.name)}</h2><p class="muted">${esc(t.description)} · ${stories.length} rutas</p></div><button class="icon" id="close">×</button></div>
+    <div class="topic-tabs"><button class="on" data-tview="stories">📖 Historias</button><button data-tview="guide">🧠 Guía de prédica</button></div>
+    <div id="tstories"><input class="story-search" id="sq" placeholder="Buscar dentro de ${esc(t.name)}…"><div id="storylist">${stories.map(s=>storyCard(s,t.id)).join('')}</div></div>
+    <div id="tguide" hidden>${topicGuide(t)}</div>
+    <button class="primary sticky" id="use">Preparar prédica sobre ${esc(t.name)}</button>
+  </section></div>`);
+  $('#close').onclick=()=>$('#modal').remove();$('#modal').onclick=e=>{if(e.target.id==='modal')e.currentTarget.remove()};
+  $$('[data-tview]',$('#modal')).forEach(b=>b.onclick=()=>{$$('[data-tview]',$('#modal')).forEach(x=>x.classList.toggle('on',x===b));$('#tstories').hidden=b.dataset.tview!=='stories';$('#tguide').hidden=b.dataset.tview!=='guide'});
+  $('#sq').oninput=e=>{let q=norm(e.target.value);$$('.story',$('#storylist')).forEach(x=>x.hidden=q&&!norm(x.innerText).includes(q))};
+  bindStoryExpand($('#storylist'));
+  $('#use').onclick=()=>{S.edit=fresh();S.edit.topic=slug;S.tab='create';$('#modal').remove();render();scrollTo(0,0)};
+  if(focus)setTimeout(()=>{let el=document.querySelector(`[data-story-id="${focus}"]`);el?.scrollIntoView({behavior:'smooth',block:'start'});el?.querySelector('[data-expand]')?.click()},100)
+}
+function bookStoryCount(id){return S.stories.filter(s=>s.book_start===id).length}
+function openBooks(){
+  let ot=S.books.filter(b=>b.testament==='OT'),nt=S.books.filter(b=>b.testament==='NT'),block=(title,a)=>`<div class="section"><h2>${title}</h2><span>${a.length} libros</span></div><div class="book-grid">${a.map(b=>`<button class="book" data-book="${b.id}"><b>${esc(b.name)}</b><small>${esc(b.category)}</small><em>${bookStoryCount(b.id)} rutas</em></button>`).join('')}</div>`;
+  document.body.insertAdjacentHTML('beforeend',`<div class="back" id="bm"><section class="sheet"><div class="sheethead"><div><div class="eyebrow">Cobertura bíblica</div><h2>📚 Los 66 libros</h2><p class="muted">Cada libro tiene rutas cargadas. Abrí una para entrar a sus fichas profundas.</p></div><button class="icon" id="bmx">×</button></div>${block('Antiguo Testamento',ot)}${block('Nuevo Testamento',nt)}</section></div>`);
+  $('#bmx').onclick=()=>$('#bm').remove();$$('[data-book]',$('#bm')).forEach(x=>x.onclick=()=>{let id=+x.dataset.book;$('#bm').remove();openBook(id)})
+}
+function openBook(id){
+  let b=S.books.find(x=>x.id===id),a=S.stories.filter(s=>s.book_start===id);
+  document.body.insertAdjacentHTML('beforeend',`<div class="back" id="bd"><section class="sheet"><div class="sheethead"><div><div class="eyebrow">${esc(b.category)} · ${b.testament==='OT'?'Antiguo':'Nuevo'} Testamento</div><h2>${esc(b.name)}</h2><p class="muted">${a.length} rutas profundas cargadas</p></div><button class="icon" id="bdx">×</button></div><input class="story-search" id="bq" placeholder="Buscar dentro de ${esc(b.name)}…"><div id="bookstories">${a.map(s=>storyCard(s,null)).join('')}</div></section></div>`);
+  $('#bdx').onclick=()=>$('#bd').remove();$('#bq').oninput=e=>{let q=norm(e.target.value);$$('.story',$('#bookstories')).forEach(x=>x.hidden=q&&!norm(x.innerText).includes(q))};bindStoryExpand($('#bookstories'))
+}
+function openSermon(id){
+  let s=S.sermons.find(x=>x.id===id),own=s.author_id===S.session.user.id,t=S.topics.find(x=>x.id===s.topic_id);
+  document.body.insertAdjacentHTML('beforeend',`<div class="back" id="sm"><section class="sheet"><div class="sheethead"><div><span class="badge ${s.status}">${statusN[s.status]}</span><h2>${esc(s.title)}</h2><p class="muted">${t?`${t.icon||'✦'} ${esc(t.name)}`:'Sin tema'}</p></div><button class="icon" id="sx">×</button></div>${preview({title:s.title,subtitle:s.subtitle,text:s.original_text,style:s.visual_style,topic:t?.slug})}${own?`<div class="actions"><button class="btn" id="edit">Editar</button><button class="btn" id="exp">Exportar HTML</button>${s.status==='finalized'?'<button class="primary wide" id="pub">Publicar</button>':''}</div>`:''}</section></div>`);
+  $('#sx').onclick=()=>$('#sm').remove();
+  if(own){$('#edit').onclick=()=>{S.edit={id:s.id,title:s.title||'',subtitle:s.subtitle||'',topic:t?.slug||'',text:s.original_text||'',style:s.visual_style||'modern',status:s.status,file:null,source_type:s.source_type,source_filename:s.source_filename,finalized_at:s.finalized_at};S.tab='create';$('#sm').remove();render()};$('#exp').onclick=()=>download(s.generated_html||buildHtml({title:s.title,subtitle:s.subtitle,text:s.original_text,style:s.visual_style,topic:t?.slug}),s.title);$('#pub')?.addEventListener('click',()=>{S.edit={id:s.id,title:s.title,subtitle:s.subtitle||'',topic:t?.slug||'',text:s.original_text,style:s.visual_style||'modern',status:s.status,file:null,source_type:s.source_type,source_filename:s.source_filename,finalized_at:s.finalized_at};$('#sm').remove();save('published')})}
+}
+
+function buildHtml(e){
+  let t=topic(e.topic),title=esc(e.title||'Prédica TNT'),sub=esc(e.subtitle||''),body=esc(e.text||'').replace(/\n/g,'<br>'),modern=e.style==='modern';
+  return`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>*{box-sizing:border-box}body{margin:0;padding:18px;background:${modern?'#0d1118':'#eee8dc'};font:16px/1.7 Arial;color:#171717}.p{max-width:850px;margin:auto;border-radius:28px;overflow:hidden;background:${e.style==='friendly'?'#fff3e9':e.style==='ancient'?'#efe2c7':'#fff'};box-shadow:0 20px 60px #0002}.h,.b{padding:clamp(28px,7vw,70px)}.h{${modern?'background:#10131a;color:white;':''}}h1{font-size:clamp(2.6rem,8vw,5.5rem);line-height:.96;letter-spacing:-.05em;margin:8px 0}.k{font-size:.72rem;text-transform:uppercase;letter-spacing:.12em;opacity:.6}.s{opacity:.7}</style></head><body><main class="p"><header class="h"><div class="k">TNT · ${esc(t?.name||'Mensaje')}</div><h1>${title}</h1>${sub?`<div class="s">${sub}</div>`:''}</header><div class="b">${body}</div></main></body></html>`
+}
+function download(html,name){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));a.download=(name||'predica-tnt').replace(/[^a-z0-9áéíóúñ _-]/gi,'').trim().replace(/\s+/g,'-')+'.html';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),700)}
+
+init();
+</script>
+</body></html>
