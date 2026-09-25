@@ -1,0 +1,24 @@
+/* TNT v10 shared visual bridge for legacy modules */
+html[data-tnt-theme="dark"] body[data-tnt-module="efe"],
+html[data-tnt-theme="dark"] body[data-tnt-module="lista-sabados"]{
+ --p:#0b0d12!important;--i:#f7f8fb!important;--m:#949cab!important;--l:#ffffff18!important;--soft:#1a1f2a!important;--n:#080b12!important;--n2:#151b29!important;
+ background:#0b0d12!important;color:#f7f8fb!important
+}
+html[data-tnt-theme="dark"] body[data-tnt-module="efe"] .person,
+html[data-tnt-theme="dark"] body[data-tnt-module="efe"] .wed,
+html[data-tnt-theme="dark"] body[data-tnt-module="efe"] .hist,
+html[data-tnt-theme="dark"] body[data-tnt-module="efe"] .tool,
+html[data-tnt-theme="dark"] body[data-tnt-module="efe"] .leaderrow,
+html[data-tnt-theme="dark"] body[data-tnt-module="efe"] .sheet,
+html[data-tnt-theme="dark"] body[data-tnt-module="lista-sabados"] .card,
+html[data-tnt-theme="dark"] body[data-tnt-module="lista-sabados"] .sheet,
+html[data-tnt-theme="dark"] body[data-tnt-module="lista-sabados"] .swipeCard,
+html[data-tnt-theme="dark"] body[data-tnt-module="lista-sabados"] .followRow{background:#141821!important;color:#f7f8fb!important;border-color:#ffffff16!important}
+html[data-tnt-theme="dark"] body[data-tnt-module="efe"] input,
+html[data-tnt-theme="dark"] body[data-tnt-module="efe"] select,
+html[data-tnt-theme="dark"] body[data-tnt-module="lista-sabados"] input,
+html[data-tnt-theme="dark"] body[data-tnt-module="lista-sabados"] select{background:#1b202b!important;color:#f7f8fb!important;border-color:#ffffff18!important}
+body[data-tnt-module="campamento"],body[data-tnt-module="glosario"],body[data-tnt-module="buffet"]{transition:background .2s ease,color .2s ease}
+html[data-tnt-theme="dark"] body[data-tnt-module="campamento"]{background:#0b0d12!important}
+html[data-tnt-theme="light"] body[data-tnt-module="campamento"]{background:#f5f4ef!important}
+@media(max-width:600px){body.tnt-shell-active{padding-top:58px!important}}
