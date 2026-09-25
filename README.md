@@ -16,3 +16,6 @@ Notas:
 - Glosario mantiene la conexión Supabase TNT actual.
 - Buffet mantiene por ahora su conexión Supabase actual independiente.
 - Organización y Campamento conservan su persistencia local actual.
+
+
+<!-- deploy-trigger: mobile-fix-2 -->
