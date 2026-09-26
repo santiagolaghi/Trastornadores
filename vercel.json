@@ -267,5 +267,8 @@
         }
       ]
     }
-  ]
+  ],
+  "buildCommand": "mkdir -p public && cp -r assets admin buffet campamento chat efe glosario icons organizacion lista-sabados manifest.webmanifest index.html sw.js public/",
+  "outputDirectory": "public",
+  "installCommand": "echo skip-install"
 }
