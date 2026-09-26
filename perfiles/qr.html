@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d12">
+  <title>QR · Perfiles</title>
+  <link rel="icon" href="/perfiles/icon.svg">
+  <link rel="stylesheet" href="/perfiles/styles.css?v=1">
+  <style>
+    .qr-wrap{min-height:92vh;display:grid;place-items:center}.qr-card{text-align:center;width:min(100%,440px)}
+    .qr-box{background:white;border-radius:24px;padding:20px;display:inline-block;margin:20px auto;box-shadow:0 24px 60px rgba(0,0,0,.35)}
+    #qr img,#qr canvas{display:block!important;width:230px!important;height:230px!important}
+    .qr-link{word-break:break-all;color:#8e96a8;font-size:12px;line-height:1.5;margin:0 auto 18px;max-width:340px}
+    .qr-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.back{display:inline-flex;margin-bottom:16px;color:#bba8ff;text-decoration:none;font-size:13px;font-weight:800}
+  </style>
+</head>
+<body>
+  <main class="shell qr-wrap">
+    <section class="card qr-card">
+      <a class="back" href="/perfiles">← Volver</a>
+      <span class="pill">Escaneá para registrarte</span>
+      <h2 style="font-size:38px;line-height:1;letter-spacing:-.045em;margin:15px 0 5px">Perfiles</h2>
+      <p style="color:var(--muted);margin:0">Apuntá la cámara al código y completá tus datos.</p>
+      <div class="qr-box"><div id="qr"></div></div>
+      <p class="qr-link" id="profileUrl"></p>
+      <div class="qr-actions">
+        <button class="secondary" id="copyBtn" type="button">Copiar link</button>
+        <button class="primary" id="downloadBtn" type="button">Descargar QR</button>
+      </div>
+    </section>
+  </main>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    const url = location.origin + "/perfiles";
+    document.getElementById("profileUrl").textContent = url;
+    new QRCode(document.getElementById("qr"), { text:url, width:230, height:230, correctLevel:QRCode.CorrectLevel.H });
+    document.getElementById("copyBtn").onclick = async () => {
+      await navigator.clipboard.writeText(url);
+      document.getElementById("copyBtn").textContent = "Copiado ✓";
+    };
+    document.getElementById("downloadBtn").onclick = () => {
+      const canvas = document.querySelector("#qr canvas");
+      const img = document.querySelector("#qr img");
+      const href = canvas ? canvas.toDataURL("image/png") : img?.src;
+      if(!href) return;
+      const a = document.createElement("a");
+      a.href = href; a.download = "QR-Perfiles.png"; a.click();
+    };
+  </script>
+</body>
+</html>
