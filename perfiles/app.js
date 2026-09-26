@@ -1,7 +1,4 @@
 (() => {
-  const SUPABASE_URL = "https://oeodnnomgiddkblnlzay.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_X06jWDKqV6jgKbaa1PrrbQ_zto1XeTJ";
-
   const femaleNames = new Set([
     "abril","agostina","agustina","aldana","alejandra","alexia","alma","amanda","amelia","ana","andrea","angela","antonella","ayelen","barbara","belen","bianca","brenda","camila","candela","carla","carolina","catalina","celeste","chiara","clara","daiana","dai","daniela","delfina","elena","eliana","elisa","emilia","erica","estefania","eugenia","eva","florencia","francesca","gabriela","guadalupe","hannah","irina","isabella","isidora","jazmin","jimena","josefina","julia","juliana","julieta","lara","laura","leila","lola","lucia","luciana","lucrecia","lula","luz","magali","malena","maria","mariana","martina","melina","melisa","micaela","milagros","morena","natalia","nicole","noelia","olivia","paula","pilar","priscila","rebeca","renata","rocio","romina","sabrina","samanta","sara","sofia","sol","tamara","tatiana","valentina","valeria","victoria","violeta","zoe"
   ]);
@@ -143,17 +140,12 @@
     if (!genero) return showError("Elegí Mujer o Varón.");
     if (!consentimiento) return showError("Necesitamos tu autorización para guardar los datos.");
 
-    if (!window.supabase?.createClient) {
-      return showError("No se pudo conectar con la base. Recargá la página e intentá de nuevo.");
-    }
+    const client = window.TNT?.sb;
+    if (!client) return showError("No se pudo conectar con la base. Recargá la página e intentá de nuevo.");
 
     setLoading(true);
 
     try {
-      const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
-      });
-
       const payload = {
         nombre: nombre.value,
         apellido: apellido.value,
