@@ -1,5 +1,5 @@
 {
-  "cleanUrls": false,
+  "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
     {
@@ -25,74 +25,6 @@
     {
       "source": "/api/lista/push-subscribe",
       "destination": "https://lista-sabados.vercel.app/api/push-subscribe"
-    },
-    {
-      "source": "/",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/organizacion",
-      "destination": "/organizacion/index.html"
-    },
-    {
-      "source": "/organizacion/",
-      "destination": "/organizacion/index.html"
-    },
-    {
-      "source": "/campamento",
-      "destination": "/campamento/index.html"
-    },
-    {
-      "source": "/campamento/",
-      "destination": "/campamento/index.html"
-    },
-    {
-      "source": "/efe",
-      "destination": "/efe/index.html"
-    },
-    {
-      "source": "/efe/",
-      "destination": "/efe/index.html"
-    },
-    {
-      "source": "/lista-sabados",
-      "destination": "/lista-sabados/index.html"
-    },
-    {
-      "source": "/lista-sabados/",
-      "destination": "/lista-sabados/index.html"
-    },
-    {
-      "source": "/glosario",
-      "destination": "/glosario/index.html"
-    },
-    {
-      "source": "/glosario/",
-      "destination": "/glosario/index.html"
-    },
-    {
-      "source": "/buffet",
-      "destination": "/buffet/index.html"
-    },
-    {
-      "source": "/buffet/",
-      "destination": "/buffet/index.html"
-    },
-    {
-      "source": "/chat",
-      "destination": "/chat/index.html"
-    },
-    {
-      "source": "/chat/",
-      "destination": "/chat/index.html"
-    },
-    {
-      "source": "/admin",
-      "destination": "/admin/index.html"
-    },
-    {
-      "source": "/admin/",
-      "destination": "/admin/index.html"
     }
   ],
   "headers": [
@@ -324,98 +256,6 @@
     },
     {
       "source": "/chat/index.html",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "text/html; charset=utf-8"
-        },
-        {
-          "key": "Cache-Control",
-          "value": "no-store, max-age=0"
-        }
-      ]
-    },
-    {
-      "source": "/",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "text/html; charset=utf-8"
-        }
-      ]
-    },
-    {
-      "source": "/index.html",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "text/html; charset=utf-8"
-        }
-      ]
-    },
-    {
-      "source": "/sw.js",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "text/html; charset=utf-8"
-        }
-      ]
-    },
-    {
-      "source": "/lista-sabados/index.html",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "text/html; charset=utf-8"
-        },
-        {
-          "key": "Cache-Control",
-          "value": "no-store, max-age=0"
-        }
-      ]
-    },
-    {
-      "source": "/efe/index.html",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "text/html; charset=utf-8"
-        },
-        {
-          "key": "Cache-Control",
-          "value": "no-store, max-age=0"
-        }
-      ]
-    },
-    {
-      "source": "/campamento/index.html",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "text/html; charset=utf-8"
-        },
-        {
-          "key": "Cache-Control",
-          "value": "no-store, max-age=0"
-        }
-      ]
-    },
-    {
-      "source": "/buffet/index.html",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "text/html; charset=utf-8"
-        },
-        {
-          "key": "Cache-Control",
-          "value": "no-store, max-age=0"
-        }
-      ]
-    },
-    {
-      "source": "/glosario/index.html",
       "headers": [
         {
           "key": "Content-Type",
