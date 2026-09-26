@@ -1,0 +1,13 @@
+{
+  "name": "Perfiles",
+  "short_name": "Perfiles",
+  "description": "Registro de perfiles TNT",
+  "start_url": "/perfiles",
+  "scope": "/perfiles/",
+  "display": "standalone",
+  "background_color": "#090b10",
+  "theme_color": "#0b0d12",
+  "icons": [
+    {"src":"/perfiles/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
