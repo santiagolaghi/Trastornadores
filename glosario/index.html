@@ -50,7 +50,7 @@ button,input,textarea,select{font:inherit}.orb{position:fixed;border-radius:50%;
 <body data-tnt-module="glosario" data-tnt-label="Prédicas & Glosario" data-build="v4-deep-20260906">
 <div class="orb orb-a"></div><div class="orb orb-b"></div>
 <div id="app"></div>
-<script src="/supabase-lite.js?v=12"></script><script src="/assets/tnt-components.js?v=14"></script><script src="/assets/tnt-core.js?v=14" data-module="glosario" data-label="Prédicas & Glosario"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="/supabase-lite.js?v=12"></script><script src="/assets/tnt-components.js?v=14"></script><script src="/assets/tnt-editor.js?v=15"></script><script src="/assets/tnt-core.js?v=14" data-module="glosario" data-label="Prédicas & Glosario"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <script>
 
@@ -61,6 +61,7 @@ const norm=(v='')=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
 const statusN={draft:'Borrador',finalized:'Finalizada',published:'Publicada'};const BUILD='v4-deep-20260906';
 const arr=v=>Array.isArray(v)?v.filter(Boolean):[];
 
+let sermonEditor=null;
 let S={session:null,profile:null,tab:'home',topics:[],stories:[],links:[],books:[],sermons:[],group:'Todos',q:'',filter:'all',theme:localStorage.getItem('tnt-theme')||'dark',font:+localStorage.getItem('tnt-font')||16,edit:null};
 const fresh=()=>({id:null,title:'',subtitle:'',topic:'',text:'',style:'modern',status:'draft',file:null,source_type:'text',source_filename:null,finalized_at:null});
 S.edit=fresh();
@@ -142,7 +143,7 @@ function create(){
   <div class="field"><label>Título</label><input id="title" value="${esc(e.title)}"></div>
   <div class="field"><label>Subtítulo</label><input id="subtitle" value="${esc(e.subtitle)}"></div>
   <div class="field"><label>Tema principal</label><select id="topic"><option value="">Sin tema</option>${S.topics.map(t=>`<option value="${t.slug}" ${e.topic===t.slug?'selected':''}>${t.icon||'✦'} ${esc(t.name)}</option>`).join('')}</select></div>
-  <div class="field"><label>Contenido original</label><textarea id="text" placeholder="Pegá o escribí la prédica completa…">${esc(e.text)}</textarea></div>
+  <div class="field"><label>Contenido original</label><textarea id="text" placeholder="Pegá o escribí la prédica completa…">${esc(e.text)}</textarea><small class="muted">Usá el editor para subrayar, resaltar y cambiar colores. El texto original se conserva.</small></div>
   <div class="section"><h2>Estilo visual</h2><span>el contenido no cambia</span></div>
   <div class="styles">${[['modern','Moderno','linear-gradient(90deg,#111722,#ff5a36)'],['friendly','Amigable','linear-gradient(90deg,#ffe2cf,#ff7353)'],['minimal','Minimalista','linear-gradient(90deg,#fff,#bbb)'],['ancient','Antiguo','linear-gradient(90deg,#ead9b5,#8d6d47)']].map(x=>`<button class="style ${e.style===x[0]?'on':''}" data-style="${x[0]}"><div class="swatch" style="background:${x[2]}"></div><b>${x[1]}</b></button>`).join('')}</div>
   <div id="pv">${preview(e)}</div>
@@ -175,7 +176,7 @@ function bindAuth(){
   $$('[data-mode]').forEach(b=>b.onclick=()=>{mode=b.dataset.mode;$$('[data-mode]').forEach(x=>x.classList.toggle('on',x===b));$('.name').hidden=mode!=='signup';$('#authbtn').textContent=mode==='signup'?'Crear cuenta':'Entrar'});
   $('#auth').onsubmit=async e=>{e.preventDefault();let email=$('#email').value.trim(),password=$('#pass').value,name=$('#name').value.trim(),m=$('#msg');m.textContent='Procesando…';let r=mode==='signup'?await db.auth.signUp({email,password,options:{data:{display_name:name||email.split('@')[0]}}}):await db.auth.signInWithPassword({email,password});if(r.error){m.textContent=r.error.message;return}m.textContent=mode==='signup'&&!r.data.session?'Cuenta creada. Revisá tu email para confirmarla.':'Listo.'}
 }
-function capture(){if(!$('#title'))return;S.edit.title=$('#title').value.trim();S.edit.subtitle=$('#subtitle').value.trim();S.edit.topic=$('#topic').value;S.edit.text=$('#text').value}
+function capture(){if(!$('#title'))return;S.edit.title=$('#title').value.trim();S.edit.subtitle=$('#subtitle').value.trim();S.edit.topic=$('#topic').value;S.edit.text=sermonEditor?.get().text||$('#text').value}
 function bind(){
   $$('[data-nav]').forEach(b=>b.onclick=()=>{if(S.tab==='create')capture();S.tab=b.dataset.nav;render();scrollTo(0,0)});
   $('#theme')?.addEventListener('click',toggle);$('#theme2')?.addEventListener('click',toggle);
@@ -186,7 +187,8 @@ function bind(){
   $('#books')?.addEventListener('click',openBooks);
   $('#random')?.addEventListener('click',()=>{let s=S.stories[Math.floor(Math.random()*S.stories.length)],l=S.links.find(x=>x.story_id===s.id),t=S.topics.find(x=>x.id===l?.topic_id);if(t)openTopic(t.slug,s.id)});
   $$('[data-style]').forEach(b=>b.onclick=()=>{capture();S.edit.style=b.dataset.style;render()});
-  ['title','subtitle','text','topic'].forEach(id=>$('#'+id)?.addEventListener('input',()=>{capture();$('#pv').innerHTML=preview(S.edit)}));
+  if($('#text')&&window.TNTEditor){sermonEditor=TNTEditor.attach($('#text'));sermonEditor.area.addEventListener('input',()=>{capture();$('#pv').innerHTML=preview(S.edit);try{localStorage.setItem('tnt-glosario-draft',JSON.stringify(S.edit))}catch{}})}
+  ['title','subtitle','topic'].forEach(id=>$('#'+id)?.addEventListener('input',()=>{capture();$('#pv').innerHTML=preview(S.edit)}));
   $('#file')?.addEventListener('change',filePick);
   $$('[data-save]').forEach(b=>b.onclick=()=>save(b.dataset.save));
   $('#export')?.addEventListener('click',()=>{capture();download(buildHtml(S.edit),S.edit.title||'predica-tnt')});
