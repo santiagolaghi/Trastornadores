@@ -14,7 +14,7 @@
     {"source":"/api/(.*)","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"}]},
     {"source":"/supabase-lite.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"}]}
   ],
-  "buildCommand":"mkdir -p public && cp -r assets admin buffet campamento chat efe glosario icons organizacion lista-sabados manifest.webmanifest index.html sw.js public/",
+  "buildCommand":"mkdir -p public && cp -r assets admin buffet campamento chat efe glosario icons organizacion lista-sabados perfiles manifest.webmanifest index.html sw.js public/",
   "outputDirectory":"public",
   "installCommand":"echo skip-install"
 }
