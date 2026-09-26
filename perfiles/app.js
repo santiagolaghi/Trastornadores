@@ -11,6 +11,9 @@
   const maleExceptions = new Set(["luca","elias","tobias","matias","jeremias","josue","noe","andrea"]);
 
   const $ = (id) => document.getElementById(id);
+  const share = new URLSearchParams(location.search).get("_vercel_share");
+  const qrLink = document.querySelector('a[href="/perfiles/qr"]');
+  if (share && qrLink) qrLink.href = "/perfiles/qr?_vercel_share=" + encodeURIComponent(share);
   const form = $("profileForm");
   const nombre = $("nombre");
   const apellido = $("apellido");
