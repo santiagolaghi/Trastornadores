@@ -32,8 +32,10 @@
   </main>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
-    const url = location.origin + "/perfiles";
-    document.getElementById("profileUrl").textContent = url;
+    const params = new URLSearchParams(location.search);
+    const share = params.get("_vercel_share");
+    const url = location.origin + "/perfiles" + (share ? "?_vercel_share=" + encodeURIComponent(share) : "");
+    document.getElementById("profileUrl").textContent = share ? location.origin + "/perfiles" : url;
     new QRCode(document.getElementById("qr"), { text:url, width:230, height:230, correctLevel:QRCode.CorrectLevel.H });
     document.getElementById("copyBtn").onclick = async () => {
       await navigator.clipboard.writeText(url);
