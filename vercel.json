@@ -2,52 +2,19 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    {
-      "source": "/supabase-lite.js",
-      "destination": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.min.js"
-    },
-    {
-      "source": "/api/efe/auth",
-      "destination": "https://lista-efe.vercel.app/api/auth"
-    },
-    {
-      "source": "/api/efe/sync",
-      "destination": "https://lista-efe.vercel.app/api/sync"
-    },
-    {
-      "source": "/api/lista/sync",
-      "destination": "https://lista-sabados.vercel.app/api/sync"
-    },
-    {
-      "source": "/api/lista/import-analyze",
-      "destination": "https://lista-sabados.vercel.app/api/import-analyze"
-    },
-    {
-      "source": "/api/lista/push-subscribe",
-      "destination": "https://lista-sabados.vercel.app/api/push-subscribe"
-    }
+    {"source":"/supabase-lite.js","destination":"https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.min.js"},
+    {"source":"/api/efe/auth","destination":"https://lista-efe.vercel.app/api/auth"},
+    {"source":"/api/efe/sync","destination":"https://lista-efe.vercel.app/api/sync"},
+    {"source":"/api/lista/sync","destination":"https://lista-sabados.vercel.app/api/sync"},
+    {"source":"/api/lista/import-analyze","destination":"https://lista-sabados.vercel.app/api/import-analyze"},
+    {"source":"/api/lista/push-subscribe","destination":"https://lista-sabados.vercel.app/api/push-subscribe"}
   ],
   "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-store, max-age=0"
-        }
-      ]
-    },
-    {
-      "source": "/supabase-lite.js",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-store, max-age=0"
-        }
-      ]
-    }
+    {"source":"/(.*)","headers":[{"key":"Cache-Control","value":"no-store, max-age=0, must-revalidate"},{"key":"X-TNT-Deployment","value":"coherent-2026-09-26"}]},
+    {"source":"/api/(.*)","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"}]},
+    {"source":"/supabase-lite.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"}]}
   ],
-  "buildCommand": "mkdir -p public && cp -r assets admin buffet campamento chat efe glosario icons organizacion lista-sabados manifest.webmanifest index.html sw.js public/",
-  "outputDirectory": "public",
-  "installCommand": "echo skip-install"
+  "buildCommand":"mkdir -p public && cp -r assets admin buffet campamento chat efe glosario icons organizacion lista-sabados manifest.webmanifest index.html sw.js public/",
+  "outputDirectory":"public",
+  "installCommand":"echo skip-install"
 }
