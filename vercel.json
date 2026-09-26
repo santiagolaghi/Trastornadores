@@ -1,5 +1,5 @@
 {
-  "cleanUrls": true,
+  "cleanUrls": false,
   "trailingSlash": false,
   "rewrites": [
     {
@@ -25,6 +25,74 @@
     {
       "source": "/api/lista/push-subscribe",
       "destination": "https://lista-sabados.vercel.app/api/push-subscribe"
+    },
+    {
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/organizacion",
+      "destination": "/organizacion/index.html"
+    },
+    {
+      "source": "/organizacion/",
+      "destination": "/organizacion/index.html"
+    },
+    {
+      "source": "/campamento",
+      "destination": "/campamento/index.html"
+    },
+    {
+      "source": "/campamento/",
+      "destination": "/campamento/index.html"
+    },
+    {
+      "source": "/efe",
+      "destination": "/efe/index.html"
+    },
+    {
+      "source": "/efe/",
+      "destination": "/efe/index.html"
+    },
+    {
+      "source": "/lista-sabados",
+      "destination": "/lista-sabados/index.html"
+    },
+    {
+      "source": "/lista-sabados/",
+      "destination": "/lista-sabados/index.html"
+    },
+    {
+      "source": "/glosario",
+      "destination": "/glosario/index.html"
+    },
+    {
+      "source": "/glosario/",
+      "destination": "/glosario/index.html"
+    },
+    {
+      "source": "/buffet",
+      "destination": "/buffet/index.html"
+    },
+    {
+      "source": "/buffet/",
+      "destination": "/buffet/index.html"
+    },
+    {
+      "source": "/chat",
+      "destination": "/chat/index.html"
+    },
+    {
+      "source": "/chat/",
+      "destination": "/chat/index.html"
+    },
+    {
+      "source": "/admin",
+      "destination": "/admin/index.html"
+    },
+    {
+      "source": "/admin/",
+      "destination": "/admin/index.html"
     }
   ],
   "headers": [
