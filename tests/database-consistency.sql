@@ -1,0 +1,21 @@
+begin;
+select set_config('request.jwt.claims',jsonb_build_object('sub',(select auth_user_id from public.tnt_accounts where system_role='admin' and auth_user_id is not null limit 1),'role','authenticated')::text,true);
+set local role authenticated;
+do $$ declare e uuid; t uuid; d uuid; i uuid; t2 uuid; p uuid:=public.tnt_current_person_id(); dt date:=current_date+1; r uuid;
+begin
+ insert into public.tnt_events(name,start_date,end_date,created_by) values('Prueba sincronización',dt,dt,p) returning id into e;
+ t:=public.tnt_save_task(null,e,jsonb_build_object('title','Actividad','planned_start',(dt+time '18:00') at time zone 'America/Argentina/Buenos_Aires','duration_minutes',30),array[p]);
+ select id,day_id into i,d from public.tnt_schedule_items where task_id=t;
+ if i is null or not exists(select 1 from public.tnt_schedule_responsibles where item_id=i and person_id=p) then raise exception 'Task absent from calendar'; end if;
+ perform public.tnt_save_task(t,e,jsonb_build_object('title','Actividad editada','planned_start',(dt+time '19:00') at time zone 'America/Argentina/Buenos_Aires','duration_minutes',45),'{}'::uuid[]);
+ if exists(select 1 from public.tnt_schedule_responsibles where item_id=i) or not exists(select 1 from public.tnt_schedule_items where id=i and title='Actividad editada' and starts_at=time '19:00') then raise exception 'Task edit not synchronized'; end if;
+ i:=public.tnt_save_schedule_item(null,d,'{"title":"Desde calendario","starts_at":"20:00","duration_minutes":20}',array[p]);
+ select task_id into t2 from public.tnt_schedule_items where id=i;
+ if t2 is null or not exists(select 1 from public.tnt_task_assignees where task_id=t2 and person_id=p) then raise exception 'Calendar activity not linked to task'; end if;
+ r:=public.tnt_open_activity_chat(t2,null);
+ if r is null then raise exception 'Activity chat missing'; end if;
+ perform public.tnt_delete_activity(t2);
+ if exists(select 1 from public.tnt_tasks where id=t2) or exists(select 1 from public.tnt_schedule_items where id=i) then raise exception 'Activity deletion not synchronized'; end if;
+end $$;
+rollback;
+select 'Passed: new task in calendar, edits and responsible team synchronized both ways, calendar activity chat, atomic deletion; all test writes rolled back' verification;

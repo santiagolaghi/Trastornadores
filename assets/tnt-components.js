@@ -45,7 +45,7 @@
     const part=k=>p.find(x=>x.type===k)?.value; return `${part('year')}-${part('month')}-${part('day')}`;
   }
   function addDays(key, days) { const d=new Date(key+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10); }
-  function date(value, options={day:'numeric',month:'short'}) { if(!value)return ''; const d=new Date(value.length===10?value+'T12:00:00Z':value);return Number.isNaN(d.valueOf())?'':new Intl.DateTimeFormat('es-AR',{timeZone:'America/Argentina/Buenos_Aires',...options}).format(d); }
+  function date(value, options={day:'numeric',month:'short'}) { if(!value)return ''; const d=new Date(value.length===10?value+'T12:00:00Z':value);return Number.isNaN(d.valueOf())?'':new Intl.DateTimeFormat('es-AR',{timeZone:'America/Argentina/Buenos_Aires',hourCycle:'h23',...options}).format(d); }
   function time(value) { return value?date(value,{hour:'2-digit',minute:'2-digit'}):''; }
   const completed = t => ['done','completed','cancelled'].includes(typeof t==='string'?t:t?.status);
   function modal(title, body, wide=false) {
