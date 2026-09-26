@@ -2,13 +2,49 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    { "source": "/api/efe/auth", "destination": "https://lista-efe.vercel.app/api/auth" },
-    { "source": "/api/efe/sync", "destination": "https://lista-efe.vercel.app/api/sync" },
-    { "source": "/api/lista/sync", "destination": "https://lista-sabados.vercel.app/api/sync" },
-    { "source": "/api/lista/import-analyze", "destination": "https://lista-sabados.vercel.app/api/import-analyze" },
-    { "source": "/api/lista/push-subscribe", "destination": "https://lista-sabados.vercel.app/api/push-subscribe" }
+    {
+      "source": "/supabase-lite.js",
+      "destination": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.min.js"
+    },
+    {
+      "source": "/api/efe/auth",
+      "destination": "https://lista-efe.vercel.app/api/auth"
+    },
+    {
+      "source": "/api/efe/sync",
+      "destination": "https://lista-efe.vercel.app/api/sync"
+    },
+    {
+      "source": "/api/lista/sync",
+      "destination": "https://lista-sabados.vercel.app/api/sync"
+    },
+    {
+      "source": "/api/lista/import-analyze",
+      "destination": "https://lista-sabados.vercel.app/api/import-analyze"
+    },
+    {
+      "source": "/api/lista/push-subscribe",
+      "destination": "https://lista-sabados.vercel.app/api/push-subscribe"
+    }
   ],
   "headers": [
-    { "source": "/api/(.*)", "headers": [{ "key": "Cache-Control", "value": "no-store, max-age=0" }] }
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/supabase-lite.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    }
   ]
 }
