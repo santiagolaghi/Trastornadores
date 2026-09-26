@@ -46,15 +46,15 @@ button,input,textarea,select{font:inherit}.orb{position:fixed;border-radius:50%;
 @media(min-width:600px){.stats{grid-template-columns:repeat(4,1fr)}.book-grid{grid-template-columns:repeat(3,1fr)}.topics{grid-template-columns:repeat(3,1fr)}.groups{grid-template-columns:repeat(4,1fr)}.styles{grid-template-columns:repeat(4,1fr)}.library-filters{grid-template-columns:repeat(5,1fr)}.deep-grid{grid-template-columns:1fr 1fr}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
-<link rel="stylesheet" href="/assets/tnt-ui.css?v=13"><link rel="stylesheet" href="/assets/tnt-module-theme.css?v=13"></head>
+<link rel="stylesheet" href="/assets/tnt-ui.css?v=14"><link rel="stylesheet" href="/assets/tnt-module-theme.css?v=14"></head>
 <body data-tnt-module="glosario" data-tnt-label="Prédicas & Glosario" data-build="v4-deep-20260906">
 <div class="orb orb-a"></div><div class="orb orb-b"></div>
 <div id="app"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="/supabase-lite.js?v=12"></script><script src="/assets/tnt-components.js?v=14"></script><script src="/assets/tnt-core.js?v=14" data-module="glosario" data-label="Prédicas & Glosario"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
-<script src="/supabase-lite.js?v=12"></script><script>const {createClient}=supabase;
+<script>
 
-const db=createClient('https://oeodnnomgiddkblnlzay.supabase.co','sb_publishable_X06jWDKqV6jgKbaa1PrrbQ_zto1XeTJ',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+const db=TNT.sb;
 const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=(v='')=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const norm=(v='')=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
@@ -65,7 +65,7 @@ let S={session:null,profile:null,tab:'home',topics:[],stories:[],links:[],books:
 const fresh=()=>({id:null,title:'',subtitle:'',topic:'',text:'',style:'modern',status:'draft',file:null,source_type:'text',source_filename:null,finalized_at:null});
 S.edit=fresh();
 
-function apply(){document.documentElement.dataset.theme=S.theme;document.documentElement.style.setProperty('--fs',S.font+'px')}
+function apply(){if(document.documentElement.dataset.tntTheme!==S.theme)TNT.setTheme(S.theme);document.documentElement.dataset.theme=S.theme;document.documentElement.style.setProperty('--fs',S.font+'px')}
 function toast(t){$('.toast')?.remove();let e=document.createElement('div');e.className='toast';e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),2700)}
 function topic(slug){return S.topics.find(t=>t.slug===slug)}
 function story(id){return S.stories.find(s=>s.id===id)}
@@ -97,15 +97,11 @@ async function load(){
       fetchAll('bible_books','id,name,slug,testament,category','id'),
       db.from('sermons').select('*').order('updated_at',{ascending:false})
     ]);
-    S.profile=p.data;S.topics=t.filter(x=>x.active!==false);S.stories=st;S.links=l;S.books=bk;S.sermons=se.data||[];
+    if(se.error)throw se.error;S.profile=p.data;S.topics=t.filter(x=>x.active!==false);S.stories=st;S.links=l;S.books=bk;S.sermons=se.data||[];
     render();
   }catch(e){console.error(e);toast('Error cargando datos. Probá recargar.')}
 }
-async function init(){
-  apply();S.session=(await db.auth.getSession()).data.session;
-  db.auth.onAuthStateChange((_e,s)=>{S.session=s;if(s)load();else{S.profile=null;render()}});
-  S.session?await load():render();
-}
+async function init(){await TNT.ready;if(!TNT.identity||TNT.blocked)return;S.theme=document.documentElement.dataset.tntTheme;apply();S.session=TNT.session;await load();document.addEventListener('tnt:theme',()=>{S.theme=document.documentElement.dataset.tntTheme;apply();render()});}
 
 function top(){return`<div class="top"><div class="brand"><div class="mark">TNT</div><div><strong>Trastornadores</strong><small>Centro de prédicas</small></div></div><button class="icon" id="theme">${S.theme==='dark'?'☀':'◐'}</button></div>`}
 function nav(){return`<nav class="nav">${[['home','⌂ Inicio'],['create','✦ Predicar'],['library','▤ Biblioteca'],['settings','⚙ Ajustes']].map(x=>`<button data-nav="${x[0]}" class="${S.tab===x[0]?'on':''}">${x[1]}</button>`).join('')}</nav>`}
@@ -129,7 +125,7 @@ function home(){
     <div class="section"><h2>Familias temáticas</h2><span>${groups.length-1} familias</span></div>
     <div class="groups">${groups.map(g=>`<button class="group ${S.group===g?'on':''}" data-group="${esc(g)}">${esc(g)}</button>`).join('')}</div>
     <div class="section"><h2>Explorá el glosario</h2><span>${filtered.length} resultados</span></div>
-    <div class="topics">${filtered.map(t=>`<button class="topic" style="--tc:${t.color||'var(--accent)'}" data-topic="${t.slug}"><i>${t.icon||'✦'}</i><b>${esc(t.name)}</b><small>${esc(t.description)}</small><em>${linksForTopic(t.id).length} rutas ·%20guía%20de%20prédica</em></button>`).join('')}</div>
+    <div class="topics">${filtered.map(t=>`<button class="topic" style="--tc:${t.color||'var(--accent)'}" data-topic="${t.slug}"><i>${t.icon||'✦'}</i><b>${esc(t.name)}</b><small>${esc(t.description)}</small><em>${linksForTopic(t.id).length} rutas · guía de prédica</em></button>`).join('')}</div>
     ${!filtered.length?'<div class="empty">No encontré esa búsqueda. Probá describiendo la situación con otras palabras.</div>':''}
     <div class="actions"><button class="btn wide" id="random">🎲 Sorprendeme con una historia</button></div>
   </main>`;
@@ -300,7 +296,7 @@ function openSermon(id){
 
 function buildHtml(e){
   let t=topic(e.topic),title=esc(e.title||'Prédica TNT'),sub=esc(e.subtitle||''),body=esc(e.text||'').replace(/\n/g,'<br>'),modern=e.style==='modern';
-  return`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>*{box-sizing:border-box}body{margin:0;padding:18px;background:${modern?'#0d1118':'#eee8dc'};font:16px/1.7 Arial;color:#171717}.p{max-width:850px;margin:auto;border-radius:28px;overflow:hidden;background:${e.style==='friendly'?'#fff3e9':e.style==='ancient'?'#efe2c7':'#fff'};box-shadow:0 20px 60px #0002}.h,.b{padding:clamp(28px,7vw,70px)}.h{${modern?'background:#10131a;color:white;':''}}h1{font-size:clamp(2.6rem,8vw,5.5rem);line-height:.96;letter-spacing:-.05em;margin:8px 0}.k{font-size:.72rem;text-transform:uppercase;letter-spacing:.12em;opacity:.6}.s{opacity:.7}</style></head><body><main class="p"><header class="h"><div class="k">TNT · ${esc(t?.name||'Mensaje')}</div><h1>${title}</h1>${sub?`<div class="s">${sub}</div>`:''}</header><div class="b">${body}</div></main><script src="/supabase-lite.js?v=12"><\/script><script src="/assets/tnt-core.js?v=13" data-module="glosario" data-label="Prédicas & Glosario"><\/script></body></html>`
+  return`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>*{box-sizing:border-box}body{margin:0;padding:18px;background:${modern?'#0d1118':'#eee8dc'};font:16px/1.7 Arial;color:#171717}.p{max-width:850px;margin:auto;border-radius:28px;overflow:hidden;background:${e.style==='friendly'?'#fff3e9':e.style==='ancient'?'#efe2c7':'#fff'};box-shadow:0 20px 60px #0002}.h,.b{padding:clamp(28px,7vw,70px)}.h{${modern?'background:#10131a;color:white;':''}}h1{font-size:clamp(2.6rem,8vw,5.5rem);line-height:.96;letter-spacing:-.05em;margin:8px 0}.k{font-size:.72rem;text-transform:uppercase;letter-spacing:.12em;opacity:.6}.s{opacity:.7}</style></head><body><main class="p"><header class="h"><div class="k">TNT · ${esc(t?.name||'Mensaje')}</div><h1>${title}</h1>${sub?`<div class="s">${sub}</div>`:''}</header><div class="b">${body}</div></main></body></html>`
 }
 function download(html,name){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));a.download=(name||'predica-tnt').replace(/[^a-z0-9áéíóúñ _-]/gi,'').trim().replace(/\s+/g,'-')+'.html';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),700)}
 
