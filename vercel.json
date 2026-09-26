@@ -49,113 +49,222 @@
     {
       "source": "/organizacion",
       "headers": [
-        {"key": "Content-Type", "value": "text/html; charset=utf-8"},
-        {"key": "Cache-Control", "value": "no-store, max-age=0"}
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
       ]
     },
     {
       "source": "/organizacion/",
       "headers": [
-        {"key": "Content-Type", "value": "text/html; charset=utf-8"},
-        {"key": "Cache-Control", "value": "no-store, max-age=0"}
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
       ]
     },
     {
       "source": "/admin",
       "headers": [
-        {"key": "Content-Type", "value": "text/html; charset=utf-8"},
-        {"key": "Cache-Control", "value": "no-store, max-age=0"}
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
       ]
     },
     {
       "source": "/admin/",
       "headers": [
-        {"key": "Content-Type", "value": "text/html; charset=utf-8"},
-        {"key": "Cache-Control", "value": "no-store, max-age=0"}
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
       ]
     },
     {
       "source": "/campamento",
       "headers": [
-        {"key": "Content-Type", "value": "text/html; charset=utf-8"},
-        {"key": "Cache-Control", "value": "no-store, max-age=0"}
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
       ]
     },
     {
       "source": "/campamento/",
       "headers": [
-        {"key": "Content-Type", "value": "text/html; charset=utf-8"},
-        {"key": "Cache-Control", "value": "no-store, max-age=0"}
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
       ]
     },
     {
       "source": "/lista-sabados",
       "headers": [
-        {"key": "Content-Type", "value": "text/html; charset=utf-8"},
-        {"key": "Cache-Control", "value": "no-store, max-age=0"}
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
       ]
     },
     {
       "source": "/lista-sabados/",
       "headers": [
-        {"key": "Content-Type", "value": "text/html; charset=utf-8"},
-        {"key": "Cache-Control", "value": "no-store, max-age=0"}
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
       ]
     },
     {
       "source": "/buffet",
       "headers": [
-        {"key": "Content-Type", "value": "text/html; charset=utf-8"},
-        {"key": "Cache-Control", "value": "no-store, max-age=0"}
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
       ]
     },
     {
       "source": "/buffet/",
       "headers": [
-        {"key": "Content-Type", "value": "text/html; charset=utf-8"},
-        {"key": "Cache-Control", "value": "no-store, max-age=0"}
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
       ]
     },
     {
       "source": "/efe",
       "headers": [
-        {"key": "Content-Type", "value": "text/html; charset=utf-8"},
-        {"key": "Cache-Control", "value": "no-store, max-age=0"}
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
       ]
     },
     {
       "source": "/efe/",
       "headers": [
-        {"key": "Content-Type", "value": "text/html; charset=utf-8"},
-        {"key": "Cache-Control", "value": "no-store, max-age=0"}
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
       ]
     },
     {
       "source": "/glosario",
       "headers": [
-        {"key": "Content-Type", "value": "text/html; charset=utf-8"},
-        {"key": "Cache-Control", "value": "no-store, max-age=0"}
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
       ]
     },
     {
       "source": "/glosario/",
       "headers": [
-        {"key": "Content-Type", "value": "text/html; charset=utf-8"},
-        {"key": "Cache-Control", "value": "no-store, max-age=0"}
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
       ]
     },
     {
       "source": "/chat",
       "headers": [
-        {"key": "Content-Type", "value": "text/html; charset=utf-8"},
-        {"key": "Cache-Control", "value": "no-store, max-age=0"}
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
       ]
     },
     {
       "source": "/chat/",
       "headers": [
-        {"key": "Content-Type", "value": "text/html; charset=utf-8"},
-        {"key": "Cache-Control", "value": "no-store, max-age=0"}
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/chat/index.html",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
       ]
     }
   ]
