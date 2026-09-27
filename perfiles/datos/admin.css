@@ -962,3 +962,219 @@ body.perfiles-admin #baseTnt [hidden]{display:none!important}
 }
 
 body.perfiles-admin #baseTnt [hidden]{display:none!important}
+/* v4 · edición y eliminación */
+body.perfiles-admin #baseTnt .management-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:14px;
+  padding-top:14px;
+  border-top:1px solid var(--line)
+}
+body.perfiles-admin #baseTnt .manage-btn{
+  all:unset!important;
+  box-sizing:border-box!important;
+  min-height:48px!important;
+  padding:0 12px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:7px!important;
+  border:1px solid var(--line)!important;
+  border-radius:13px!important;
+  background:var(--surface-3)!important;
+  font-size:12px!important;
+  font-weight:800!important;
+  text-align:center!important;
+  cursor:pointer!important
+}
+body.perfiles-admin #baseTnt .edit-btn{
+  color:var(--accent)!important;
+  border-color:color-mix(in srgb,var(--accent) 24%,transparent)!important;
+  background:var(--accent-soft)!important
+}
+body.perfiles-admin #baseTnt .delete-btn{
+  color:var(--danger)!important;
+  border-color:color-mix(in srgb,var(--danger) 22%,transparent)!important
+}
+body.perfiles-admin #baseTnt .edit-backdrop,
+body.perfiles-admin #baseTnt .delete-backdrop{z-index:100!important}
+body.perfiles-admin #baseTnt .edit-sheet,
+body.perfiles-admin #baseTnt .delete-sheet{z-index:110!important}
+body.perfiles-admin #baseTnt .edit-sheet{width:min(600px,calc(100% - 28px))!important}
+body.perfiles-admin #baseTnt .edit-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px
+}
+body.perfiles-admin #baseTnt .edit-field{
+  display:block;
+  margin-bottom:13px
+}
+body.perfiles-admin #baseTnt .edit-field>span{
+  display:block;
+  margin-bottom:7px;
+  color:var(--text-2);
+  font-size:12px;
+  font-weight:800
+}
+body.perfiles-admin #baseTnt .edit-field em{
+  color:var(--muted);
+  font-style:normal;
+  font-weight:600
+}
+body.perfiles-admin #baseTnt .edit-field input[type="text"],
+body.perfiles-admin #baseTnt .edit-field input[type="tel"],
+body.perfiles-admin #baseTnt .edit-field input[type="date"]{
+  all:unset!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  height:52px!important;
+  padding:0 13px!important;
+  border:1px solid var(--line)!important;
+  border-radius:14px!important;
+  background:var(--surface-3)!important;
+  color:var(--text)!important;
+  font-size:14px!important
+}
+body.perfiles-admin #baseTnt .edit-field input:focus{
+  border-color:color-mix(in srgb,var(--accent) 55%,transparent)!important;
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 10%,transparent)!important
+}
+body.perfiles-admin #baseTnt .gender-segment{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px
+}
+body.perfiles-admin #baseTnt .gender-segment label{position:relative}
+body.perfiles-admin #baseTnt .gender-segment input{
+  position:absolute!important;
+  opacity:0!important;
+  pointer-events:none!important
+}
+body.perfiles-admin #baseTnt .gender-segment label>span{
+  min-height:48px;
+  display:grid;
+  place-items:center;
+  border:1px solid var(--line);
+  border-radius:13px;
+  background:var(--surface-3);
+  color:var(--muted);
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer
+}
+body.perfiles-admin #baseTnt .gender-segment input:checked+span{
+  color:var(--accent);
+  background:var(--accent-soft);
+  border-color:color-mix(in srgb,var(--accent) 38%,transparent)
+}
+body.perfiles-admin #baseTnt .edit-message{min-height:20px;margin-top:-3px}
+body.perfiles-admin #baseTnt .edit-actions{
+  display:grid;
+  grid-template-columns:.8fr 1.2fr;
+  gap:9px;
+  margin-top:5px
+}
+body.perfiles-admin #baseTnt .edit-actions button{
+  all:unset!important;
+  box-sizing:border-box!important;
+  min-height:52px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:8px!important;
+  border-radius:14px!important;
+  font-size:12px!important;
+  font-weight:800!important;
+  cursor:pointer!important
+}
+body.perfiles-admin #baseTnt .cancel-edit-btn{
+  color:var(--text)!important;
+  background:var(--surface-3)!important;
+  border:1px solid var(--line)!important
+}
+body.perfiles-admin #baseTnt .save-edit-btn{
+  color:#fff!important;
+  background:var(--accent)!important
+}
+body.perfiles-admin #baseTnt .save-edit-btn:disabled,
+body.perfiles-admin #baseTnt #confirmDeleteBtn:disabled{opacity:.55!important}
+body.perfiles-admin #baseTnt .delete-sheet{
+  width:min(480px,calc(100% - 28px))!important;
+  text-align:center!important;
+  padding:18px 20px 20px!important
+}
+body.perfiles-admin #baseTnt .danger-icon{
+  width:62px;
+  height:62px;
+  display:grid;
+  place-items:center;
+  margin:2px auto 12px;
+  border-radius:19px;
+  color:var(--danger);
+  background:color-mix(in srgb,var(--danger) 11%,transparent);
+  border:1px solid color-mix(in srgb,var(--danger) 22%,transparent);
+  font-size:28px;
+  font-weight:800
+}
+body.perfiles-admin #baseTnt .delete-sheet h2{
+  margin:0 0 8px!important;
+  color:var(--text)!important;
+  font-size:25px!important;
+  line-height:1.1!important;
+  font-weight:800!important;
+  letter-spacing:-.035em!important
+}
+body.perfiles-admin #baseTnt .delete-sheet p{
+  margin:0;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.6
+}
+body.perfiles-admin #baseTnt .delete-sheet p strong{color:var(--text)}
+body.perfiles-admin #baseTnt .delete-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+  margin-top:17px
+}
+body.perfiles-admin #baseTnt .delete-actions button{
+  all:unset!important;
+  box-sizing:border-box!important;
+  min-height:51px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:8px!important;
+  border-radius:14px!important;
+  font-size:12px!important;
+  font-weight:800!important;
+  cursor:pointer!important
+}
+body.perfiles-admin #baseTnt #cancelDeleteBtn{
+  color:var(--text)!important;
+  background:var(--surface-3)!important;
+  border:1px solid var(--line)!important
+}
+body.perfiles-admin #baseTnt #confirmDeleteBtn{
+  color:#fff!important;
+  background:var(--danger)!important
+}
+@media(max-width:620px){
+  body.perfiles-admin #baseTnt .edit-sheet,
+  body.perfiles-admin #baseTnt .delete-sheet{
+    left:0!important;
+    bottom:0!important;
+    width:100%!important;
+    transform:translateY(105%)!important;
+    border-radius:25px 25px 0 0!important;
+    border-left:0!important;
+    border-right:0!important;
+    border-bottom:0!important
+  }
+  body.perfiles-admin #baseTnt .edit-sheet.open,
+  body.perfiles-admin #baseTnt .delete-sheet.open{transform:translateY(0)!important}
+  body.perfiles-admin #baseTnt .edit-grid{grid-template-columns:1fr}
+  body.perfiles-admin #baseTnt .management-actions{grid-template-columns:1fr 1fr}
+}
