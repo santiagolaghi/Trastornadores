@@ -6,6 +6,7 @@
 .chat-room-head{grid-row:1}.chat-pinned{grid-row:2}.chat-messages{grid-row:3}.chat-compose-wrap{grid-row:4}
 
 #chat-voice{touch-action:none;user-select:none;-webkit-user-select:none}#chat-record-status{display:flex;align-items:center;flex-wrap:wrap;gap:8px}#chat-record-status span{flex:1;min-width:170px}#chat-record-status small{display:block;color:var(--tnt-muted);font-size:12px;margin-top:3px}#chat-record-status.locked{border:1px solid var(--tnt-accent);background:color-mix(in srgb,var(--tnt-accent) 9%,var(--tnt-panel))}#room-options{flex:none}.chat-room-head .room-people{min-width:0}
+.chat-attach-options{display:grid;gap:9px;margin-top:15px}.chat-attach-options button{display:flex;align-items:center;gap:14px;width:100%;padding:14px;border:1px solid var(--tnt-line);border-radius:16px;background:var(--tnt-panel2);color:var(--tnt-text);font:inherit;font-size:23px;text-align:left;cursor:pointer}.chat-attach-options b{display:block;font-size:16px}.chat-attach-options small{display:block;color:var(--tnt-muted);font-size:13px;margin-top:3px}#chat-format{font-weight:800}.chat-composer .tnt-editor-tools select{background:var(--tnt-panel);color:var(--tnt-text);border:1px solid var(--tnt-line);border-radius:9px}
 
 .chat-room>*{min-width:0}.chat-pinned button{width:100%;min-width:0}.chat-sidebar{min-width:0}
 
