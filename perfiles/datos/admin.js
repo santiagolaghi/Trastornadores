@@ -1,82 +1,55 @@
 (() => {
-  const $ = (id) => document.getElementById(id);
+  "use strict";
 
+  const $ = (id) => document.getElementById(id);
   const loginView = $("loginView");
   const dashboardView = $("dashboardView");
   const loginForm = $("loginForm");
-  const claveInput = $("password");
-  const toggleClave = $("togglePassword");
+  const passwordInput = $("password");
+  const togglePassword = $("togglePassword");
   const loginMessage = $("loginMessage");
   const loginBtn = $("loginBtn");
   const loginText = $("loginText");
   const loginSpinner = $("loginSpinner");
 
   const searchInput = $("searchInput");
-  const categoryFilter = $("categoryFilter");
-  const genderFilter = $("genderFilter");
-  const contactFilter = $("contactFilter");
-  const sortFilter = $("sortFilter");
+  const clearSearchBtn = $("clearSearchBtn");
+  const activeFilters = $("activeFilters");
+  const filterCount = $("filterCount");
+  const visibleCount = $("visibleCount");
+  const listSubtext = $("listSubtext");
+  const updatedBadge = $("updatedBadge");
   const rowsBody = $("rowsBody");
   const cardsList = $("cardsList");
   const emptyState = $("emptyState");
-  const visibleCount = $("visibleCount");
-  const activeFilterText = $("activeFilterText");
-  const updatedBadge = $("updatedBadge");
-  const refreshBtn = $("refreshBtn");
-  const exportBtn = $("exportBtn");
   const toast = $("toast");
-  const themeToggle = $("themeToggle");
-  const themeIcon = $("themeIcon");
 
-  let registros = [];
+  const filterSheet = $("filterSheet");
+  const filterBackdrop = $("filterBackdrop");
+  const detailSheet = $("detailSheet");
+  const detailBackdrop = $("detailBackdrop");
+
+  let records = [];
   let accessToken = "";
   let toastTimer = null;
+
+  const defaultFilters = () => ({
+    category: "",
+    gender: "",
+    contact: "",
+    sort: "recent",
+  });
+
+  let filters = defaultFilters();
+  let draftFilters = defaultFilters();
 
   const icons = {
     whatsapp: `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.6a8 8 0 0 1-11.8 7L4 20l1.4-4A8 8 0 1 1 20 11.6Z"/><path d="M9 8.3c.2-.4.4-.4.7-.4h.5c.2 0 .4.1.5.5l.7 1.7c.1.3.1.5-.1.7l-.6.7c-.2.2-.2.4 0 .7.5.9 1.3 1.7 2.2 2.2.3.2.5.2.7 0l.8-1c.2-.2.4-.3.7-.2l1.6.8c.3.2.5.3.5.5 0 .3-.1 1.3-.8 1.9-.6.6-1.5.8-2.4.5-1.5-.5-3.2-1.4-4.6-2.8-1.2-1.2-2.1-2.7-2.5-3.9-.3-.9-.1-1.6.3-2.1.3-.4.6-.6.8-.8Z"/></svg>`,
     instagram: `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.4" cy="6.7" r="1" fill="currentColor" stroke="none"/></svg>`,
+    eye: `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.8"/></svg>`,
+    phone: `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7.2 3.5 9.7 7c.4.6.3 1.3-.2 1.8L8 10.1c1.2 2.6 3.3 4.7 5.9 5.9l1.3-1.5c.5-.5 1.2-.6 1.8-.2l3.5 2.5c.6.4.8 1.2.4 1.8-.8 1.3-2.2 2.1-3.7 2-7-.9-12.5-6.4-13.4-13.4-.2-1.5.7-2.9 2-3.7.5-.3 1.1-.3 1.4 0Z"/></svg>`,
     copy: `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>`,
   };
-
-  function applyTheme(theme) {
-    const finalTheme = theme === "light" ? "light" : "dark";
-    document.documentElement.dataset.theme = finalTheme;
-    themeIcon.textContent = finalTheme === "dark" ? "☀" : "☾";
-    themeToggle.title = finalTheme === "dark" ? "Usar tema claro" : "Usar tema oscuro";
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", finalTheme === "dark" ? "#0b0d12" : "#f4f6fb");
-    try { localStorage.setItem("tnt_perfiles_theme", finalTheme); } catch (_) {}
-  }
-
-  function loadInitialTheme() {
-    let saved = "";
-    try { saved = localStorage.getItem("tnt_perfiles_theme") || ""; } catch (_) {}
-    if (!saved && window.matchMedia?.("(prefers-color-scheme: light)").matches) saved = "light";
-    applyTheme(saved || "dark");
-  }
-
-  function showToast(message) {
-    toast.textContent = message;
-    toast.hidden = false;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { toast.hidden = true; }, 2300);
-  }
-
-  async function hashClave(value) {
-    const bytes = new TextEncoder().encode(value);
-    const digest = await crypto.subtle.digest("SHA-256", bytes);
-    return Array.from(new Uint8Array(digest))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-  }
-
-  function normalize(value = "") {
-    return String(value)
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLocaleLowerCase("es-AR")
-      .trim();
-  }
 
   function escapeHtml(value = "") {
     return String(value).replace(/[&<>"']/g, (char) => ({
@@ -88,10 +61,27 @@
     }[char]));
   }
 
+  function normalize(value = "") {
+    return String(value)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("es-AR")
+      .trim();
+  }
+
+  async function hashPassword(value) {
+    const bytes = new TextEncoder().encode(value);
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
   function ageFromBirthdate(value) {
     if (!value) return 0;
-    const [year, month, day] = value.split("-").map(Number);
-    if (!year || !month || !day) return 0;
+    const parts = value.split("-").map(Number);
+    if (parts.length !== 3 || parts.some(Number.isNaN)) return 0;
+    const [year, month, day] = parts;
     const today = new Date();
     let age = today.getFullYear() - year;
     if (
@@ -101,8 +91,8 @@
     return Math.max(0, age);
   }
 
-  function liveCategory(row) {
-    return ageFromBirthdate(row.fecha_nacimiento) < 18 ? "Adolescente" : "Joven";
+  function groupFor(record) {
+    return ageFromBirthdate(record.fecha_nacimiento) < 18 ? "Adolescente" : "Joven";
   }
 
   function formatDate(value, withTime = false) {
@@ -139,338 +129,481 @@
   }
 
   function instagramUrl(value) {
-    const user = String(value || "").trim().replace(/^@+/, "");
-    return user ? "https://www.instagram.com/" + encodeURIComponent(user) : "";
+    const username = String(value || "").trim().replace(/^@+/, "");
+    return username ? "https://www.instagram.com/" + encodeURIComponent(username) : "";
   }
 
-  function filteredRows() {
-    const q = normalize(searchInput.value);
-    const contact = contactFilter.value;
+  function showToast(message) {
+    toast.textContent = message;
+    toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      toast.hidden = true;
+    }, 2300);
+  }
 
-    const result = registros.filter((row) => {
-      const text = normalize([
-        row.nombre,
-        row.apellido,
-        row.instagram,
-        row.telefono,
+  function applyTheme(theme) {
+    const finalTheme = theme === "light" ? "light" : "dark";
+    document.documentElement.dataset.theme = finalTheme;
+    $("themeIcon").textContent = finalTheme === "dark" ? "☀" : "☾";
+    $("themeToggle").title = finalTheme === "dark" ? "Usar tema claro" : "Usar tema oscuro";
+    document.querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", finalTheme === "dark" ? "#0b0d12" : "#f2f4fa");
+    try {
+      localStorage.setItem("tnt_base_theme", finalTheme);
+    } catch (_) {}
+  }
+
+  function initTheme() {
+    let saved = "";
+    try {
+      saved = localStorage.getItem("tnt_base_theme") || "";
+    } catch (_) {}
+    if (!saved && window.matchMedia?.("(prefers-color-scheme: light)").matches) {
+      saved = "light";
+    }
+    applyTheme(saved || "dark");
+  }
+
+  function filterRecords() {
+    const query = normalize(searchInput.value);
+    const result = records.filter((record) => {
+      const searchable = normalize([
+        record.nombre,
+        record.apellido,
+        record.instagram,
+        record.telefono,
       ].filter(Boolean).join(" "));
 
-      if (q && !text.includes(q)) return false;
-      if (categoryFilter.value && liveCategory(row) !== categoryFilter.value) return false;
-      if (genderFilter.value && row.genero !== genderFilter.value) return false;
+      if (query && !searchable.includes(query)) return false;
+      if (filters.category && groupFor(record) !== filters.category) return false;
+      if (filters.gender && record.genero !== filters.gender) return false;
 
-      const hasIg = Boolean(String(row.instagram || "").trim());
-      const hasPhone = Boolean(String(row.telefono || "").trim());
+      const hasPhone = Boolean(String(record.telefono || "").trim());
+      const hasInstagram = Boolean(String(record.instagram || "").trim());
 
-      if (contact === "instagram" && !hasIg) return false;
-      if (contact === "telefono" && !hasPhone) return false;
-      if (contact === "ambos" && !(hasIg && hasPhone)) return false;
-      if (contact === "sininstagram" && hasIg) return false;
+      if (filters.contact === "telefono" && !hasPhone) return false;
+      if (filters.contact === "instagram" && !hasInstagram) return false;
+      if (filters.contact === "ambos" && !(hasPhone && hasInstagram)) return false;
+      if (filters.contact === "sininstagram" && hasInstagram) return false;
 
       return true;
     });
 
     return result.sort((a, b) => {
-      if (sortFilter.value === "name") {
+      if (filters.sort === "name") {
         return (a.nombre + " " + a.apellido).localeCompare(
           b.nombre + " " + b.apellido,
           "es-AR",
           { sensitivity: "base" }
         );
       }
-      if (sortFilter.value === "ageAsc") {
+      if (filters.sort === "ageAsc") {
         return ageFromBirthdate(a.fecha_nacimiento) - ageFromBirthdate(b.fecha_nacimiento);
       }
-      if (sortFilter.value === "ageDesc") {
+      if (filters.sort === "ageDesc") {
         return ageFromBirthdate(b.fecha_nacimiento) - ageFromBirthdate(a.fecha_nacimiento);
       }
-      if (sortFilter.value === "oldest") {
+      if (filters.sort === "oldest") {
         return new Date(a.creado_en || 0) - new Date(b.creado_en || 0);
       }
       return new Date(b.creado_en || 0) - new Date(a.creado_en || 0);
     });
   }
 
-  function activeFilterDescription() {
-    const parts = [];
-    if (searchInput.value.trim()) parts.push('búsqueda "' + searchInput.value.trim() + '"');
-    if (categoryFilter.value) parts.push(categoryFilter.value === "Joven" ? "jóvenes" : "adolescentes");
-    if (genderFilter.value) parts.push(genderFilter.value === "Mujer" ? "mujeres" : "varones");
-    if (contactFilter.value === "instagram") parts.push("con Instagram");
-    if (contactFilter.value === "telefono") parts.push("con teléfono");
-    if (contactFilter.value === "ambos") parts.push("con Instagram y teléfono");
-    if (contactFilter.value === "sininstagram") parts.push("sin Instagram");
-    return parts.length ? "Filtros: " + parts.join(" · ") : "Mostrando todos los perfiles";
-  }
-
   function renderStats() {
-    const adolescentes = registros.filter((r) => liveCategory(r) === "Adolescente").length;
-    const jovenes = registros.length - adolescentes;
-    const mujeres = registros.filter((r) => r.genero === "Mujer").length;
-    const varones = registros.filter((r) => r.genero === "Varón").length;
+    const adolescentes = records.filter((record) => groupFor(record) === "Adolescente").length;
+    const jovenes = records.length - adolescentes;
+    const mujeres = records.filter((record) => record.genero === "Mujer").length;
+    const varones = records.filter((record) => record.genero === "Varón").length;
 
-    $("statTotal").textContent = registros.length;
+    $("statTotal").textContent = records.length;
     $("statAdolescentes").textContent = adolescentes;
     $("statJovenes").textContent = jovenes;
     $("statMujeres").textContent = mujeres;
     $("statVarones").textContent = varones;
-
-    $("summaryText").textContent = registros.length === 1
-      ? "Hay 1 persona cargada en Perfiles."
-      : "Hay " + registros.length + " personas cargadas en Perfiles.";
+    $("summaryText").textContent = records.length === 1
+      ? "1 persona cargada desde Perfiles."
+      : records.length + " personas cargadas desde Perfiles.";
   }
 
-  function syncQuickButtons() {
-    let active = "all";
-    if (categoryFilter.value) active = categoryFilter.value;
-    else if (genderFilter.value) active = genderFilter.value;
+  function activeQuickValue() {
+    const extraActive = filters.contact || filters.sort !== "recent";
+    if (extraActive) return "";
+    if (filters.category && !filters.gender) return filters.category;
+    if (filters.gender && !filters.category) return filters.gender;
+    if (!filters.category && !filters.gender) return "all";
+    return "";
+  }
 
-    document.querySelectorAll("[data-chip]").forEach((button) => {
-      button.classList.toggle("active", button.dataset.chip === active);
-    });
-
-    document.querySelectorAll("[data-quick-filter]").forEach((button) => {
-      button.classList.toggle("active", button.dataset.quickFilter === active);
+  function syncQuickFilters() {
+    const active = activeQuickValue();
+    document.querySelectorAll("[data-quick], [data-summary-filter]").forEach((button) => {
+      const value = button.dataset.quick ?? button.dataset.summaryFilter;
+      button.classList.toggle("active", value === active);
     });
   }
 
-  function socialActions(row, mobile = false) {
-    const phone = String(row.telefono || "").trim();
-    const ig = String(row.instagram || "").trim();
+  function filterLabel(key, value) {
+    const maps = {
+      category: { Adolescente: "Adolescentes", Joven: "Jóvenes" },
+      gender: { Mujer: "Mujeres", "Varón": "Varones" },
+      contact: {
+        telefono: "Con teléfono",
+        instagram: "Con Instagram",
+        ambos: "Con ambos",
+        sininstagram: "Sin Instagram",
+      },
+      sort: {
+        name: "Nombre A–Z",
+        ageAsc: "Menor edad",
+        ageDesc: "Mayor edad",
+        oldest: "Más antiguos",
+      },
+    };
+    return maps[key]?.[value] || value;
+  }
+
+  function renderActiveFilters() {
+    const chips = [];
+    if (filters.category) chips.push(["category", filters.category]);
+    if (filters.gender) chips.push(["gender", filters.gender]);
+    if (filters.contact) chips.push(["contact", filters.contact]);
+    if (filters.sort !== "recent") chips.push(["sort", filters.sort]);
+
+    activeFilters.innerHTML = chips.map(([key, value]) => `
+      <button class="active-filter-chip" type="button" data-remove-filter="${key}">
+        ${escapeHtml(filterLabel(key, value))}<span>×</span>
+      </button>
+    `).join("");
+    activeFilters.hidden = chips.length === 0;
+
+    filterCount.textContent = chips.length;
+    filterCount.hidden = chips.length === 0;
+  }
+
+  function contactMarkup(record) {
+    const phone = String(record.telefono || "").trim();
+    const instagram = String(record.instagram || "").trim();
+    return `
+      <div class="person-contact">
+        <div class="contact-row">
+          <span class="contact-icon">${icons.phone}</span>
+          <span>${escapeHtml(phone || "Sin teléfono")}</span>
+        </div>
+        <div class="contact-row">
+          <span class="contact-icon">${icons.instagram}</span>
+          <span>${escapeHtml(instagram || "Sin Instagram")}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function actionMarkup(record, compact = false) {
+    const phone = String(record.telefono || "").trim();
+    const instagram = String(record.instagram || "").trim();
     const wa = whatsappUrl(phone);
-    const insta = instagramUrl(ig);
+    const ig = instagramUrl(instagram);
+    const id = escapeHtml(record.id);
 
-    if (mobile) {
+    if (compact) {
       return `
-        <div class="mobile-actions">
-          <a class="mobile-action whatsapp ${wa ? "" : "disabled"}" ${wa ? `href="${wa}" target="_blank" rel="noopener"` : ""}>
-            ${icons.whatsapp}<span>WhatsApp</span>
-          </a>
-          <a class="mobile-action instagram ${insta ? "" : "disabled"}" ${insta ? `href="${insta}" target="_blank" rel="noopener"` : ""}>
-            ${icons.instagram}<span>Instagram</span>
-          </a>
-          <button class="mobile-action copy-contact ${phone ? "" : "disabled"}" type="button" data-copy-phone="${escapeHtml(phone)}">
-            ${icons.copy}<span>Copiar teléfono</span>
-          </button>
-        </div>`;
+        <div class="table-actions">
+          <a class="icon-action whatsapp ${wa ? "" : "disabled"}" ${wa ? `href="${wa}" target="_blank" rel="noopener"` : ""} title="WhatsApp" aria-label="WhatsApp">${icons.whatsapp}</a>
+          <a class="icon-action instagram ${ig ? "" : "disabled"}" ${ig ? `href="${ig}" target="_blank" rel="noopener"` : ""} title="Instagram" aria-label="Instagram">${icons.instagram}</a>
+          <button class="icon-action view" type="button" data-view-id="${id}" title="Ver perfil" aria-label="Ver perfil">${icons.eye}</button>
+        </div>
+      `;
     }
 
     return `
-      <div class="row-actions">
-        <a class="social-button whatsapp ${wa ? "" : "disabled"}" ${wa ? `href="${wa}" target="_blank" rel="noopener"` : ""} aria-label="Abrir WhatsApp" title="WhatsApp">${icons.whatsapp}</a>
-        <a class="social-button instagram ${insta ? "" : "disabled"}" ${insta ? `href="${insta}" target="_blank" rel="noopener"` : ""} aria-label="Abrir Instagram" title="Instagram">${icons.instagram}</a>
-        <button class="social-button copy ${phone ? "" : "disabled"}" type="button" data-copy-phone="${escapeHtml(phone)}" aria-label="Copiar teléfono" title="Copiar teléfono">${icons.copy}</button>
-      </div>`;
+      <div class="person-actions">
+        <a class="person-action whatsapp ${wa ? "" : "disabled"}" ${wa ? `href="${wa}" target="_blank" rel="noopener"` : ""}>${icons.whatsapp}<span>WhatsApp</span></a>
+        <a class="person-action instagram ${ig ? "" : "disabled"}" ${ig ? `href="${ig}" target="_blank" rel="noopener"` : ""}>${icons.instagram}<span>Instagram</span></a>
+        <button class="person-action view" type="button" data-view-id="${id}">${icons.eye}<span>Ver perfil</span></button>
+      </div>
+    `;
   }
 
-  function renderRows() {
-    const filtered = filteredRows();
+  function renderList() {
+    const filtered = filterRecords();
 
-    rowsBody.innerHTML = filtered.map((row) => {
-      const age = ageFromBirthdate(row.fecha_nacimiento);
-      const group = liveCategory(row);
-      const ig = String(row.instagram || "").trim();
-      const phone = String(row.telefono || "").trim();
-
+    rowsBody.innerHTML = filtered.map((record) => {
+      const age = ageFromBirthdate(record.fecha_nacimiento);
+      const group = groupFor(record);
+      const phone = String(record.telefono || "").trim();
+      const instagram = String(record.instagram || "").trim();
       return `
         <tr>
           <td class="person-cell">
-            <strong>${escapeHtml(row.nombre)} ${escapeHtml(row.apellido)}</strong>
-            <small>${escapeHtml(ig || "Sin Instagram")}</small>
+            <strong>${escapeHtml(record.nombre)} ${escapeHtml(record.apellido)}</strong>
+            <small>${escapeHtml(instagram || "Sin Instagram")}</small>
           </td>
           <td><strong>${age}</strong></td>
-          <td><span class="badge ${group === "Adolescente" ? "teen" : "young"}">${group}</span></td>
-          <td>${escapeHtml(row.genero || "—")}</td>
-          <td>${formatDate(row.fecha_nacimiento)}</td>
-          <td>
-            <div class="contact-stack">
-              <span>${escapeHtml(phone || "Sin teléfono")}</span>
-              <small>${escapeHtml(ig || "Sin Instagram")}</small>
-            </div>
+          <td><span class="mini-badge ${group === "Adolescente" ? "teen" : "young"}">${group}</span></td>
+          <td>${escapeHtml(record.genero || "—")}</td>
+          <td class="contact-cell">
+            <span>${escapeHtml(phone || "Sin teléfono")}</span>
+            <small>${escapeHtml(instagram || "Sin Instagram")}</small>
           </td>
-          <td>${formatDate(row.creado_en, true)}</td>
-          <td class="actions-col">${socialActions(row)}</td>
-        </tr>`;
+          <td>${formatDate(record.creado_en, true)}</td>
+          <td>${actionMarkup(record, true)}</td>
+        </tr>
+      `;
     }).join("");
 
-    cardsList.innerHTML = filtered.map((row) => {
-      const age = ageFromBirthdate(row.fecha_nacimiento);
-      const group = liveCategory(row);
-      const ig = String(row.instagram || "").trim();
-      const phone = String(row.telefono || "").trim();
-
+    cardsList.innerHTML = filtered.map((record) => {
+      const age = ageFromBirthdate(record.fecha_nacimiento);
+      const group = groupFor(record);
       return `
         <article class="person-card">
-          <div class="person-card-head">
-            <div>
-              <strong>${escapeHtml(row.nombre)} ${escapeHtml(row.apellido)}</strong>
-              <small>Registrado: ${formatDate(row.creado_en, true)}</small>
+          <div class="person-card-main">
+            <div class="person-card-head">
+              <div>
+                <strong class="person-name">${escapeHtml(record.nombre)} ${escapeHtml(record.apellido)}</strong>
+                <p class="person-subtitle">${age} años · ${group} · ${escapeHtml(record.genero || "Sin género")}</p>
+              </div>
+              <span class="mini-badge ${group === "Adolescente" ? "teen" : "young"}">${group}</span>
             </div>
-            <span class="badge ${group === "Adolescente" ? "teen" : "young"}">${group}</span>
+            ${contactMarkup(record)}
+            <div class="future-tags"><span class="future-tag">Perfil</span></div>
           </div>
-
-          <div class="person-meta">
-            <div class="meta-box"><small>Edad</small><span>${age} años</span></div>
-            <div class="meta-box"><small>Género</small><span>${escapeHtml(row.genero || "—")}</span></div>
-            <div class="meta-box"><small>Nacimiento</small><span>${formatDate(row.fecha_nacimiento)}</span></div>
-            <div class="meta-box"><small>Instagram</small><span>${escapeHtml(ig || "—")}</span></div>
-            <div class="meta-box"><small>Teléfono</small><span>${escapeHtml(phone || "—")}</span></div>
-          </div>
-
-          ${socialActions(row, true)}
-        </article>`;
+          ${actionMarkup(record)}
+        </article>
+      `;
     }).join("");
 
-    visibleCount.textContent = filtered.length === 1
-      ? "1 persona"
-      : filtered.length + " personas";
-    activeFilterText.textContent = activeFilterDescription();
+    visibleCount.textContent = filtered.length === 1 ? "1 persona" : filtered.length + " personas";
+    listSubtext.textContent = (searchInput.value.trim() || activeFilters.hidden === false)
+      ? "Resultados de tu búsqueda y filtros"
+      : "Todos los perfiles";
+
     emptyState.hidden = filtered.length !== 0;
-    syncQuickButtons();
+    clearSearchBtn.hidden = !searchInput.value.trim();
+    syncQuickFilters();
+    renderActiveFilters();
   }
 
-  function setLoading(active) {
-    loginBtn.disabled = active;
-    loginText.textContent = active ? "Abriendo…" : "Abrir base";
-    loginSpinner.hidden = !active;
-  }
-
-  function setRefreshLoading(active) {
-    refreshBtn.disabled = active;
-    refreshBtn.querySelector(".button-icon").textContent = active ? "…" : "↻";
-  }
-
-  async function loadData(token, { silent = false } = {}) {
-    const sb = window.TNT?.sb;
-    if (!sb) throw new Error("No se pudo conectar con Supabase.");
-
-    if (!silent) setRefreshLoading(true);
-    try {
-      const { data, error } = await sb.rpc("perfiles_admin_listar", { p_token: token });
-      if (error) throw error;
-      registros = Array.isArray(data) ? data : [];
-      renderStats();
-      renderRows();
-      const now = new Intl.DateTimeFormat("es-AR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }).format(new Date());
-      updatedBadge.textContent = "Actualizado " + now;
-      return true;
-    } finally {
-      if (!silent) setRefreshLoading(false);
-    }
-  }
-
-  function clearFilters() {
-    searchInput.value = "";
-    categoryFilter.value = "";
-    genderFilter.value = "";
-    contactFilter.value = "";
-    sortFilter.value = "recent";
-    renderRows();
-  }
-
-  function applyQuickFilter(value) {
-    categoryFilter.value = "";
-    genderFilter.value = "";
-
-    if (value === "Adolescente" || value === "Joven") categoryFilter.value = value;
-    if (value === "Mujer" || value === "Varón") genderFilter.value = value;
-
-    renderRows();
-  }
-
-  function csvEscape(value) {
-    const string = String(value ?? "");
-    return '"' + string.replace(/"/g, '""') + '"';
-  }
-
-  function exportCsv() {
-    const filtered = filteredRows();
-    if (!filtered.length) {
-      showToast("No hay personas para exportar.");
-      return;
-    }
-
-    const header = [
-      "Nombre",
-      "Apellido",
-      "Fecha de nacimiento",
-      "Edad",
-      "Grupo",
-      "Género",
-      "Instagram",
-      "Teléfono",
-      "Fecha de registro",
-    ];
-
-    const lines = [
-      header.map(csvEscape).join(";"),
-      ...filtered.map((row) => [
-        row.nombre,
-        row.apellido,
-        row.fecha_nacimiento,
-        ageFromBirthdate(row.fecha_nacimiento),
-        liveCategory(row),
-        row.genero,
-        row.instagram || "",
-        row.telefono || "",
-        row.creado_en || "",
-      ].map(csvEscape).join(";")),
-    ];
-
-    const blob = new Blob(["\ufeff" + lines.join("\n")], {
-      type: "text/csv;charset=utf-8",
+  function syncChoiceButtons() {
+    document.querySelectorAll("[data-filter-group]").forEach((group) => {
+      const key = group.dataset.filterGroup;
+      group.querySelectorAll("[data-value]").forEach((button) => {
+        button.classList.toggle("active", button.dataset.value === draftFilters[key]);
+      });
     });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    const date = new Date().toISOString().slice(0, 10);
-    link.href = url;
-    link.download = "TNT_Perfiles_" + date + ".csv";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    showToast("CSV descargado.");
+  }
+
+  function openFilters() {
+    draftFilters = { ...filters };
+    syncChoiceButtons();
+    filterBackdrop.hidden = false;
+    filterSheet.classList.add("open");
+    filterSheet.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeFilters() {
+    filterSheet.classList.remove("open");
+    filterSheet.setAttribute("aria-hidden", "true");
+    filterBackdrop.hidden = true;
+    document.body.style.overflow = "";
+  }
+
+  function resetAllFilters() {
+    filters = defaultFilters();
+    draftFilters = defaultFilters();
+    searchInput.value = "";
+    syncChoiceButtons();
+    renderList();
+  }
+
+  function setQuickFilter(value) {
+    filters = defaultFilters();
+    if (value === "Adolescente" || value === "Joven") filters.category = value;
+    if (value === "Mujer" || value === "Varón") filters.gender = value;
+    draftFilters = { ...filters };
+    renderList();
+  }
+
+  function detailItem(label, value) {
+    return `
+      <div class="detail-item">
+        <small>${escapeHtml(label)}</small>
+        <strong>${escapeHtml(value || "—")}</strong>
+      </div>
+    `;
+  }
+
+  function openDetail(id) {
+    const record = records.find((item) => String(item.id) === String(id));
+    if (!record) return;
+
+    const age = ageFromBirthdate(record.fecha_nacimiento);
+    const group = groupFor(record);
+    const phone = String(record.telefono || "").trim();
+    const instagram = String(record.instagram || "").trim();
+    const wa = whatsappUrl(phone);
+    const ig = instagramUrl(instagram);
+
+    $("detailAvatar").textContent =
+      ((record.nombre || "P").charAt(0) + (record.apellido || "").charAt(0)).toUpperCase();
+    $("detailName").textContent = [record.nombre, record.apellido].filter(Boolean).join(" ");
+    $("detailSummary").textContent = age + " años · " + group + " · " + (record.genero || "Sin género");
+    $("detailData").innerHTML = [
+      detailItem("Fecha de nacimiento", formatDate(record.fecha_nacimiento)),
+      detailItem("Edad actual", age + " años"),
+      detailItem("Grupo", group),
+      detailItem("Género", record.genero || "—"),
+      detailItem("Teléfono", phone || "—"),
+      detailItem("Instagram", instagram || "—"),
+      detailItem("Registrado", formatDate(record.creado_en, true)),
+    ].join("");
+
+    $("detailActions").innerHTML = `
+      <a class="detail-action whatsapp ${wa ? "" : "disabled"}" ${wa ? `href="${wa}" target="_blank" rel="noopener"` : ""}>${icons.whatsapp}<span>WhatsApp</span></a>
+      <a class="detail-action instagram ${ig ? "" : "disabled"}" ${ig ? `href="${ig}" target="_blank" rel="noopener"` : ""}>${icons.instagram}<span>Instagram</span></a>
+      <button class="detail-action copy-detail ${phone ? "" : "disabled"}" type="button" data-copy-phone="${escapeHtml(phone)}">${icons.copy}<span>Copiar teléfono</span></button>
+    `;
+
+    detailBackdrop.hidden = false;
+    detailSheet.classList.add("open");
+    detailSheet.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeDetail() {
+    detailSheet.classList.remove("open");
+    detailSheet.setAttribute("aria-hidden", "true");
+    detailBackdrop.hidden = true;
+    document.body.style.overflow = "";
   }
 
   async function copyPhone(phone) {
     if (!phone) return;
     try {
       await navigator.clipboard.writeText(phone);
-      showToast("Teléfono copiado: " + phone);
     } catch (_) {
-      const input = document.createElement("textarea");
-      input.value = phone;
-      input.style.position = "fixed";
-      input.style.opacity = "0";
-      document.body.appendChild(input);
-      input.select();
+      const textarea = document.createElement("textarea");
+      textarea.value = phone;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
       document.execCommand("copy");
-      input.remove();
-      showToast("Teléfono copiado.");
+      textarea.remove();
     }
+    showToast("Teléfono copiado: " + phone);
+  }
+
+  function csvEscape(value) {
+    return '"' + String(value ?? "").replace(/"/g, '""') + '"';
+  }
+
+  function exportCsv() {
+    const filtered = filterRecords();
+    if (!filtered.length) {
+      showToast("No hay personas para exportar.");
+      return;
+    }
+
+    const rows = [
+      ["Nombre","Apellido","Fecha de nacimiento","Edad","Grupo","Género","Instagram","Teléfono","Fecha de registro"],
+      ...filtered.map((record) => [
+        record.nombre,
+        record.apellido,
+        record.fecha_nacimiento,
+        ageFromBirthdate(record.fecha_nacimiento),
+        groupFor(record),
+        record.genero,
+        record.instagram || "",
+        record.telefono || "",
+        record.creado_en || "",
+      ]),
+    ];
+
+    const csv = "\ufeff" + rows.map((row) => row.map(csvEscape).join(";")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "Base_TNT_" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    showToast("Base exportada a CSV.");
+  }
+
+  function setLoginLoading(active) {
+    loginBtn.disabled = active;
+    loginText.textContent = active ? "Abriendo…" : "Abrir Base TNT";
+    loginSpinner.hidden = !active;
+  }
+
+  function setRefreshLoading(active) {
+    document.querySelectorAll("#refreshBtn,#mobileRefreshBtn").forEach((button) => {
+      button.disabled = active;
+    });
+    const symbol = document.querySelector("#refreshBtn .refresh-symbol");
+    if (symbol) symbol.textContent = active ? "…" : "↻";
+  }
+
+  async function loadData(token, options = {}) {
+    const sb = window.TNT?.sb;
+    if (!sb) throw new Error("No se pudo conectar con la base.");
+
+    if (!options.silent) setRefreshLoading(true);
+    try {
+      const { data, error } = await sb.rpc("perfiles_admin_listar", { p_token: token });
+      if (error) throw error;
+
+      records = Array.isArray(data) ? data : [];
+      renderStats();
+      renderList();
+
+      const time = new Intl.DateTimeFormat("es-AR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(new Date());
+      updatedBadge.textContent = "Actualizado " + time;
+    } finally {
+      if (!options.silent) setRefreshLoading(false);
+    }
+  }
+
+  function lockBase() {
+    records = [];
+    accessToken = "";
+    filters = defaultFilters();
+    draftFilters = defaultFilters();
+    searchInput.value = "";
+    dashboardView.hidden = true;
+    loginView.hidden = false;
+    loginMessage.textContent = "";
+    passwordInput.value = "";
+    closeFilters();
+    closeDetail();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(() => passwordInput.focus(), 150);
   }
 
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     loginMessage.textContent = "";
 
-    const clave = claveInput.value;
-    if (!clave) {
+    const password = passwordInput.value;
+    if (!password) {
       loginMessage.textContent = "Ingresá la contraseña.";
-      claveInput.focus();
+      passwordInput.focus();
       return;
     }
 
-    setLoading(true);
+    setLoginLoading(true);
     try {
-      const token = await hashClave(clave);
-      accessToken = token;
+      const token = await hashPassword(password);
       await loadData(token, { silent: true });
-
-      claveInput.value = "";
+      accessToken = token;
+      passwordInput.value = "";
       loginView.hidden = true;
       dashboardView.hidden = false;
       window.scrollTo({ top: 0 });
@@ -481,44 +614,88 @@
         ? "Contraseña incorrecta."
         : "No se pudieron cargar los datos.";
     } finally {
-      setLoading(false);
+      setLoginLoading(false);
     }
   });
 
-  toggleClave.addEventListener("click", () => {
-    const visible = claveInput.type === "text";
-    claveInput.type = visible ? "password" : "text";
-    toggleClave.textContent = visible ? "Ver" : "Ocultar";
-    claveInput.focus();
+  togglePassword.addEventListener("click", () => {
+    const visible = passwordInput.type === "text";
+    passwordInput.type = visible ? "password" : "text";
+    togglePassword.textContent = visible ? "Ver" : "Ocultar";
+    passwordInput.focus();
   });
 
-  themeToggle.addEventListener("click", () => {
+  $("themeToggle").addEventListener("click", () => {
     applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
   });
 
-  searchInput.addEventListener("input", renderRows);
-  [categoryFilter, genderFilter, contactFilter, sortFilter].forEach((el) => {
-    el.addEventListener("change", renderRows);
-  });
-
-  $("clearSearchBtn").addEventListener("click", () => {
+  searchInput.addEventListener("input", renderList);
+  clearSearchBtn.addEventListener("click", () => {
     searchInput.value = "";
-    renderRows();
+    renderList();
     searchInput.focus();
   });
 
-  $("clearFiltersBtn").addEventListener("click", clearFilters);
-  $("emptyClearBtn").addEventListener("click", clearFilters);
-
-  document.querySelectorAll("[data-chip]").forEach((button) => {
-    button.addEventListener("click", () => applyQuickFilter(button.dataset.chip));
+  document.querySelectorAll("[data-quick], [data-summary-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setQuickFilter(button.dataset.quick ?? button.dataset.summaryFilter);
+    });
   });
 
-  document.querySelectorAll("[data-quick-filter]").forEach((button) => {
-    button.addEventListener("click", () => applyQuickFilter(button.dataset.quickFilter));
+  $("openFiltersBtn").addEventListener("click", openFilters);
+  $("closeFiltersBtn").addEventListener("click", closeFilters);
+  filterBackdrop.addEventListener("click", closeFilters);
+
+  document.querySelectorAll("[data-filter-group]").forEach((group) => {
+    group.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-value]");
+      if (!button) return;
+      const key = group.dataset.filterGroup;
+      draftFilters[key] = button.dataset.value;
+      syncChoiceButtons();
+    });
   });
 
-  refreshBtn.addEventListener("click", async () => {
+  $("resetFiltersBtn").addEventListener("click", () => {
+    draftFilters = defaultFilters();
+    syncChoiceButtons();
+  });
+
+  $("applyFiltersBtn").addEventListener("click", () => {
+    filters = { ...draftFilters };
+    renderList();
+    closeFilters();
+  });
+
+  activeFilters.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-remove-filter]");
+    if (!button) return;
+    const key = button.dataset.removeFilter;
+    if (key === "sort") filters.sort = "recent";
+    else filters[key] = "";
+    draftFilters = { ...filters };
+    renderList();
+  });
+
+  $("emptyClearBtn").addEventListener("click", resetAllFilters);
+
+  document.addEventListener("click", (event) => {
+    const viewButton = event.target.closest("[data-view-id]");
+    if (viewButton) {
+      openDetail(viewButton.dataset.viewId);
+      return;
+    }
+
+    const copyButton = event.target.closest("[data-copy-phone]");
+    if (copyButton) {
+      copyPhone(copyButton.dataset.copyPhone || "");
+    }
+  });
+
+  $("closeDetailBtn").addEventListener("click", closeDetail);
+  detailBackdrop.addEventListener("click", closeDetail);
+
+  const refresh = async () => {
     if (!accessToken) return;
     try {
       await loadData(accessToken);
@@ -527,36 +704,30 @@
       console.error(error);
       showToast("No se pudo actualizar.");
     }
-  });
+  };
 
-  exportBtn.addEventListener("click", exportCsv);
+  $("refreshBtn").addEventListener("click", refresh);
+  $("mobileRefreshBtn").addEventListener("click", refresh);
+  $("exportBtn").addEventListener("click", exportCsv);
+  $("mobileExportBtn").addEventListener("click", exportCsv);
+  $("logoutBtn").addEventListener("click", lockBase);
+  $("headerLockBtn").addEventListener("click", lockBase);
 
-  document.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-copy-phone]");
-    if (!button) return;
-    copyPhone(button.dataset.copyPhone || "");
-  });
-
-  $("logoutBtn").addEventListener("click", () => {
-    registros = [];
-    accessToken = "";
-    dashboardView.hidden = true;
-    loginView.hidden = false;
-    loginMessage.textContent = "";
-    claveInput.value = "";
-    clearFilters();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    setTimeout(() => claveInput.focus(), 150);
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    if (detailSheet.classList.contains("open")) closeDetail();
+    else if (filterSheet.classList.contains("open")) closeFilters();
   });
 
   const share = new URLSearchParams(location.search).get("_vercel_share");
   if (share) {
-    document.querySelector(".back-button").href =
-      "/perfiles?_vercel_share=" + encodeURIComponent(share);
-    $("newProfileBtn").href =
-      "/perfiles?_vercel_share=" + encodeURIComponent(share);
+    const suffix = "?_vercel_share=" + encodeURIComponent(share);
+    document.querySelector(".back-button").href = "/perfiles" + suffix;
+    $("newProfileBtn").href = "/perfiles" + suffix;
+    $("mobileNewProfileBtn").href = "/perfiles" + suffix;
   }
 
-  loadInitialTheme();
-  claveInput.focus();
+  initTheme();
+  syncChoiceButtons();
+  passwordInput.focus();
 })();
