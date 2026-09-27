@@ -70,7 +70,7 @@
       if(select.dataset.tntEnhanced||select.multiple||select.size>1||select.closest('.tnt-select-dialog'))continue;
       select.dataset.tntEnhanced='true';select.classList.add('tnt-native-select');
       const button=root.document.createElement('button');button.type='button';button.className='tnt-select-trigger';
-      const label=select.labels?.[0]?.textContent?.trim()||select.getAttribute('aria-label')||'Elegir opción';
+      const label=select.labels?.[0]?.textContent?.trim()||select.getAttribute('aria-label')||select.closest('.field')?.querySelector('label')?.textContent?.trim()||select.previousElementSibling?.matches?.('label')&&select.previousElementSibling.textContent.trim()||'Seleccionar';
       button.setAttribute('aria-label',label);button.setAttribute('aria-haspopup','dialog');
       const sync=()=>{button.innerHTML=`<span>${esc(select.options[select.selectedIndex]?.textContent?.trim()||label)}</span><span class="tnt-select-chevron" aria-hidden="true">⌄</span>`;button.disabled=select.disabled;};
       const field=root.document.createElement('span');field.className='tnt-select-field';select.before(field);field.append(select,button);select.addEventListener('change',sync);sync();
