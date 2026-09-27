@@ -64,8 +64,35 @@
     let t=root.document.getElementById('tnt-toast');if(!t){t=root.document.createElement('div');t.id='tnt-toast';t.setAttribute('role','status');root.document.body.append(t);}
     t.textContent=message;t.className=error?'show error':'show';clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),4500);
   }
-  const api={esc,icon,safeUrl,initials,avatar,avatarStack,dateKey,addDays,date,time,completed,modal,toast};
+  function enhanceSelects(scope=root.document) {
+    const choices=scope.matches?.('select')?[scope]:[...scope.querySelectorAll?.('select')||[]];
+    for(const select of choices){
+      if(select.dataset.tntEnhanced||select.multiple||select.size>1||select.closest('.tnt-select-dialog'))continue;
+      select.dataset.tntEnhanced='true';select.classList.add('tnt-native-select');
+      const button=root.document.createElement('button');button.type='button';button.className='tnt-select-trigger';
+      const label=select.labels?.[0]?.textContent?.trim()||select.getAttribute('aria-label')||'Elegir opción';
+      button.setAttribute('aria-label',label);button.setAttribute('aria-haspopup','dialog');
+      const sync=()=>{button.innerHTML=`<span>${esc(select.options[select.selectedIndex]?.textContent?.trim()||label)}</span><span class="tnt-select-chevron" aria-hidden="true">⌄</span>`;button.disabled=select.disabled;};
+      const field=root.document.createElement('span');field.className='tnt-select-field';select.before(field);field.append(select,button);select.addEventListener('change',sync);sync();
+      button.onclick=()=>{
+        sync();const options=[...select.options],previous=root.document.activeElement;
+        const dialog=root.document.createElement('dialog');dialog.className='tnt-select-dialog';dialog.setAttribute('aria-label',label);
+        dialog.innerHTML=`<div class="tnt-select-sheet"><header><h2>${esc(label)}</h2><button type="button" class="tnt-select-close" aria-label="Cerrar">${icon('close')}</button></header>${options.length>8?'<input type="search" class="tnt-select-search" placeholder="Buscar opción…" aria-label="Buscar opción">':''}<div class="tnt-select-list" role="listbox">${options.map((option,index)=>`<button type="button" role="option" data-option="${index}" aria-selected="${option.selected}" ${option.disabled?'disabled':''}><span>${esc(option.textContent.trim())}</span>${option.selected?icon('check'):''}</button>`).join('')}</div></div>`;
+        root.document.body.append(dialog);
+        const close=()=>{dialog.close?.();dialog.remove();previous?.focus?.();};
+        dialog.querySelector('.tnt-select-close').onclick=close;
+        dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
+        dialog.addEventListener('click',e=>{if(e.target===dialog)close();});
+        dialog.querySelectorAll('[data-option]').forEach(item=>item.onclick=()=>{select.selectedIndex=Number(item.dataset.option);select.dispatchEvent(new root.Event('change',{bubbles:true}));sync();close();});
+        const search=dialog.querySelector('.tnt-select-search');if(search)search.oninput=()=>{const term=search.value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();dialog.querySelectorAll('[data-option]').forEach(item=>{const value=item.textContent.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();item.hidden=!value.includes(term);});};
+        if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');
+        (search||dialog.querySelector('[aria-selected=true]')||dialog.querySelector('[data-option]'))?.focus();
+      };
+    }
+  }
+  const api={esc,icon,safeUrl,initials,avatar,avatarStack,dateKey,addDays,date,time,completed,modal,toast,enhanceSelects};
   root.TNTUI=api;
+  if(root.document){const init=()=>{enhanceSelects();if(root.MutationObserver){new root.MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1)enhanceSelects(node);}).observe(root.document.body,{childList:true,subtree:true});}};if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init,{once:true});else init();}
   root.document?.addEventListener('error',e=>{if(e.target?.matches?.('.tnt-person-avatar img'))e.target.remove();},true);
   if(typeof module!=='undefined')module.exports=api;
 })(typeof window==='undefined'?globalThis:window);
