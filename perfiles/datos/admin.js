@@ -32,6 +32,10 @@
   let records = [];
   let accessToken = "";
   let toastTimer = null;
+  let currentDetailId = "";
+
+  const SESSION_KEY = "tnt_base_admin_session_v1";
+  const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
   const defaultFilters = () => ({
     category: "",
@@ -163,6 +167,37 @@
       saved = "light";
     }
     applyTheme(saved || "dark");
+  }
+
+  function savePanelSession(token) {
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+        token,
+        expiresAt: Date.now() + SESSION_TTL_MS,
+      }));
+    } catch (_) {}
+  }
+
+  function clearPanelSession() {
+    try {
+      sessionStorage.removeItem(SESSION_KEY);
+    } catch (_) {}
+  }
+
+  function readPanelSession() {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      if (!raw) return "";
+      const parsed = JSON.parse(raw);
+      if (!parsed?.token || !parsed?.expiresAt || parsed.expiresAt <= Date.now()) {
+        clearPanelSession();
+        return "";
+      }
+      return parsed.token;
+    } catch (_) {
+      clearPanelSession();
+      return "";
+    }
   }
 
   function filterRecords() {
@@ -437,6 +472,7 @@
   function openDetail(id) {
     const record = records.find((item) => String(item.id) === String(id));
     if (!record) return;
+    currentDetailId = String(record.id);
 
     const age = ageFromBirthdate(record.fecha_nacimiento);
     const group = groupFor(record);
@@ -476,6 +512,72 @@
     detailSheet.setAttribute("aria-hidden", "true");
     detailBackdrop.hidden = true;
     document.body.style.overflow = "";
+  }
+
+  function currentRecord() {
+    return records.find((item) => String(item.id) === String(currentDetailId)) || null;
+  }
+
+  function closeEdit() {
+    $("editSheet").classList.remove("open");
+    $("editSheet").setAttribute("aria-hidden", "true");
+    $("editBackdrop").hidden = true;
+    $("editMessage").textContent = "";
+    document.body.style.overflow = "";
+  }
+
+  function openEdit() {
+    const record = currentRecord();
+    if (!record) return;
+
+    closeDetail();
+
+    $("editNombre").value = record.nombre || "";
+    $("editApellido").value = record.apellido || "";
+    $("editFechaNacimiento").value = record.fecha_nacimiento || "";
+    $("editInstagram").value = record.instagram || "";
+    $("editTelefono").value = record.telefono || "";
+    document.querySelectorAll('input[name="editGenero"]').forEach((input) => {
+      input.checked = input.value === record.genero;
+    });
+
+    $("editMessage").textContent = "";
+    $("editBackdrop").hidden = false;
+    $("editSheet").classList.add("open");
+    $("editSheet").setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+    setTimeout(() => $("editNombre").focus(), 120);
+  }
+
+  function setEditLoading(active) {
+    $("saveEditBtn").disabled = active;
+    $("saveEditText").textContent = active ? "Guardando…" : "Guardar cambios";
+    $("saveEditSpinner").hidden = !active;
+  }
+
+  function closeDelete() {
+    $("deleteSheet").classList.remove("open");
+    $("deleteSheet").setAttribute("aria-hidden", "true");
+    $("deleteBackdrop").hidden = true;
+    document.body.style.overflow = "";
+  }
+
+  function openDelete() {
+    const record = currentRecord();
+    if (!record) return;
+
+    closeDetail();
+    $("deleteProfileName").textContent = [record.nombre, record.apellido].filter(Boolean).join(" ");
+    $("deleteBackdrop").hidden = false;
+    $("deleteSheet").classList.add("open");
+    $("deleteSheet").setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+  }
+
+  function setDeleteLoading(active) {
+    $("confirmDeleteBtn").disabled = active;
+    $("confirmDeleteText").textContent = active ? "Eliminando…" : "Sí, eliminar";
+    $("deleteSpinner").hidden = !active;
   }
 
   async function copyPhone(phone) {
@@ -574,6 +676,8 @@
   function lockBase() {
     records = [];
     accessToken = "";
+    currentDetailId = "";
+    clearPanelSession();
     filters = defaultFilters();
     draftFilters = defaultFilters();
     searchInput.value = "";
@@ -603,6 +707,7 @@
       const token = await hashPassword(password);
       await loadData(token, { silent: true });
       accessToken = token;
+      savePanelSession(token);
       passwordInput.value = "";
       loginView.hidden = true;
       dashboardView.hidden = false;
@@ -695,6 +800,122 @@
   $("closeDetailBtn").addEventListener("click", closeDetail);
   detailBackdrop.addEventListener("click", closeDetail);
 
+  $("editProfileBtn").addEventListener("click", openEdit);
+  $("deleteProfileBtn").addEventListener("click", openDelete);
+
+  $("closeEditBtn").addEventListener("click", closeEdit);
+  $("cancelEditBtn").addEventListener("click", closeEdit);
+  $("editBackdrop").addEventListener("click", closeEdit);
+
+  $("editForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const record = currentRecord();
+    if (!record || !accessToken) return;
+
+    const nombre = $("editNombre").value.trim();
+    const apellido = $("editApellido").value.trim();
+    const fecha = $("editFechaNacimiento").value;
+    const instagram = $("editInstagram").value.trim();
+    const telefono = $("editTelefono").value.trim();
+    const genero = document.querySelector('input[name="editGenero"]:checked')?.value || "";
+
+    $("editMessage").textContent = "";
+
+    if (nombre.length < 2) {
+      $("editMessage").textContent = "Revisá el nombre.";
+      return;
+    }
+    if (apellido.length < 2) {
+      $("editMessage").textContent = "Revisá el apellido.";
+      return;
+    }
+    if (!fecha) {
+      $("editMessage").textContent = "Elegí la fecha de nacimiento.";
+      return;
+    }
+    if (telefono.replace(/\D/g, "").length < 6) {
+      $("editMessage").textContent = "Revisá el número de teléfono.";
+      return;
+    }
+    if (!genero) {
+      $("editMessage").textContent = "Elegí Mujer o Varón.";
+      return;
+    }
+
+    setEditLoading(true);
+    try {
+      const sb = window.TNT?.sb;
+      if (!sb) throw new Error("No se pudo conectar con la base.");
+
+      const { data, error } = await sb.rpc("perfiles_admin_actualizar", {
+        p_token: accessToken,
+        p_id: record.id,
+        p_nombre: nombre,
+        p_apellido: apellido,
+        p_fecha_nacimiento: fecha,
+        p_instagram: instagram,
+        p_telefono: telefono,
+        p_genero: genero,
+      });
+
+      if (error) throw error;
+
+      const updated = Array.isArray(data) ? data[0] : data;
+      if (!updated?.id) throw new Error("No se recibió el perfil actualizado.");
+
+      records = records.map((item) =>
+        String(item.id) === String(updated.id) ? { ...item, ...updated } : item
+      );
+
+      renderStats();
+      renderList();
+      closeEdit();
+      openDetail(updated.id);
+      showToast("Perfil actualizado.");
+    } catch (error) {
+      console.error(error);
+      $("editMessage").textContent = "No se pudieron guardar los cambios.";
+    } finally {
+      setEditLoading(false);
+    }
+  });
+
+  $("cancelDeleteBtn").addEventListener("click", closeDelete);
+  $("deleteBackdrop").addEventListener("click", closeDelete);
+
+  $("confirmDeleteBtn").addEventListener("click", async () => {
+    const record = currentRecord();
+    if (!record || !accessToken) return;
+
+    setDeleteLoading(true);
+    try {
+      const sb = window.TNT?.sb;
+      if (!sb) throw new Error("No se pudo conectar con la base.");
+
+      const { data, error } = await sb.rpc("perfiles_admin_eliminar", {
+        p_token: accessToken,
+        p_id: record.id,
+      });
+
+      if (error) throw error;
+      if (data !== true) throw new Error("No se confirmó la eliminación.");
+
+      const deletedName = [record.nombre, record.apellido].filter(Boolean).join(" ");
+      records = records.filter((item) => String(item.id) !== String(record.id));
+      currentDetailId = "";
+      renderStats();
+      renderList();
+      closeDelete();
+      showToast(deletedName + " fue eliminado.");
+    } catch (error) {
+      console.error(error);
+      showToast("No se pudo eliminar el perfil.");
+    } finally {
+      setDeleteLoading(false);
+    }
+  });
+
   const refresh = async () => {
     if (!accessToken) return;
     try {
@@ -715,7 +936,9 @@
 
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
-    if (detailSheet.classList.contains("open")) closeDetail();
+    if ($("deleteSheet").classList.contains("open")) closeDelete();
+    else if ($("editSheet").classList.contains("open")) closeEdit();
+    else if (detailSheet.classList.contains("open")) closeDetail();
     else if (filterSheet.classList.contains("open")) closeFilters();
   });
 
@@ -727,7 +950,30 @@
     $("mobileNewProfileBtn").href = "/perfiles" + suffix;
   }
 
+  async function restorePanelSession() {
+    const token = readPanelSession();
+    if (!token) {
+      passwordInput.focus();
+      return;
+    }
+
+    try {
+      accessToken = token;
+      await loadData(token, { silent: true });
+      loginView.hidden = true;
+      dashboardView.hidden = false;
+    } catch (error) {
+      console.error("No se pudo restaurar la sesión de Base TNT", error);
+      accessToken = "";
+      clearPanelSession();
+      loginView.hidden = false;
+      dashboardView.hidden = true;
+      passwordInput.focus();
+    }
+  }
+
   initTheme();
   syncChoiceButtons();
-  passwordInput.focus();
+  $("editFechaNacimiento").max = new Date().toISOString().slice(0, 10);
+  restorePanelSession();
 })();
