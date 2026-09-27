@@ -49,7 +49,7 @@ button,input,textarea,select{font:inherit}.orb{position:fixed;border-radius:50%;
 <link rel="stylesheet" href="/assets/tnt-ui.css?v=14"><link rel="stylesheet" href="/assets/tnt-module-theme.css?v=14"></head>
 <body data-tnt-module="glosario" data-tnt-label="Prédicas & Glosario" data-build="v4-deep-20260906">
 <div class="orb orb-a"></div><div class="orb orb-b"></div>
-<div id="app"></div>
+<div id="app" role="main"><div class="tnt-skeleton"><div><div class="tnt-loader"></div>Cargando prédicas y glosario…</div></div></div>
 <script src="/supabase-lite.js?v=12"></script><script src="/assets/tnt-components.js?v=14"></script><script src="/assets/tnt-editor.js?v=15"></script><script src="/assets/tnt-core.js?v=14" data-module="glosario" data-label="Prédicas & Glosario"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <script>
@@ -100,7 +100,11 @@ async function load(){
     ]);
     if(se.error)throw se.error;S.profile=p.data;S.topics=t.filter(x=>x.active!==false);S.stories=st;S.links=l;S.books=bk;S.sermons=se.data||[];
     render();
-  }catch(e){console.error(e);toast('Error cargando datos. Probá recargar.')}
+  }catch(e){
+    console.error('Glosario: error de carga',e);
+    $('#app').innerHTML=`<main class="page"><section class="card" role="alert"><h1>No pudimos cargar Prédicas y Glosario</h1><p>${esc(e.message||'Revisá la conexión e intentá nuevamente.')}</p><button class="btn primary" id="glosario-retry">Reintentar</button><a class="btn" href="/">Volver a TNT</a></section></main>`;
+    $('#glosario-retry').onclick=load;
+  }
 }
 async function init(){await TNT.ready;if(!TNT.identity||TNT.blocked)return;S.theme=document.documentElement.dataset.tntTheme;apply();S.session=TNT.session;await load();document.addEventListener('tnt:theme',()=>{S.theme=document.documentElement.dataset.tntTheme;apply();render()});}
 
@@ -139,7 +143,7 @@ function preview(e){
 function create(){
   let e=S.edit;
   return`<main class="page"><section class="hero"><div class="eyebrow">${e.id?'Editar':'Nueva'} prédica</div><h1 style="font-size:3.05rem">Tu mensaje. Sin perder una palabra.</h1><p>Subí el material, elegí el tema y TNT conserva íntegro el contenido original.</p></section>
-  <div class="upload"><input id="file" type="file" accept=".pdf,.doc,.docx,.txt,.md"><b>⇧ PDF · Word · TXT · Markdown</b><div class="muted" style="font-size:.72rem;margin-top:5px">PDF y DOCX extraen el texto automáticamente.</div></div>
+  <div class="upload"><input id="file" type="file" accept=".pdf,.doc,.docx,.txt,.md"><label for="file" style="display:block;cursor:pointer"><b>⇧ Elegir archivo</b><div class="muted" style="font-size:.72rem;margin-top:5px">${esc(e.source_filename||'PDF, Word, TXT o Markdown · hasta 10 MB')}</div></label></div>
   <div class="field"><label>Título</label><input id="title" value="${esc(e.title)}"></div>
   <div class="field"><label>Subtítulo</label><input id="subtitle" value="${esc(e.subtitle)}"></div>
   <div class="field"><label>Tema principal</label><select id="topic"><option value="">Sin tema</option>${S.topics.map(t=>`<option value="${t.slug}" ${e.topic===t.slug?'selected':''}>${t.icon||'✦'} ${esc(t.name)}</option>`).join('')}</select></div>
@@ -200,7 +204,7 @@ function bind(){
 function toggle(){S.theme=S.theme==='dark'?'light':'dark';localStorage.setItem('tnt-theme',S.theme);render()}
 
 async function filePick(e){
-  let f=e.target.files[0];if(!f)return;S.edit.file=f;S.edit.source_filename=f.name;let ext=f.name.split('.').pop().toLowerCase();S.edit.source_type=ext;
+  let f=e.target.files[0];if(!f)return;if(f.size>10485760){toast('El archivo puede pesar hasta 10 MB.');return;}S.edit.file=f;S.edit.source_filename=f.name;let ext=f.name.split('.').pop().toLowerCase();S.edit.source_type=ext;
   try{
     if(['txt','md'].includes(ext))S.edit.text=await f.text();
     else if(ext==='docx')S.edit.text=(await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()})).value.trim();
