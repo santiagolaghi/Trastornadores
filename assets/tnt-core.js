@@ -20,12 +20,12 @@ TNT.setTheme=function(t){localStorage.setItem('tnt-theme',t);theme();document.di
 TNT.toggleTheme=function(){const current=document.documentElement.dataset.tntTheme||theme();TNT.setTheme(current==='dark'?'light':'dark')};
 function rank(x){return levelRank[String(x||'none').toLowerCase()]||0}
 TNT.accessLevel=function(mod,scope='*'){
- if(TNT.isAdmin)return'manage';
+ if(TNT.isAdmin&&mod!=='efe')return'manage';
  let best='none',br=0;
  for(const g of TNT.grants||[]){if(!g.enabled||g.module!==mod)continue;if(g.scope!=='*'&&g.scope!==scope)continue;if(g.valid_from&&Date.parse(g.valid_from)>Date.now())continue;if(g.valid_until&&Date.parse(g.valid_until)<Date.now())continue;const r=rank(g.access_level);if(r>br){br=r;best=g.access_level}}
  return best;
 };
-TNT.hasAccess=function(mod,scope='*',min='view'){return TNT.isAdmin||rank(TNT.accessLevel(mod,scope))>=rank(min)};
+TNT.hasAccess=function(mod,scope='*',min='view'){return (TNT.isAdmin&&mod!=='efe')||rank(TNT.accessLevel(mod,scope))>=rank(min)};
 TNT.displayName=function(){return TNT.identity?.display_name||TNT.account?.nickname||TNT.person?.full_name||TNT.identity?.email||'TNT'};
 TNT.avatar=function(){return TNT.account?.avatar_url||TNT.identity?.avatar_url||''};
 TNT.logout=async function(){await sb?.auth?.signOut?.();localStorage.removeItem('tnt-central-user');location.replace('/?v=14')};
@@ -37,7 +37,7 @@ async function ensureIdentity(session){
  if(!ar.data)throw new Error('No pude vincular tu Cuenta TNT.');if(ar.data.enabled===false)throw new Error('Tu cuenta está deshabilitada. Consultá con un Admin TNT.');
  const pr=await sb.from('tnt_people').select('*').eq('id',ar.data.person_id).single();if(pr.error)throw pr.error;
  const gr=await sb.from('tnt_access_grants').select('*').eq('person_id',ar.data.person_id);TNT.grants=gr.data||[];
- const legacy=await sb.from('tnt_module_access').select('*').eq('person_id',ar.data.person_id);for(const g of legacy.data||[]){if(!TNT.grants.some(x=>x.module===g.module&&x.scope==='*'))TNT.grants.push({module:g.module,scope:'*',enabled:g.enabled,access_level:g.access_level});}
+ const legacy=await sb.from('tnt_module_access').select('*').eq('person_id',ar.data.person_id);for(const g of legacy.data||[]){if(g.module!=='efe'&&!TNT.grants.some(x=>x.module===g.module&&x.scope==='*'))TNT.grants.push({module:g.module,scope:'*',enabled:g.enabled,access_level:g.access_level});}
  TNT.account=ar.data;TNT.person=pr.data;TNT.isAdmin=ar.data.system_role==='admin';
  TNT.identity={person_id:pr.data.id,auth_user_id:session.user.id,email:session.user.email||ar.data.email||'',full_name:pr.data.full_name||'',nickname:ar.data.nickname||'',display_name:ar.data.nickname||pr.data.full_name||session.user.email||'TNT',system_role:ar.data.system_role,ministry_role:ar.data.ministry_role||'',avatar_url:ar.data.avatar_url||session.user.user_metadata?.avatar_url||session.user.user_metadata?.picture||''};
  localStorage.setItem('tnt-central-user',JSON.stringify(TNT.identity));
