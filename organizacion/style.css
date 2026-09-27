@@ -39,3 +39,11 @@ dialog.modal{position:fixed;inset:0;padding:0;max-width:min(960px,calc(100vw - 2
 @media(max-width:600px){.sat-config-row{grid-template-columns:24px 1fr 85px}.sat-config-row>.actions{grid-column:2/-1;justify-content:flex-end}.projection-list article{grid-template-columns:70px 1fr;padding:18px;gap:15px}.projection-list article>b{font-size:23px}.projection-list article>span{grid-column:2}}
 
 .sheetHead{background:var(--tnt-panel)!important;color:var(--tnt-text)!important}.sheetHead p{color:var(--tnt-muted)!important}.org-nav,.filters,.tabs,.chips{flex-wrap:wrap!important;overflow:visible!important;white-space:normal!important}.org-nav button,.filters button,.tabs button{white-space:normal!important}.sheet .card,.sheet .grid{min-width:0}.sheet .card p{font-size:16px}.comment .tnt-rich{margin:12px 0}.sheet{overflow-x:hidden!important}.statusChip,.chip{opacity:1}.sheetHead h2{color:var(--tnt-text)!important}
+
+/* Person selector and planning previews stay readable on narrow phones. */
+#membersForm .checkRow{display:grid;grid-template-columns:24px minmax(0,1fr) minmax(130px,auto);gap:10px;align-items:center}
+#membersForm .checkRow>div{min-width:0;overflow-wrap:anywhere}
+#membersForm .checkRow select{max-width:190px;min-width:0;width:100%;border:1px solid var(--tnt-line);border-radius:12px;background:var(--tnt-panel);color:var(--tnt-text);padding:10px;font:inherit}
+#membersForm .checkRow>label{grid-column:2/-1}
+#event-preview{overflow-wrap:anywhere;line-height:1.5}
+@media(max-width:560px){#membersForm .checkRow{grid-template-columns:24px minmax(0,1fr)}#membersForm .checkRow select{grid-column:2;width:100%;max-width:none}#membersForm .checkRow>label{grid-column:2}}
