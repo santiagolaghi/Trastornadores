@@ -1,14 +1,14 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b0d12">
   <meta name="robots" content="noindex,nofollow,noarchive">
-  <meta name="description" content="Panel privado de datos de Perfiles TNT.">
-  <title>Datos · Perfiles</title>
+  <meta name="description" content="Base central TNT · Perfiles.">
+  <title>Base TNT · Perfiles</title>
   <link rel="icon" href="/perfiles/icon.svg">
-  <link rel="stylesheet" href="/perfiles/datos/admin.css?v=1">
+  <link rel="stylesheet" href="/perfiles/datos/admin.css?v=2">
 </head>
 <body>
   <div class="glow glow-a"></div>
@@ -16,119 +16,194 @@
 
   <main class="shell">
     <header class="topbar">
-      <a class="back-button" href="/perfiles" aria-label="Volver a Perfiles">←</a>
+      <a class="icon-button back-button" href="/perfiles" aria-label="Volver a Perfiles" title="Volver">←</a>
+
       <div class="brand">
-        <div class="brand-mark">P</div>
+        <div class="brand-mark">T</div>
         <div>
-          <span class="eyebrow">TNT · PRIVADO</span>
-          <h1>Datos de Perfiles</h1>
+          <span class="eyebrow">TNT · BASE CENTRAL</span>
+          <h1>Perfiles</h1>
         </div>
       </div>
-      <span class="lock-chip">🔒</span>
+
+      <div class="top-actions">
+        <button class="icon-button" id="themeToggle" type="button" aria-label="Cambiar tema" title="Cambiar tema">
+          <span id="themeIcon">☾</span>
+        </button>
+        <span class="icon-button lock-chip" aria-label="Sección privada" title="Privado">🔒</span>
+      </div>
     </header>
 
     <section class="login-view" id="loginView">
       <div class="login-card">
-        <div class="lock-orb">⌁</div>
-        <span class="pill">Acceso privado</span>
-        <h2>Entrá para ver<br><span>los registros.</span></h2>
-        <p>Esta sección contiene datos personales y está protegida por contraseña.</p>
+        <div class="lock-orb">🔒</div>
+        <span class="pill">Base central TNT</span>
+        <h2>Acceso a<br><span>Perfiles.</span></h2>
+        <p>Acá vas a administrar la base de personas de TNT. Por ahora muestra únicamente los perfiles registrados desde esta app.</p>
 
         <form id="loginForm" novalidate>
           <label class="field">
             <span>Contraseña</span>
             <div class="password-wrap">
               <input id="password" type="password" autocomplete="current-password" placeholder="Ingresá la contraseña" required>
-              <button class="eye-button" id="togglePassword" type="button" aria-label="Mostrar contraseña">Ver</button>
+              <button class="inside-button" id="togglePassword" type="button" aria-label="Mostrar contraseña">Ver</button>
             </div>
           </label>
 
           <div class="message" id="loginMessage" role="status" aria-live="polite"></div>
 
           <button class="primary" id="loginBtn" type="submit">
-            <span id="loginText">Abrir datos</span>
+            <span id="loginText">Abrir base</span>
             <span class="spinner" id="loginSpinner" hidden></span>
           </button>
         </form>
 
-        <small class="privacy-note">La contraseña se valida en Supabase y no queda guardada en esta página.</small>
+        <div class="security-note">
+          <span>✓</span>
+          <small>Los datos no tienen lectura pública directa.</small>
+        </div>
       </div>
     </section>
 
     <section class="dashboard" id="dashboardView" hidden>
       <div class="dashboard-heading">
         <div>
-          <span class="pill">Base de datos</span>
-          <h2>Personas registradas</h2>
+          <span class="pill">Base central TNT · Perfiles</span>
+          <h2>Personas</h2>
           <p id="summaryText">Cargando registros…</p>
         </div>
-        <button class="secondary compact" id="logoutBtn" type="button">Bloquear</button>
+
+        <div class="heading-actions">
+          <a class="action-button primary-soft" id="newProfileBtn" href="/perfiles">
+            <span class="button-icon">＋</span>
+            <span>Nuevo perfil</span>
+          </a>
+          <button class="action-button" id="refreshBtn" type="button">
+            <span class="button-icon">↻</span>
+            <span>Actualizar</span>
+          </button>
+          <button class="action-button" id="exportBtn" type="button">
+            <span class="button-icon">⇩</span>
+            <span>Exportar CSV</span>
+          </button>
+          <button class="action-button danger-soft" id="logoutBtn" type="button">
+            <span class="button-icon">⌁</span>
+            <span>Bloquear</span>
+          </button>
+        </div>
       </div>
 
-      <div class="stats">
-        <article class="stat-card">
-          <small>Total</small>
+      <section class="stats" aria-label="Resumen">
+        <button class="stat-card active" type="button" data-quick-filter="all">
+          <div class="stat-top"><small>Total</small><span class="stat-icon">👥</span></div>
           <strong id="statTotal">0</strong>
-          <span>perfiles</span>
-        </article>
-        <article class="stat-card">
-          <small>Adolescentes</small>
+          <span>personas</span>
+        </button>
+        <button class="stat-card" type="button" data-quick-filter="Adolescente">
+          <div class="stat-top"><small>Adolescentes</small><span class="stat-icon">A</span></div>
           <strong id="statAdolescentes">0</strong>
           <span>menores de 18</span>
-        </article>
-        <article class="stat-card">
-          <small>Jóvenes</small>
+        </button>
+        <button class="stat-card" type="button" data-quick-filter="Joven">
+          <div class="stat-top"><small>Jóvenes</small><span class="stat-icon">J</span></div>
           <strong id="statJovenes">0</strong>
           <span>18 o más</span>
-        </article>
-        <article class="stat-card">
-          <small>Género</small>
-          <strong id="statGenero">0 / 0</strong>
-          <span>Mujer / Varón</span>
-        </article>
-      </div>
+        </button>
+        <button class="stat-card" type="button" data-quick-filter="Mujer">
+          <div class="stat-top"><small>Mujeres</small><span class="stat-icon">♀</span></div>
+          <strong id="statMujeres">0</strong>
+          <span>registradas</span>
+        </button>
+        <button class="stat-card" type="button" data-quick-filter="Varón">
+          <div class="stat-top"><small>Varones</small><span class="stat-icon">♂</span></div>
+          <strong id="statVarones">0</strong>
+          <span>registrados</span>
+        </button>
+      </section>
 
-      <section class="filters-card">
-        <label class="search-field">
-          <span>Buscar</span>
+      <section class="toolbar-card">
+        <div class="search-block">
+          <label for="searchInput">Buscar persona</label>
           <div class="search-box">
             <span class="search-icon">⌕</span>
             <input id="searchInput" type="search" autocomplete="off" placeholder="Nombre, apellido, Instagram o teléfono">
+            <button class="clear-search" id="clearSearchBtn" type="button" aria-label="Borrar búsqueda" title="Borrar">×</button>
           </div>
-        </label>
+        </div>
 
-        <label class="select-field">
-          <span>Grupo</span>
-          <div class="select-wrap">
-            <select id="categoryFilter">
-              <option value="">Todos</option>
-              <option value="Adolescente">Adolescentes</option>
-              <option value="Joven">Jóvenes</option>
-            </select>
-            <span>⌄</span>
-          </div>
-        </label>
+        <div class="filter-grid">
+          <label class="select-field">
+            <span>Grupo</span>
+            <div class="select-wrap">
+              <select id="categoryFilter">
+                <option value="">Todos</option>
+                <option value="Adolescente">Adolescentes</option>
+                <option value="Joven">Jóvenes</option>
+              </select>
+              <span>⌄</span>
+            </div>
+          </label>
 
-        <label class="select-field">
-          <span>Género</span>
-          <div class="select-wrap">
-            <select id="genderFilter">
-              <option value="">Todos</option>
-              <option value="Mujer">Mujer</option>
-              <option value="Varón">Varón</option>
-            </select>
-            <span>⌄</span>
+          <label class="select-field">
+            <span>Género</span>
+            <div class="select-wrap">
+              <select id="genderFilter">
+                <option value="">Todos</option>
+                <option value="Mujer">Mujeres</option>
+                <option value="Varón">Varones</option>
+              </select>
+              <span>⌄</span>
+            </div>
+          </label>
+
+          <label class="select-field">
+            <span>Contacto</span>
+            <div class="select-wrap">
+              <select id="contactFilter">
+                <option value="">Todos</option>
+                <option value="instagram">Con Instagram</option>
+                <option value="telefono">Con teléfono</option>
+                <option value="ambos">Con ambos</option>
+                <option value="sininstagram">Sin Instagram</option>
+              </select>
+              <span>⌄</span>
+            </div>
+          </label>
+
+          <label class="select-field">
+            <span>Ordenar</span>
+            <div class="select-wrap">
+              <select id="sortFilter">
+                <option value="recent">Más recientes</option>
+                <option value="name">Nombre A–Z</option>
+                <option value="ageAsc">Menor edad</option>
+                <option value="ageDesc">Mayor edad</option>
+                <option value="oldest">Registro más antiguo</option>
+              </select>
+              <span>⌄</span>
+            </div>
+          </label>
+        </div>
+
+        <div class="filter-footer">
+          <div class="quick-filters" aria-label="Filtros rápidos">
+            <button class="filter-chip active" type="button" data-chip="all">Todos</button>
+            <button class="filter-chip" type="button" data-chip="Adolescente">Adolescentes</button>
+            <button class="filter-chip" type="button" data-chip="Joven">Jóvenes</button>
+            <button class="filter-chip" type="button" data-chip="Mujer">Mujeres</button>
+            <button class="filter-chip" type="button" data-chip="Varón">Varones</button>
           </div>
-        </label>
+          <button class="text-button" id="clearFiltersBtn" type="button">Limpiar filtros</button>
+        </div>
       </section>
 
       <section class="records-card">
         <div class="records-head">
           <div>
-            <strong id="visibleCount">0 registros</strong>
-            <small>Ordenados del más reciente al más antiguo</small>
+            <strong id="visibleCount">0 personas</strong>
+            <small id="activeFilterText">Mostrando todos los perfiles</small>
           </div>
-          <button class="ghost-button" id="clearFiltersBtn" type="button">Limpiar filtros</button>
+          <span class="updated-badge" id="updatedBadge">Actualizado ahora</span>
         </div>
 
         <div class="table-scroll">
@@ -139,10 +214,10 @@
                 <th>Edad</th>
                 <th>Grupo</th>
                 <th>Género</th>
-                <th>Instagram</th>
-                <th>Teléfono</th>
                 <th>Nacimiento</th>
+                <th>Contacto</th>
                 <th>Registro</th>
+                <th class="actions-col">Acciones</th>
               </tr>
             </thead>
             <tbody id="rowsBody"></tbody>
@@ -152,19 +227,22 @@
         <div class="mobile-list" id="cardsList"></div>
 
         <div class="empty-state" id="emptyState" hidden>
-          <div>⌕</div>
-          <strong>No encontramos resultados</strong>
-          <span>Probá cambiando la búsqueda o los filtros.</span>
+          <div class="empty-icon">⌕</div>
+          <strong>No encontramos personas</strong>
+          <span>Probá cambiando la búsqueda o limpiando los filtros.</span>
+          <button class="secondary" id="emptyClearBtn" type="button">Limpiar filtros</button>
         </div>
       </section>
 
-      <p class="session-note">Por seguridad, si recargás esta página vas a tener que ingresar la contraseña nuevamente.</p>
+      <p class="session-note">La sesión de esta pantalla se mantiene solo mientras la tengas abierta. Si recargás, vas a tener que ingresar la contraseña nuevamente.</p>
     </section>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   </main>
 
   <script src="/supabase-lite.js?v=12"></script>
   <script src="/assets/tnt-components.js?v=14"></script>
   <script src="/assets/tnt-core.js?v=14" data-public="true" data-shell="off"></script>
-  <script src="/perfiles/datos/admin.js?v=1"></script>
+  <script src="/perfiles/datos/admin.js?v=2"></script>
 </body>
 </html>
