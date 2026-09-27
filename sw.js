@@ -1,7 +1,7 @@
 // Bump this whenever the shell or a module changes. Older caches are removed
 // during activate so a phone cannot keep rendering a previous TNT build.
-const CACHE='tnt-v22-chat-roles';
-const CORE=['/','/index.html','/manifest.webmanifest','/icons/icon.svg','/supabase-lite.js?v=12','/assets/tnt-ui.css?v=15','/assets/tnt-core.js?v=22','/assets/tnt-module-theme.css?v=10','/organizacion/','/campamento/','/glosario/','/lista-sabados/','/efe/','/buffet/','/chat/','/admin/'];
+const CACHE='tnt-v23-voice-select';
+const CORE=['/','/index.html','/manifest.webmanifest','/icons/icon.svg','/supabase-lite.js?v=12','/assets/tnt-ui.css?v=23','/assets/tnt-core.js?v=22','/assets/tnt-module-theme.css?v=10','/organizacion/','/campamento/','/glosario/','/lista-sabados/','/efe/','/buffet/','/chat/','/admin/'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).catch(()=>{}).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{
