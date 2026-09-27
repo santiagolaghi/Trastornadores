@@ -5,6 +5,8 @@
 
 .chat-room-head{grid-row:1}.chat-pinned{grid-row:2}.chat-messages{grid-row:3}.chat-compose-wrap{grid-row:4}
 
+#chat-voice{touch-action:none;user-select:none;-webkit-user-select:none}#chat-record-status{display:flex;align-items:center;flex-wrap:wrap;gap:8px}#chat-record-status span{flex:1;min-width:170px}#chat-record-status small{display:block;color:var(--tnt-muted);font-size:12px;margin-top:3px}#chat-record-status.locked{border:1px solid var(--tnt-accent);background:color-mix(in srgb,var(--tnt-accent) 9%,var(--tnt-panel))}#room-options{flex:none}.chat-room-head .room-people{min-width:0}
+
 .chat-room>*{min-width:0}.chat-pinned button{width:100%;min-width:0}.chat-sidebar{min-width:0}
 
 /* Fit the visible viewport, including the software keyboard. */
