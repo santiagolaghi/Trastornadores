@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d12">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="description" content="Panel privado de datos de Perfiles TNT.">
+  <title>Datos · Perfiles</title>
+  <link rel="icon" href="/perfiles/icon.svg">
+  <link rel="stylesheet" href="/perfiles/datos/admin.css?v=1">
+</head>
+<body>
+  <div class="glow glow-a"></div>
+  <div class="glow glow-b"></div>
+
+  <main class="shell">
+    <header class="topbar">
+      <a class="back-button" href="/perfiles" aria-label="Volver a Perfiles">←</a>
+      <div class="brand">
+        <div class="brand-mark">P</div>
+        <div>
+          <span class="eyebrow">TNT · PRIVADO</span>
+          <h1>Datos de Perfiles</h1>
+        </div>
+      </div>
+      <span class="lock-chip">🔒</span>
+    </header>
+
+    <section class="login-view" id="loginView">
+      <div class="login-card">
+        <div class="lock-orb">⌁</div>
+        <span class="pill">Acceso privado</span>
+        <h2>Entrá para ver<br><span>los registros.</span></h2>
+        <p>Esta sección contiene datos personales y está protegida por contraseña.</p>
+
+        <form id="loginForm" novalidate>
+          <label class="field">
+            <span>Contraseña</span>
+            <div class="password-wrap">
+              <input id="password" type="password" autocomplete="current-password" placeholder="Ingresá la contraseña" required>
+              <button class="eye-button" id="togglePassword" type="button" aria-label="Mostrar contraseña">Ver</button>
+            </div>
+          </label>
+
+          <div class="message" id="loginMessage" role="status" aria-live="polite"></div>
+
+          <button class="primary" id="loginBtn" type="submit">
+            <span id="loginText">Abrir datos</span>
+            <span class="spinner" id="loginSpinner" hidden></span>
+          </button>
+        </form>
+
+        <small class="privacy-note">La contraseña se valida en Supabase y no queda guardada en esta página.</small>
+      </div>
+    </section>
+
+    <section class="dashboard" id="dashboardView" hidden>
+      <div class="dashboard-heading">
+        <div>
+          <span class="pill">Base de datos</span>
+          <h2>Personas registradas</h2>
+          <p id="summaryText">Cargando registros…</p>
+        </div>
+        <button class="secondary compact" id="logoutBtn" type="button">Bloquear</button>
+      </div>
+
+      <div class="stats">
+        <article class="stat-card">
+          <small>Total</small>
+          <strong id="statTotal">0</strong>
+          <span>perfiles</span>
+        </article>
+        <article class="stat-card">
+          <small>Adolescentes</small>
+          <strong id="statAdolescentes">0</strong>
+          <span>menores de 18</span>
+        </article>
+        <article class="stat-card">
+          <small>Jóvenes</small>
+          <strong id="statJovenes">0</strong>
+          <span>18 o más</span>
+        </article>
+        <article class="stat-card">
+          <small>Género</small>
+          <strong id="statGenero">0 / 0</strong>
+          <span>Mujer / Varón</span>
+        </article>
+      </div>
+
+      <section class="filters-card">
+        <label class="search-field">
+          <span>Buscar</span>
+          <div class="search-box">
+            <span class="search-icon">⌕</span>
+            <input id="searchInput" type="search" autocomplete="off" placeholder="Nombre, apellido, Instagram o teléfono">
+          </div>
+        </label>
+
+        <label class="select-field">
+          <span>Grupo</span>
+          <div class="select-wrap">
+            <select id="categoryFilter">
+              <option value="">Todos</option>
+              <option value="Adolescente">Adolescentes</option>
+              <option value="Joven">Jóvenes</option>
+            </select>
+            <span>⌄</span>
+          </div>
+        </label>
+
+        <label class="select-field">
+          <span>Género</span>
+          <div class="select-wrap">
+            <select id="genderFilter">
+              <option value="">Todos</option>
+              <option value="Mujer">Mujer</option>
+              <option value="Varón">Varón</option>
+            </select>
+            <span>⌄</span>
+          </div>
+        </label>
+      </section>
+
+      <section class="records-card">
+        <div class="records-head">
+          <div>
+            <strong id="visibleCount">0 registros</strong>
+            <small>Ordenados del más reciente al más antiguo</small>
+          </div>
+          <button class="ghost-button" id="clearFiltersBtn" type="button">Limpiar filtros</button>
+        </div>
+
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Persona</th>
+                <th>Edad</th>
+                <th>Grupo</th>
+                <th>Género</th>
+                <th>Instagram</th>
+                <th>Teléfono</th>
+                <th>Nacimiento</th>
+                <th>Registro</th>
+              </tr>
+            </thead>
+            <tbody id="rowsBody"></tbody>
+          </table>
+        </div>
+
+        <div class="mobile-list" id="cardsList"></div>
+
+        <div class="empty-state" id="emptyState" hidden>
+          <div>⌕</div>
+          <strong>No encontramos resultados</strong>
+          <span>Probá cambiando la búsqueda o los filtros.</span>
+        </div>
+      </section>
+
+      <p class="session-note">Por seguridad, si recargás esta página vas a tener que ingresar la contraseña nuevamente.</p>
+    </section>
+  </main>
+
+  <script src="/supabase-lite.js?v=12"></script>
+  <script src="/assets/tnt-components.js?v=14"></script>
+  <script src="/assets/tnt-core.js?v=14" data-public="true" data-shell="off"></script>
+  <script src="/perfiles/datos/admin.js?v=1"></script>
+</body>
+</html>
