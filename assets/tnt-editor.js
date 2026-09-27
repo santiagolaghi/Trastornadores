@@ -25,14 +25,25 @@
   function render(plain,rich){return rich?'<span class="tnt-rich">'+clean(rich)+'</span>':esc(plain||'').replace(/(https?:\/\/[^\s<>]+)/g,url=>'<a href="'+url+'" target="_blank" rel="noopener noreferrer">'+url+'</a>');}
   function attach(input,options={}){
     const wrap=document.createElement('div');wrap.className='tnt-editor';
-    wrap.innerHTML='<div class="tnt-editor-tools" role="toolbar" aria-label="Formato del texto"><button type="button" data-command="bold" aria-label="Negrita"><b>B</b></button><button type="button" data-command="italic" aria-label="Cursiva"><i>I</i></button><button type="button" data-command="underline" aria-label="Subrayar"><u>U</u></button><button type="button" data-command="hiliteColor" aria-label="Resaltar">▰</button><select aria-label="Color del texto"><option value="">Color</option><option value="purple">Violeta</option><option value="blue">Azul</option><option value="red">Rojo</option><option value="green">Verde</option></select><button type="button" data-command="removeFormat" aria-label="Quitar formato">Aa</button></div><div class="tnt-editor-content tnt-rich" contenteditable="true" role="textbox" aria-multiline="true"></div>';
+    wrap.innerHTML='<div class="tnt-editor-tools" role="toolbar" aria-label="Formato del texto"><button type="button" data-command="bold" aria-label="Negrita"><b>B</b></button><button type="button" data-command="italic" aria-label="Cursiva"><i>I</i></button><button type="button" data-command="underline" aria-label="Subrayar"><u>U</u></button><button type="button" data-command="hiliteColor" aria-label="Resaltar">▰</button><button type="button" class="tnt-swatch tnt-swatch-purple" data-color="purple" aria-label="Texto violeta" title="Violeta"></button><button type="button" class="tnt-swatch tnt-swatch-blue" data-color="blue" aria-label="Texto azul" title="Azul"></button><button type="button" class="tnt-swatch tnt-swatch-red" data-color="red" aria-label="Texto rojo" title="Rojo"></button><button type="button" class="tnt-swatch tnt-swatch-green" data-color="green" aria-label="Texto verde" title="Verde"></button><button type="button" data-command="removeFormat" aria-label="Quitar formato">Aa</button></div><div class="tnt-editor-content tnt-rich" contenteditable="true" role="textbox" aria-multiline="true"></div>';
     input.after(wrap);input.hidden=true;const area=wrap.querySelector('[contenteditable]');area.setAttribute('aria-label',input.getAttribute('aria-label')||input.placeholder||'Texto');area.dataset.placeholder=input.placeholder||'Escribí acá…';
     const sync=()=>{input.value=text(area.innerHTML);input.dispatchEvent(new Event('input',{bubbles:true}));};
     const api={area,wrap,get:()=>({text:text(area.innerHTML),html:clean(area.innerHTML)}),set:(plain,rich)=>{area.innerHTML=rich?clean(rich):esc(plain||'').replace(/\n/g,'<br>');sync();},focus:()=>area.focus(),lock:value=>{area.contentEditable=value?'false':'true';wrap.querySelectorAll('button,select').forEach(b=>b.disabled=value);}};
-    let selection=null;area.addEventListener('keyup',save);area.addEventListener('mouseup',save);area.addEventListener('touchend',save);function save(){const s=getSelection();if(s.rangeCount&&area.contains(s.anchorNode))selection=s.getRangeAt(0).cloneRange();}
-    function command(cmd,value){area.focus();if(selection){const s=getSelection();s.removeAllRanges();s.addRange(selection);}document.execCommand(cmd,false,value);sync();save();}
+    let selection=null;area.addEventListener('keyup',save);area.addEventListener('mouseup',save);area.addEventListener('touchend',save);area.addEventListener('pointerup',save);
+    document.addEventListener('selectionchange',()=>{if(document.activeElement===area)save();});
+    function save(){const s=getSelection();if(s.rangeCount&&!s.isCollapsed&&area.contains(s.anchorNode)&&area.contains(s.focusNode))selection=s.getRangeAt(0).cloneRange();}
+    function command(cmd,value){
+      const range=selection?.cloneRange();if(!range||range.collapsed||!area.contains(range.commonAncestorContainer)){area.focus();return;}
+      if(cmd==='foreColor'||cmd==='hiliteColor'||cmd==='underline'){
+        const node=document.createElement(cmd==='underline'?'u':'span');
+        if(cmd==='foreColor')node.className='tnt-color-'+Object.keys(colors).find(k=>colors[k]===value);
+        if(cmd==='hiliteColor')node.className='tnt-highlight';
+        node.append(range.extractContents());range.insertNode(node);const s=getSelection();s.removeAllRanges();s.selectAllChildren(node);selection=s.getRangeAt(0).cloneRange();
+      }else{area.focus();const s=getSelection();s.removeAllRanges();s.addRange(range);document.execCommand(cmd,false,value);save();}
+      sync();
+    }
     wrap.querySelectorAll('[data-command]').forEach(b=>{b.onmousedown=e=>e.preventDefault();b.onclick=()=>command(b.dataset.command,b.dataset.command==='hiliteColor'?'#f7df86':null);});
-    wrap.querySelector('select').onchange=e=>{if(e.target.value)command('foreColor',colors[e.target.value]);e.target.value='';};
+    wrap.querySelectorAll('[data-color]').forEach(b=>{b.onpointerdown=save;b.onclick=()=>command('foreColor',colors[b.dataset.color]);});
     area.addEventListener('input',()=>{if(text(area.innerHTML).length>10000){area.textContent=text(area.innerHTML).slice(0,10000);}sync();save();});
     area.addEventListener('paste',e=>{e.preventDefault();document.execCommand('insertText',false,e.clipboardData.getData('text/plain'));sync();});
     area.addEventListener('keydown',e=>input.dispatchEvent(new KeyboardEvent('keydown',{key:e.key,shiftKey:e.shiftKey,isComposing:e.isComposing,bubbles:true,cancelable:true}))===false&&e.preventDefault());
