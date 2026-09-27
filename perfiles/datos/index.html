@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/perfiles/datos/admin.css?v=3">
+  <link rel="stylesheet" href="/perfiles/datos/admin.css?v=4">
 </head>
 <body class="perfiles-admin">
   <div id="baseTnt">
@@ -252,6 +252,90 @@
 
       <div class="detail-data" id="detailData"></div>
       <div class="detail-actions" id="detailActions"></div>
+
+      <div class="management-actions">
+        <button class="manage-btn edit-btn" id="editProfileBtn" type="button">✎ Editar perfil</button>
+        <button class="manage-btn delete-btn" id="deleteProfileBtn" type="button">Eliminar perfil</button>
+      </div>
+    </section>
+
+    <div class="sheet-backdrop edit-backdrop" id="editBackdrop" hidden></div>
+    <section class="bottom-sheet edit-sheet" id="editSheet" aria-hidden="true" aria-labelledby="editTitle">
+      <div class="sheet-handle"></div>
+      <header class="sheet-header">
+        <div>
+          <span>EDITAR PERSONA</span>
+          <h2 id="editTitle">Editar perfil</h2>
+        </div>
+        <button class="sheet-close" id="closeEditBtn" type="button" aria-label="Cerrar">×</button>
+      </header>
+
+      <form id="editForm" novalidate>
+        <div class="edit-grid">
+          <label class="edit-field">
+            <span>Nombre</span>
+            <input id="editNombre" type="text" maxlength="80" required>
+          </label>
+          <label class="edit-field">
+            <span>Apellido</span>
+            <input id="editApellido" type="text" maxlength="80" required>
+          </label>
+        </div>
+
+        <label class="edit-field">
+          <span>Fecha de nacimiento</span>
+          <input id="editFechaNacimiento" type="date" required>
+        </label>
+
+        <div class="edit-field">
+          <span>Género</span>
+          <div class="gender-segment">
+            <label>
+              <input type="radio" name="editGenero" value="Mujer">
+              <span>Mujer</span>
+            </label>
+            <label>
+              <input type="radio" name="editGenero" value="Varón">
+              <span>Varón</span>
+            </label>
+          </div>
+        </div>
+
+        <label class="edit-field">
+          <span>Instagram <em>opcional</em></span>
+          <input id="editInstagram" type="text" maxlength="80" placeholder="@usuario">
+        </label>
+
+        <label class="edit-field">
+          <span>Teléfono</span>
+          <input id="editTelefono" type="tel" inputmode="tel" maxlength="25" required>
+        </label>
+
+        <div class="form-message edit-message" id="editMessage" role="status" aria-live="polite"></div>
+
+        <div class="edit-actions">
+          <button class="cancel-edit-btn" id="cancelEditBtn" type="button">Cancelar</button>
+          <button class="save-edit-btn" id="saveEditBtn" type="submit">
+            <span id="saveEditText">Guardar cambios</span>
+            <span class="spinner" id="saveEditSpinner" hidden></span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <div class="sheet-backdrop delete-backdrop" id="deleteBackdrop" hidden></div>
+    <section class="bottom-sheet delete-sheet" id="deleteSheet" aria-hidden="true" aria-labelledby="deleteTitle">
+      <div class="sheet-handle"></div>
+      <div class="danger-icon">!</div>
+      <h2 id="deleteTitle">¿Eliminar perfil?</h2>
+      <p>Vas a eliminar a <strong id="deleteProfileName">esta persona</strong> de la Base TNT. Esta acción no se puede deshacer.</p>
+      <div class="delete-actions">
+        <button id="cancelDeleteBtn" type="button">Cancelar</button>
+        <button id="confirmDeleteBtn" type="button">
+          <span id="confirmDeleteText">Sí, eliminar</span>
+          <span class="spinner" id="deleteSpinner" hidden></span>
+        </button>
+      </div>
     </section>
 
     <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
@@ -259,6 +343,6 @@
 
   <script src="/supabase-lite.js?v=12"></script>
   <script src="/assets/tnt-core.js?v=14" data-public="true" data-shell="off"></script>
-  <script src="/perfiles/datos/admin.js?v=3"></script>
+  <script src="/perfiles/datos/admin.js?v=4"></script>
 </body>
 </html>
