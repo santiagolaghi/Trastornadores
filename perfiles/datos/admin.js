@@ -656,7 +656,7 @@
 
     if (!options.silent) setRefreshLoading(true);
     try {
-      const { data, error } = await sb.rpc("perfiles_admin_listar", { p_token: token });
+      const { data, error } = await sb.from("perfiles_registros").select("*").order("creado_en", { ascending: false });
       if (error) throw error;
 
       records = Array.isArray(data) ? data : [];
@@ -674,53 +674,14 @@
   }
 
   function lockBase() {
-    records = [];
-    accessToken = "";
-    currentDetailId = "";
-    clearPanelSession();
-    filters = defaultFilters();
-    draftFilters = defaultFilters();
-    searchInput.value = "";
-    dashboardView.hidden = true;
-    loginView.hidden = false;
-    loginMessage.textContent = "";
-    passwordInput.value = "";
-    closeFilters();
-    closeDetail();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    setTimeout(() => passwordInput.focus(), 150);
+    location.href = "/";
   }
 
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    loginMessage.textContent = "";
-
-    const password = passwordInput.value;
-    if (!password) {
-      loginMessage.textContent = "Ingresá la contraseña.";
-      passwordInput.focus();
-      return;
-    }
-
-    setLoginLoading(true);
-    try {
-      const token = await hashPassword(password);
-      await loadData(token, { silent: true });
-      accessToken = token;
-      savePanelSession(token);
-      passwordInput.value = "";
-      loginView.hidden = true;
-      dashboardView.hidden = false;
-      window.scrollTo({ top: 0 });
-    } catch (error) {
-      console.error(error);
-      accessToken = "";
-      loginMessage.textContent = error?.code === "42501"
-        ? "Contraseña incorrecta."
-        : "No se pudieron cargar los datos.";
-    } finally {
-      setLoginLoading(false);
-    }
+    if (!window.TNT?.isAdmin) { loginMessage.textContent = "Esta base solo está disponible para administradores TNT."; return; }
+    try { await loadData("central", { silent: true }); accessToken="central"; loginView.hidden=true; dashboardView.hidden=false; }
+    catch (error) { loginMessage.textContent="No se pudo cargar la base de perfiles."; }
   });
 
   togglePassword.addEventListener("click", () => {
@@ -848,16 +809,8 @@
       const sb = window.TNT?.sb;
       if (!sb) throw new Error("No se pudo conectar con la base.");
 
-      const { data, error } = await sb.rpc("perfiles_admin_actualizar", {
-        p_token: accessToken,
-        p_id: record.id,
-        p_nombre: nombre,
-        p_apellido: apellido,
-        p_fecha_nacimiento: fecha,
-        p_instagram: instagram,
-        p_telefono: telefono,
-        p_genero: genero,
-      });
+      const years=ageFromBirthdate(fecha);
+      const { data, error } = await sb.from("perfiles_registros").update({nombre,apellido,fecha_nacimiento:fecha,edad:years,categoria:years<18?"Adolescente":"Joven",instagram,telefono,genero,actualizado_en:new Date().toISOString()}).eq("id",record.id).select().single();
 
       if (error) throw error;
 
@@ -893,13 +846,8 @@
       const sb = window.TNT?.sb;
       if (!sb) throw new Error("No se pudo conectar con la base.");
 
-      const { data, error } = await sb.rpc("perfiles_admin_eliminar", {
-        p_token: accessToken,
-        p_id: record.id,
-      });
-
+      const { error } = await sb.from("perfiles_registros").delete().eq("id", record.id);
       if (error) throw error;
-      if (data !== true) throw new Error("No se confirmó la eliminación.");
 
       const deletedName = [record.nombre, record.apellido].filter(Boolean).join(" ");
       records = records.filter((item) => String(item.id) !== String(record.id));
@@ -951,25 +899,18 @@
   }
 
   async function restorePanelSession() {
-    const token = readPanelSession();
-    if (!token) {
-      passwordInput.focus();
+    await window.TNT?.ready;
+    if (!window.TNT?.identity || window.TNT.blocked || !window.TNT.isAdmin) {
+      loginMessage.textContent = "Esta base solo está disponible para administradores TNT.";
+      loginView.hidden = false;
       return;
     }
-
     try {
-      accessToken = token;
-      await loadData(token, { silent: true });
-      loginView.hidden = true;
-      dashboardView.hidden = false;
-    } catch (error) {
-      console.error("No se pudo restaurar la sesión de Base TNT", error);
-      accessToken = "";
-      clearPanelSession();
-      loginView.hidden = false;
-      dashboardView.hidden = true;
-      passwordInput.focus();
-    }
+      await loadData("central", { silent: true });
+      accessToken="central";
+      loginView.hidden=true;
+      dashboardView.hidden=false;
+    } catch (error) { console.error("No se pudieron cargar los perfiles",error); loginMessage.textContent="No se pudo cargar la base. Reintentá."; loginView.hidden=false; }
   }
 
   initTheme();

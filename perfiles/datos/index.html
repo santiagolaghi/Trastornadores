@@ -20,7 +20,7 @@
 
     <main class="app-shell">
       <header class="app-header">
-        <a class="square-btn back-button" href="/perfiles" aria-label="Volver" title="Volver">←</a>
+        <a class="square-btn back-button" href="/" aria-label="Volver a TNT" title="Volver">←</a>
 
         <div class="brand">
           <div class="brand-mark">T</div>
@@ -38,22 +38,22 @@
         </div>
       </header>
 
-      <section class="login-view" id="loginView">
+      <section class="login-view" id="loginView" hidden>
         <div class="login-card">
           <div class="login-icon">🔒</div>
           <span class="eyebrow-pill">Base central TNT</span>
           <h1>Tu gente,<br><span>en un solo lugar.</span></h1>
-          <p>Accedé a los perfiles registrados. Sábados y EFE todavía no están vinculados a esta base.</p>
+          <p>Accedé a los perfiles registrados con tu cuenta de administrador TNT.</p>
 
           <form id="loginForm" novalidate>
-            <label class="field-label" for="password">Contraseña</label>
-            <div class="password-field">
-              <input id="password" type="password" autocomplete="current-password" placeholder="Ingresá la contraseña" required>
+            <label class="field-label" for="password" hidden>Contraseña</label>
+            <div class="password-field" hidden>
+              <input id="password" type="password" autocomplete="current-password" placeholder="Ingresá la contraseña">
               <button id="togglePassword" type="button" aria-label="Mostrar contraseña">Ver</button>
             </div>
             <div class="form-message" id="loginMessage" role="status" aria-live="polite"></div>
             <button class="login-submit" id="loginBtn" type="submit">
-              <span id="loginText">Abrir Base TNT</span>
+              <span id="loginText">Reintentar acceso</span>
               <span class="spinner" id="loginSpinner" hidden></span>
             </button>
           </form>
@@ -342,7 +342,7 @@
   </div>
 
   <script src="/supabase-lite.js?v=12"></script>
-  <script src="/assets/tnt-core.js?v=14" data-public="true" data-shell="off"></script>
-  <script src="/perfiles/datos/admin.js?v=4"></script>
+  <script src="/assets/tnt-components.js?v=29"></script><script src="/assets/tnt-core.js?v=30" data-module="perfiles" data-label="Perfiles" data-shell="off"></script>
+  <script src="/perfiles/datos/admin.js?v=30"></script>
 </body>
 </html>

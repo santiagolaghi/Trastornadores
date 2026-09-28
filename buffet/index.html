@@ -61,12 +61,10 @@ let state={name:localStorage.getItem('tnt_name')||'',role:localStorage.getItem('
 function toast(msg){toastEl.textContent=msg;toastEl.classList.add('show');clearTimeout(toastEl._t);toastEl._t=setTimeout(()=>toastEl.classList.remove('show'),2500)}
 function errMsg(e){return e?.message?.replace(/^.*?: /,'')||'Ocurrió un error'}
 function setBusy(btn,on,label='Procesando…'){if(!btn)return;btn.disabled=on;if(on){btn.dataset.old=btn.textContent;btn.textContent=label}else if(btn.dataset.old){btn.textContent=btn.dataset.old}}
-// Buffet uses the same authenticated TNT client as every other module.
-// The previous implementation referenced credentials scoped inside tnt-core.js,
-// which made `SUPABASE_URL is not defined` stop Buffet before its first render.
+// El acceso a este módulo se valida con la Cuenta TNT antes de abrir su base original.
 function clientFor(){
-  if(!TNT?.sb)throw new Error('No se pudo cargar la conexión de TNT.');
-  return TNT.sb;
+  if(!TNT?.identity||!TNT.hasAccess('buffet','*','view'))throw new Error('No tenés acceso a Buffet.');
+  return createClient('https://lcrbhzfijumbvhmtunqv.supabase.co','sb_publishable_GKRoh5nt4lCoG0ZZYA_jdA_TnFEbdWe',{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
 }
 
 async function connectApp(){
