@@ -49,12 +49,14 @@
   function time(value) { return value?date(value,{hour:'2-digit',minute:'2-digit'}):''; }
   const completed = t => ['done','completed','cancelled'].includes(typeof t==='string'?t:t?.status);
   function modal(title, body, wide=false) {
-    root.document.querySelector('.tnt-overlay')?.remove();
+    const old=root.document.querySelector('.tnt-overlay'),replacing=!!old;old?._tntDisposeBack?.();old?.remove();
     const previous=root.document.activeElement, dialog=root.document.createElement('dialog');
     dialog.className='tnt-overlay';dialog.setAttribute('aria-label',title);
     dialog.innerHTML=`<section class="tnt-sheet ${wide?'wide':''}"><header class="tnt-sheet-head"><h2>${esc(title)}</h2><button class="tnt-close" type="button" aria-label="Cerrar">${icon('close')}</button></header>${body}</section>`;
     root.document.body.append(dialog);
-    const close=()=>{dialog.remove();previous?.focus?.();};
+    if(!replacing&&root.history?.pushState)root.history.pushState({...root.history.state,tntSharedOverlay:true},'');
+    const onBack=()=>{root.removeEventListener('popstate',onBack);if(dialog.isConnected){dialog.remove();previous?.focus?.();}};root.addEventListener('popstate',onBack);dialog._tntDisposeBack=()=>root.removeEventListener('popstate',onBack);
+    const close=()=>{dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();if(root.history?.state?.tntSharedOverlay)root.history.back();};
     dialog.querySelector('.tnt-close').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
     dialog.addEventListener('click',e=>{if(e.target===dialog)close();});
     if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');
@@ -79,7 +81,9 @@
         const dialog=root.document.createElement('dialog');dialog.className='tnt-select-dialog';dialog.setAttribute('aria-label',label);
         dialog.innerHTML=`<div class="tnt-select-sheet"><header><h2>${esc(label)}</h2><button type="button" class="tnt-select-close" aria-label="Cerrar">${icon('close')}</button></header>${options.length>8?'<input type="search" class="tnt-select-search" placeholder="Buscar opción…" aria-label="Buscar opción">':''}<div class="tnt-select-list" role="listbox">${options.map((option,index)=>`<button type="button" role="option" data-option="${index}" aria-selected="${option.selected}" ${option.disabled?'disabled':''}><span>${esc(option.textContent.trim())}</span>${option.selected?icon('check'):''}</button>`).join('')}</div></div>`;
         root.document.body.append(dialog);
-        const close=()=>{dialog.close?.();dialog.remove();previous?.focus?.();};
+        if(root.history?.pushState)root.history.pushState({...root.history.state,tntSelectOverlay:true},'');
+        const onBack=()=>{dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();};root.addEventListener('popstate',onBack);
+        const close=()=>{dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();if(root.history?.state?.tntSelectOverlay)root.history.back();};
         dialog.querySelector('.tnt-select-close').onclick=close;
         dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
         dialog.addEventListener('click',e=>{if(e.target===dialog)close();});
