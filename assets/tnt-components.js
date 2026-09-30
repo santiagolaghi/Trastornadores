@@ -63,9 +63,10 @@
   // A programmatic overlay close consumes its own history entry. Parent dialogs
   // and module navigation must not interpret that popstate as a second Back.
   function backOverlay() {
-    const consume=e=>{e.stopImmediatePropagation();root.removeEventListener('popstate',consume,true);};
-    root.addEventListener('popstate',consume,true);
-    root.history.back();
+    return new Promise(resolve=>{
+      const consume=e=>{e.stopImmediatePropagation();root.removeEventListener('popstate',consume,true);resolve();};
+      root.addEventListener('popstate',consume,true);root.history.back();
+    });
   }
   function modal(title, body, wide=false) {
     const old=root.document.querySelector('.tnt-overlay'),replacing=!!old;old?._tntDisposeBack?.();old?.remove();
@@ -75,12 +76,39 @@
     root.document.body.append(dialog);
     if(!replacing&&root.history?.pushState)root.history.pushState({...root.history.state,tntSharedOverlay:true},'');
     const onBack=e=>{if(e.state?.tntSharedOverlay)return;root.removeEventListener('popstate',onBack);if(dialog.isConnected){dialog.remove();previous?.focus?.();}};root.addEventListener('popstate',onBack);dialog._tntDisposeBack=()=>root.removeEventListener('popstate',onBack);
-    const close=()=>{dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();if(root.history?.state?.tntSharedOverlay)backOverlay();};
+    const close=()=>{if(!dialog.isConnected)return;dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();if(root.history?.state?.tntSharedOverlay)return backOverlay();};
+    dialog._tntClose=close;
     dialog.querySelector('.tnt-close').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
     dialog.addEventListener('click',e=>{if(e.target===dialog)close();});
     if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');
     return dialog;
   }
+  function closeModal(dialog) { if(dialog?._tntClose)return Promise.resolve(dialog._tntClose());dialog?.remove();return Promise.resolve(); }
+  function trackOverlay(node, dismiss=()=>node.remove()) {
+    if(node._tntLayerActive)return;
+    const id='layer-'+Date.now()+'-'+Math.random().toString(36).slice(2),previous=root.document.activeElement;
+    const stack=[...(root.history.state?.tntLayerStack||[]),id];
+    root.history.pushState({...root.history.state,tntLayerStack:stack},'');node._tntLayerActive=true;
+    const finish=()=>{node._tntLayerActive=false;root.removeEventListener('popstate',onBack);root.document.removeEventListener('keydown',onKey);dismiss();previous?.focus?.();};
+    const onBack=e=>{if(!e.state?.tntLayerStack?.includes(id))finish();};
+    const close=()=>{if(!node._tntLayerActive)return;finish();if(root.history.state?.tntLayerStack?.at(-1)===id)return backOverlay();};
+    const onKey=e=>{if(e.key==='Escape'&&root.history.state?.tntLayerStack?.at(-1)===id){e.preventDefault();e.stopImmediatePropagation();close();}};
+    root.addEventListener('popstate',onBack);root.document.addEventListener('keydown',onKey);
+    node._tntClose=close;
+  }
+  function ask(message, text=false) {
+    return new Promise(resolve=>{
+      let result=text?null:false;
+      const dialog=root.document.createElement('dialog');dialog.className='tnt-question';
+      dialog.innerHTML=`<section class="tnt-sheet"><header class="tnt-sheet-head"><h2>${esc(text?'Tu respuesta':'Confirmar acción')}</h2><button class="tnt-close" type="button" aria-label="Cerrar">${icon('close')}</button></header><form class="tnt-form"><p>${esc(message)}</p>${text?'<label>Respuesta<textarea name="answer" maxlength="2000"></textarea></label>':''}<div class="tnt-actions"><button type="button" data-cancel class="tnt-button">Cancelar</button><button type="submit" class="tnt-button primary">${text?'Continuar':'Confirmar'}</button></div></form></section>`;
+      root.document.body.append(dialog);trackOverlay(dialog,()=>{dialog.remove();resolve(result);});
+      dialog.querySelector('.tnt-close').onclick=dialog.querySelector('[data-cancel]').onclick=()=>closeModal(dialog);
+      dialog.querySelector('form').onsubmit=e=>{e.preventDefault();result=text?dialog.querySelector('textarea').value:true;closeModal(dialog);};
+      dialog.addEventListener('cancel',e=>{e.preventDefault();closeModal(dialog);});
+      dialog.showModal?.();
+    });
+  }
+  const confirm=message=>ask(message),prompt=message=>ask(message,true);
   function toast(message, error=false) {
     let t=root.document.getElementById('tnt-toast');if(!t){t=root.document.createElement('div');t.id='tnt-toast';t.setAttribute('role','status');root.document.body.append(t);}
     t.textContent=message;t.className=error?'show error':'show';clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),4500);
@@ -116,7 +144,7 @@
       };
     }
   }
-  const api={esc,icon,safeUrl,initials,avatar,avatarStack,dateKey,addDays,date,time,completed,modal,toast,enhanceSelects,backOverlay,accessInfo};
+  const api={esc,icon,safeUrl,initials,avatar,avatarStack,dateKey,addDays,date,time,completed,modal,closeModal,trackOverlay,confirm,prompt,toast,enhanceSelects,backOverlay,accessInfo};
   root.TNTUI=api;
   if(root.document){const init=()=>{enhanceSelects();if(root.MutationObserver){new root.MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1)enhanceSelects(node);}).observe(root.document.body,{childList:true,subtree:true});}};if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init,{once:true});else init();}
   root.document?.addEventListener('error',e=>{if(e.target?.matches?.('.tnt-person-avatar img'))e.target.remove();},true);

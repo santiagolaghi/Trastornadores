@@ -434,14 +434,17 @@
     filterBackdrop.hidden = false;
     filterSheet.classList.add("open");
     filterSheet.setAttribute("aria-hidden", "false");
+    window.TNTUI.trackOverlay(filterSheet, () => {
+      filterSheet.classList.remove("open");
+      filterSheet.setAttribute("aria-hidden", "true");
+      filterBackdrop.hidden = true;
+      document.body.style.overflow = document.querySelector('.bottom-sheet.open') ? 'hidden' : '';
+    });
     document.body.style.overflow = "hidden";
   }
 
   function closeFilters() {
-    filterSheet.classList.remove("open");
-    filterSheet.setAttribute("aria-hidden", "true");
-    filterBackdrop.hidden = true;
-    document.body.style.overflow = "";
+    window.TNTUI.closeModal(filterSheet);
   }
 
   function resetAllFilters() {
@@ -501,17 +504,22 @@
       <button class="detail-action copy-detail ${phone ? "" : "disabled"}" type="button" data-copy-phone="${escapeHtml(phone)}">${icons.copy}<span>Copiar teléfono</span></button>
     `;
 
+    $("editProfileBtn").hidden = !window.TNT.hasAccess('perfiles','*','edit');
+    $("deleteProfileBtn").hidden = !window.TNT.hasAccess('perfiles','*','edit');
     detailBackdrop.hidden = false;
     detailSheet.classList.add("open");
     detailSheet.setAttribute("aria-hidden", "false");
+    window.TNTUI.trackOverlay(detailSheet, () => {
+      detailSheet.classList.remove("open");
+      detailSheet.setAttribute("aria-hidden", "true");
+      detailBackdrop.hidden = true;
+      document.body.style.overflow = document.querySelector('.bottom-sheet.open') ? 'hidden' : '';
+    });
     document.body.style.overflow = "hidden";
   }
 
   function closeDetail() {
-    detailSheet.classList.remove("open");
-    detailSheet.setAttribute("aria-hidden", "true");
-    detailBackdrop.hidden = true;
-    document.body.style.overflow = "";
+    window.TNTUI.closeModal(detailSheet);
   }
 
   function currentRecord() {
@@ -519,18 +527,13 @@
   }
 
   function closeEdit() {
-    $("editSheet").classList.remove("open");
-    $("editSheet").setAttribute("aria-hidden", "true");
-    $("editBackdrop").hidden = true;
-    $("editMessage").textContent = "";
-    document.body.style.overflow = "";
+    window.TNTUI.closeModal($("editSheet"));
   }
 
   function openEdit() {
     const record = currentRecord();
-    if (!record) return;
+    if (!record || !window.TNT.hasAccess('perfiles','*','edit')) return;
 
-    closeDetail();
 
     $("editNombre").value = record.nombre || "";
     $("editApellido").value = record.apellido || "";
@@ -545,6 +548,12 @@
     $("editBackdrop").hidden = false;
     $("editSheet").classList.add("open");
     $("editSheet").setAttribute("aria-hidden", "false");
+    window.TNTUI.trackOverlay($("editSheet"), () => {
+      $("editSheet").classList.remove("open");
+      $("editSheet").setAttribute("aria-hidden", "true");
+      $("editBackdrop").hidden = true;
+      document.body.style.overflow = document.querySelector('.bottom-sheet.open') ? 'hidden' : '';
+    });
     document.body.style.overflow = "hidden";
     setTimeout(() => $("editNombre").focus(), 120);
   }
@@ -556,21 +565,23 @@
   }
 
   function closeDelete() {
-    $("deleteSheet").classList.remove("open");
-    $("deleteSheet").setAttribute("aria-hidden", "true");
-    $("deleteBackdrop").hidden = true;
-    document.body.style.overflow = "";
+    window.TNTUI.closeModal($("deleteSheet"));
   }
 
   function openDelete() {
     const record = currentRecord();
-    if (!record) return;
+    if (!record || !window.TNT.hasAccess('perfiles','*','edit')) return;
 
-    closeDetail();
     $("deleteProfileName").textContent = [record.nombre, record.apellido].filter(Boolean).join(" ");
     $("deleteBackdrop").hidden = false;
     $("deleteSheet").classList.add("open");
     $("deleteSheet").setAttribute("aria-hidden", "false");
+    window.TNTUI.trackOverlay($("deleteSheet"), () => {
+      $("deleteSheet").classList.remove("open");
+      $("deleteSheet").setAttribute("aria-hidden", "true");
+      $("deleteBackdrop").hidden = true;
+      document.body.style.overflow = document.querySelector('.bottom-sheet.open') ? 'hidden' : '';
+    });
     document.body.style.overflow = "hidden";
   }
 
@@ -679,7 +690,7 @@
 
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!window.TNT?.isAdmin) { loginMessage.textContent = "Esta base solo está disponible para administradores TNT."; return; }
+    if (!window.TNT?.hasAccess('perfiles','*','view')) { loginMessage.textContent = "Necesitás permiso para ver Perfiles. Podés solicitarlo desde tu Cuenta TNT."; return; }
     try { await loadData("central", { silent: true }); accessToken="central"; loginView.hidden=true; dashboardView.hidden=false; }
     catch (error) { loginMessage.textContent="No se pudo cargar la base de perfiles."; }
   });
@@ -846,7 +857,7 @@
       const sb = window.TNT?.sb;
       if (!sb) throw new Error("No se pudo conectar con la base.");
 
-      const { error } = await sb.from("perfiles_registros").delete().eq("id", record.id);
+      const { error } = await sb.from("perfiles_registros").delete().eq("id", record.id).select("id").single();
       if (error) throw error;
 
       const deletedName = [record.nombre, record.apellido].filter(Boolean).join(" ");
@@ -855,6 +866,12 @@
       renderStats();
       renderList();
       closeDelete();
+      // El detalle queda debajo: al volver no se muestra un registro eliminado.
+      $("detailName").textContent = "Perfil eliminado";
+      $("detailData").innerHTML = "";
+      $("detailActions").innerHTML = "";
+      $("editProfileBtn").hidden = true;
+      $("deleteProfileBtn").hidden = true;
       showToast(deletedName + " fue eliminado.");
     } catch (error) {
       console.error(error);
@@ -882,13 +899,7 @@
   $("logoutBtn").addEventListener("click", lockBase);
   $("headerLockBtn").addEventListener("click", lockBase);
 
-  document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
-    if ($("deleteSheet").classList.contains("open")) closeDelete();
-    else if ($("editSheet").classList.contains("open")) closeEdit();
-    else if (detailSheet.classList.contains("open")) closeDetail();
-    else if (filterSheet.classList.contains("open")) closeFilters();
-  });
+
 
   const share = new URLSearchParams(location.search).get("_vercel_share");
   if (share) {
@@ -900,8 +911,8 @@
 
   async function restorePanelSession() {
     await window.TNT?.ready;
-    if (!window.TNT?.identity || window.TNT.blocked || !window.TNT.isAdmin) {
-      loginMessage.textContent = "Esta base solo está disponible para administradores TNT.";
+    if (!window.TNT?.identity || window.TNT.blocked || !window.TNT.hasAccess('perfiles','*','view')) {
+      loginMessage.textContent = "Necesitás permiso para ver Perfiles. Podés solicitarlo desde tu Cuenta TNT.";
       loginView.hidden = false;
       return;
     }

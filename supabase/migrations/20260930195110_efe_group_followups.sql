@@ -1,0 +1,1 @@
+alter table public.tnt_efe_followups drop constraint if exists tnt_efe_followups_person_id_wednesday_date_key;

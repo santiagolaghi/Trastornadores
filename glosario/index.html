@@ -46,11 +46,11 @@ button,input,textarea,select{font:inherit}.orb{position:fixed;border-radius:50%;
 @media(min-width:600px){.stats{grid-template-columns:repeat(4,1fr)}.book-grid{grid-template-columns:repeat(3,1fr)}.topics{grid-template-columns:repeat(3,1fr)}.groups{grid-template-columns:repeat(4,1fr)}.styles{grid-template-columns:repeat(4,1fr)}.library-filters{grid-template-columns:repeat(5,1fr)}.deep-grid{grid-template-columns:1fr 1fr}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
-<link rel="stylesheet" href="/assets/tnt-ui.css?v=32"><link rel="stylesheet" href="/assets/tnt-module-theme.css?v=14"></head>
+<link rel="stylesheet" href="/assets/tnt-ui.css?v=33"><link rel="stylesheet" href="/assets/tnt-module-theme.css?v=14"></head>
 <body data-tnt-module="glosario" data-tnt-label="Prédicas & Glosario" data-build="v4-deep-20260906">
 <div class="orb orb-a"></div><div class="orb orb-b"></div>
 <div id="app" role="main"><div class="tnt-skeleton"><div><div class="tnt-loader"></div>Cargando prédicas y glosario…</div></div></div>
-<script src="/supabase-lite.js?v=12"></script><script src="/assets/tnt-components.js?v=32"></script><script src="/assets/tnt-editor.js?v=15"></script><script src="/assets/tnt-core.js?v=32" data-module="glosario" data-label="Prédicas & Glosario"></script>
+<script src="/supabase-lite.js?v=12"></script><script src="/assets/tnt-components.js?v=33"></script><script src="/assets/tnt-editor.js?v=15"></script><script src="/assets/tnt-core.js?v=33" data-module="glosario" data-label="Prédicas & Glosario"></script>
 
 <script>
 
@@ -216,13 +216,16 @@ async function filePick(e){
   render()
 }
 async function save(status){
+  if(S.saving)return;
   capture();if(!S.edit.text.trim())return toast('Falta el contenido de la prédica.');if(status==='published'&&S.edit.status==='draft')return toast('Primero finalizá la prédica.');if(!S.edit.title)S.edit.title='Sin título';
+  S.saving=true;document.querySelectorAll('[data-save]').forEach(b=>b.disabled=true);try{
   let tid=topic(S.edit.topic)?.id||null,now=new Date().toISOString(),row={author_id:S.session.user.id,title:S.edit.title,subtitle:S.edit.subtitle,topic_id:tid,status,original_text:S.edit.text,source_type:S.edit.source_type||'text',source_filename:S.edit.source_filename,visual_style:S.edit.style,visual_variant:1,generated_html:buildHtml(S.edit),updated_at:now,finalized_at:status!=='draft'?(S.edit.finalized_at||now):null,published_at:status==='published'?now:null};
   let r=S.edit.id?await db.from('sermons').update(row).eq('id',S.edit.id).select().single():await db.from('sermons').insert(row).select().single();
   if(r.error)return toast('Error: '+r.error.message);
   S.edit.id=r.data.id;S.edit.status=status;S.edit.finalized_at=r.data.finalized_at;
-  if(S.edit.file){let safe=S.edit.file.name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]/g,'-'),path=`${S.session.user.id}/${S.edit.id}/${Date.now()}-${safe}`,up=await db.storage.from('sermon-files').upload(path,S.edit.file);if(!up.error)await db.from('sermon_files').insert({sermon_id:S.edit.id,uploader_id:S.session.user.id,storage_path:path,original_name:S.edit.file.name,mime_type:S.edit.file.type,size_bytes:S.edit.file.size});S.edit.file=null}
+  if(S.edit.file){let safe=S.edit.file.name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]/g,'-'),path=`${S.session.user.id}/${S.edit.id}/${Date.now()}-${safe}`,up=await db.storage.from('sermon-files').upload(path,S.edit.file);if(up.error)throw new Error('La prédica quedó guardada, pero falta subir el archivo: '+up.error.message);const meta=await db.from('sermon_files').insert({sermon_id:S.edit.id,uploader_id:S.session.user.id,storage_path:path,original_name:S.edit.file.name,mime_type:S.edit.file.type,size_bytes:S.edit.file.size});if(meta.error){await db.storage.from('sermon-files').remove([path]);throw new Error('La prédica quedó guardada, pero no se pudo vincular el archivo. Reintentá.')}S.edit.file=null}
   toast(status==='published'?'Publicada para TNT ✓':status==='finalized'?'Prédica finalizada ✓':'Borrador guardado ✓');await load();S.tab='create';render()
+  }catch(error){toast(error.message||'No se pudo guardar. Tu contenido sigue acá.')}finally{S.saving=false;document.querySelectorAll('[data-save]').forEach(b=>b.disabled=b.dataset.save==='published'&&S.edit.status==='draft')}
 }
 
 const listHtml=(xs)=>arr(xs).length?`<ul>${arr(xs).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p>Sin datos adicionales.</p>';
@@ -276,29 +279,33 @@ function openTopic(slug,focus){
     <div id="tguide" hidden>${topicGuide(t)}</div>
     <button class="primary sticky" id="use">Preparar prédica sobre ${esc(t.name)}</button>
   </section></div>`);
-  $('#close').onclick=()=>$('#modal').remove();$('#modal').onclick=e=>{if(e.target.id==='modal')e.currentTarget.remove()};
+  TNTUI.trackOverlay($('#modal'));
+  $('#close').onclick=()=>TNTUI.closeModal($('#modal'));$('#modal').onclick=e=>{if(e.target.id==='modal')TNTUI.closeModal(e.currentTarget)};
   $$('[data-tview]',$('#modal')).forEach(b=>b.onclick=()=>{$$('[data-tview]',$('#modal')).forEach(x=>x.classList.toggle('on',x===b));$('#tstories').hidden=b.dataset.tview!=='stories';$('#tguide').hidden=b.dataset.tview!=='guide'});
   $('#sq').oninput=e=>{let q=norm(e.target.value);$$('.story',$('#storylist')).forEach(x=>x.hidden=q&&!norm(x.innerText).includes(q))};
   bindStoryExpand($('#storylist'));
-  $('#use').onclick=()=>{S.edit=fresh();S.edit.topic=slug;S.tab='create';$('#modal').remove();render();scrollTo(0,0)};
+  $('#use').onclick=()=>{S.edit=fresh();S.edit.topic=slug;S.tab='create';TNTUI.closeModal($('#modal'));render();scrollTo(0,0)};
   if(focus)setTimeout(()=>{let el=document.querySelector(`[data-story-id="${focus}"]`);el?.scrollIntoView({behavior:'smooth',block:'start'});el?.querySelector('[data-expand]')?.click()},100)
 }
 function bookStoryCount(id){return S.stories.filter(s=>s.book_start===id).length}
 function openBooks(){
   let ot=S.books.filter(b=>b.testament==='OT'),nt=S.books.filter(b=>b.testament==='NT'),block=(title,a)=>`<div class="section"><h2>${title}</h2><span>${a.length} libros</span></div><div class="book-grid">${a.map(b=>`<button class="book" data-book="${b.id}"><b>${esc(b.name)}</b><small>${esc(b.category)}</small><em>${bookStoryCount(b.id)} rutas</em></button>`).join('')}</div>`;
   document.body.insertAdjacentHTML('beforeend',`<div class="back" id="bm"><section class="sheet"><div class="sheethead"><div><div class="eyebrow">Cobertura bíblica</div><h2>📚 Los 66 libros</h2><p class="muted">Cada libro tiene rutas cargadas. Abrí una para entrar a sus fichas profundas.</p></div><button class="icon" id="bmx">×</button></div>${block('Antiguo Testamento',ot)}${block('Nuevo Testamento',nt)}</section></div>`);
-  $('#bmx').onclick=()=>$('#bm').remove();$$('[data-book]',$('#bm')).forEach(x=>x.onclick=()=>{let id=+x.dataset.book;$('#bm').remove();openBook(id)})
+  TNTUI.trackOverlay($('#bm'));
+  $('#bmx').onclick=()=>TNTUI.closeModal($('#bm'));$$('[data-book]',$('#bm')).forEach(x=>x.onclick=()=>{let id=+x.dataset.book;openBook(id)})
 }
 function openBook(id){
   let b=S.books.find(x=>x.id===id),a=S.stories.filter(s=>s.book_start===id);
   document.body.insertAdjacentHTML('beforeend',`<div class="back" id="bd"><section class="sheet"><div class="sheethead"><div><div class="eyebrow">${esc(b.category)} · ${b.testament==='OT'?'Antiguo':'Nuevo'} Testamento</div><h2>${esc(b.name)}</h2><p class="muted">${a.length} rutas profundas cargadas</p></div><button class="icon" id="bdx">×</button></div><input class="story-search" id="bq" placeholder="Buscar dentro de ${esc(b.name)}…"><div id="bookstories">${a.map(s=>storyCard(s,null)).join('')}</div></section></div>`);
-  $('#bdx').onclick=()=>$('#bd').remove();$('#bq').oninput=e=>{let q=norm(e.target.value);$$('.story',$('#bookstories')).forEach(x=>x.hidden=q&&!norm(x.innerText).includes(q))};bindStoryExpand($('#bookstories'))
+  TNTUI.trackOverlay($('#bd'));
+  $('#bdx').onclick=()=>TNTUI.closeModal($('#bd'));$('#bq').oninput=e=>{let q=norm(e.target.value);$$('.story',$('#bookstories')).forEach(x=>x.hidden=q&&!norm(x.innerText).includes(q))};bindStoryExpand($('#bookstories'))
 }
 function openSermon(id){
   let s=S.sermons.find(x=>x.id===id),own=s.author_id===S.session.user.id,t=S.topics.find(x=>x.id===s.topic_id);
   document.body.insertAdjacentHTML('beforeend',`<div class="back" id="sm"><section class="sheet"><div class="sheethead"><div><span class="badge ${s.status}">${statusN[s.status]}</span><h2>${esc(s.title)}</h2><p class="muted">${t?`${t.icon||'✦'} ${esc(t.name)}`:'Sin tema'}</p></div><button class="icon" id="sx">×</button></div>${preview({title:s.title,subtitle:s.subtitle,text:s.original_text,style:s.visual_style,topic:t?.slug})}${own?`<div class="actions"><button class="btn" id="edit">Editar</button><button class="btn" id="exp">Exportar HTML</button>${s.status==='finalized'?'<button class="primary wide" id="pub">Publicar</button>':''}</div>`:''}</section></div>`);
-  $('#sx').onclick=()=>$('#sm').remove();
-  if(own){$('#edit').onclick=()=>{S.edit={id:s.id,title:s.title||'',subtitle:s.subtitle||'',topic:t?.slug||'',text:s.original_text||'',style:s.visual_style||'modern',status:s.status,file:null,source_type:s.source_type,source_filename:s.source_filename,finalized_at:s.finalized_at};S.tab='create';$('#sm').remove();render()};$('#exp').onclick=()=>download(s.generated_html||buildHtml({title:s.title,subtitle:s.subtitle,text:s.original_text,style:s.visual_style,topic:t?.slug}),s.title);$('#pub')?.addEventListener('click',()=>{S.edit={id:s.id,title:s.title,subtitle:s.subtitle||'',topic:t?.slug||'',text:s.original_text,style:s.visual_style||'modern',status:s.status,file:null,source_type:s.source_type,source_filename:s.source_filename,finalized_at:s.finalized_at};$('#sm').remove();save('published')})}
+  TNTUI.trackOverlay($('#sm'));
+  $('#sx').onclick=()=>TNTUI.closeModal($('#sm'));
+  if(own){$('#edit').onclick=()=>{S.edit={id:s.id,title:s.title||'',subtitle:s.subtitle||'',topic:t?.slug||'',text:s.original_text||'',style:s.visual_style||'modern',status:s.status,file:null,source_type:s.source_type,source_filename:s.source_filename,finalized_at:s.finalized_at};S.tab='create';TNTUI.closeModal($('#sm'));render()};$('#exp').onclick=()=>download(s.generated_html||buildHtml({title:s.title,subtitle:s.subtitle,text:s.original_text,style:s.visual_style,topic:t?.slug}),s.title);$('#pub')?.addEventListener('click',()=>{S.edit={id:s.id,title:s.title,subtitle:s.subtitle||'',topic:t?.slug||'',text:s.original_text,style:s.visual_style||'modern',status:s.status,file:null,source_type:s.source_type,source_filename:s.source_filename,finalized_at:s.finalized_at};TNTUI.closeModal($('#sm'));save('published')})}
 }
 
 function buildHtml(e){
