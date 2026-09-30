@@ -46,12 +46,12 @@ button,input,textarea,select{font:inherit}.orb{position:fixed;border-radius:50%;
 @media(min-width:600px){.stats{grid-template-columns:repeat(4,1fr)}.book-grid{grid-template-columns:repeat(3,1fr)}.topics{grid-template-columns:repeat(3,1fr)}.groups{grid-template-columns:repeat(4,1fr)}.styles{grid-template-columns:repeat(4,1fr)}.library-filters{grid-template-columns:repeat(5,1fr)}.deep-grid{grid-template-columns:1fr 1fr}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
-<link rel="stylesheet" href="/assets/tnt-ui.css?v=28"><link rel="stylesheet" href="/assets/tnt-module-theme.css?v=14"></head>
+<link rel="stylesheet" href="/assets/tnt-ui.css?v=32"><link rel="stylesheet" href="/assets/tnt-module-theme.css?v=14"></head>
 <body data-tnt-module="glosario" data-tnt-label="Prédicas & Glosario" data-build="v4-deep-20260906">
 <div class="orb orb-a"></div><div class="orb orb-b"></div>
 <div id="app" role="main"><div class="tnt-skeleton"><div><div class="tnt-loader"></div>Cargando prédicas y glosario…</div></div></div>
-<script src="/supabase-lite.js?v=12"></script><script src="/assets/tnt-components.js?v=29"></script><script src="/assets/tnt-editor.js?v=15"></script><script src="/assets/tnt-core.js?v=28" data-module="glosario" data-label="Prédicas & Glosario"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<script src="/supabase-lite.js?v=12"></script><script src="/assets/tnt-components.js?v=32"></script><script src="/assets/tnt-editor.js?v=15"></script><script src="/assets/tnt-core.js?v=32" data-module="glosario" data-label="Prédicas & Glosario"></script>
+
 <script>
 
 const db=TNT.sb;
@@ -74,12 +74,13 @@ function linksForTopic(id){return S.links.filter(l=>l.topic_id===id)}
 function topicNamesForStory(id,exclude){return S.links.filter(l=>l.story_id===id&&l.topic_id!==exclude).map(l=>S.topics.find(t=>t.id===l.topic_id)?.name).filter(Boolean).slice(0,7)}
 function bookName(id){return S.books.find(b=>b.id===id)?.name||''}
 
+async function importLibrary(name,url){if(window[name])return;await TNT.withTimeout(new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=url;script.onload=resolve;script.onerror=()=>reject(new Error('No se pudo cargar el lector de archivos. Reintentá.'));document.head.append(script);}), 'El lector de archivos');}
 async function fetchAll(table,select,order){
   let out=[],from=0,size=1000;
   while(true){
     let q=db.from(table).select(select).range(from,from+size-1);
     if(order)q=q.order(order);
-    let {data,error}=await q;
+    let {data,error}=await TNT.withTimeout(q,'La carga de '+table);
     if(error)throw error;
     out.push(...(data||[]));
     if(!data||data.length<size)break;
@@ -90,14 +91,14 @@ async function fetchAll(table,select,order){
 async function load(){
   try{
     let uid=S.session.user.id;
-    let[p,t,st,l,bk,se]=await Promise.all([
+    let[p,t,st,l,bk,se]=await TNT.withTimeout(Promise.all([
       db.from('profiles').select('*').eq('id',uid).maybeSingle(),
       fetchAll('topics','id,slug,name,icon,description,category,color,sort_order,active,core_truth,biblical_tension,misconceptions,sermon_questions,youth_scenarios,suggested_structures,anchor_passages,avoid_cliches,related_topics,keywords','sort_order'),
       fetchAll('bible_stories','id,title,reference,summary,context,key_question,search_terms,sort_order,book_start,story_type,people,tension,god_revelation,human_revelation,gospel_connection,youth_applications,preaching_angles,group_questions,cross_references,key_verses,historical_context,literary_context,warnings,hope_points,takeaway,depth_score','sort_order'),
       fetchAll('topic_story_links','topic_id,story_id,angle,relevance',null),
       fetchAll('bible_books','id,name,slug,testament,category','id'),
       db.from('sermons').select('*').order('updated_at',{ascending:false})
-    ]);
+    ]),'Prédicas y Glosario');
     if(se.error)throw se.error;S.profile=p.data;S.topics=t.filter(x=>x.active!==false);S.stories=st;S.links=l;S.books=bk;S.sermons=se.data||[];
     render();
   }catch(e){
@@ -108,7 +109,7 @@ async function load(){
 }
 async function init(){await TNT.ready;if(!TNT.identity||TNT.blocked)return;S.theme=document.documentElement.dataset.tntTheme;apply();S.session=TNT.session;await load();document.addEventListener('tnt:theme',()=>{S.theme=document.documentElement.dataset.tntTheme;apply();render()});}
 
-function top(){return`<div class="top"><div class="brand"><div class="mark">TNT</div><div><strong>Trastornadores</strong><small>Centro de prédicas</small></div></div><button class="icon" id="theme">${S.theme==='dark'?'☀':'◐'}</button></div>`}
+function glosarioHeader(){return`<div class="top"><div class="brand"><div class="mark">TNT</div><div><strong>Trastornadores</strong><small>Centro de prédicas</small></div></div><button class="icon" id="theme">${S.theme==='dark'?'☀':'◐'}</button></div>`}
 function nav(){return`<nav class="nav">${[['home','⌂ Inicio'],['create','✦ Predicar'],['library','▤ Biblioteca'],['settings','⚙ Ajustes']].map(x=>`<button data-nav="${x[0]}" class="${S.tab===x[0]?'on':''}">${x[1]}</button>`).join('')}</nav>`}
 function auth(){return`<main class="auth"><div class="brand"><div class="mark">TNT</div><div><strong>Trastornadores</strong><small>Centro de prédicas</small></div></div><section class="authbox"><div class="eyebrow">Ministerio de jóvenes</div><h1>Predicá con profundidad.</h1><p class="muted">Tus borradores son privados. Solo lo publicado entra a la biblioteca del equipo.</p><div class="auth-tabs"><button class="btn on" data-mode="login">Entrar</button><button class="btn" data-mode="signup">Crear cuenta</button></div><form id="auth"><div class="field name" hidden><label>Tu nombre</label><input id="name"></div><div class="field"><label>Email</label><input id="email" type="email" required></div><div class="field"><label>Contraseña</label><input id="pass" type="password" minlength="8" required></div><button class="primary" style="width:100%" id="authbtn">Entrar</button><div class="msg" id="msg"></div></form></section></main>`}
 
@@ -172,7 +173,7 @@ function settings(){
 function render(){
   apply();let root=$('#app');
   if(!S.session){root.innerHTML=auth();bindAuth();return}
-  root.innerHTML=`<div class="shell">${top()}${S.tab==='home'?home():S.tab==='create'?create():S.tab==='library'?library():settings()}${nav()}</div>`;bind()
+  root.innerHTML=`<div class="shell">${glosarioHeader()}${S.tab==='home'?home():S.tab==='create'?create():S.tab==='library'?library():settings()}${nav()}</div>`;bind()
 }
 
 function bindAuth(){
@@ -207,8 +208,8 @@ async function filePick(e){
   let f=e.target.files[0];if(!f)return;if(f.size>10485760){toast('El archivo puede pesar hasta 10 MB.');return;}S.edit.file=f;S.edit.source_filename=f.name;let ext=f.name.split('.').pop().toLowerCase();S.edit.source_type=ext;
   try{
     if(['txt','md'].includes(ext))S.edit.text=await f.text();
-    else if(ext==='docx')S.edit.text=(await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()})).value.trim();
-    else if(ext==='pdf'){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';let pdf=await pdfjsLib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise,out=[];for(let i=1;i<=pdf.numPages;i++){let c=await(await pdf.getPage(i)).getTextContent();out.push(c.items.map(x=>x.str).join(' '))}S.edit.text=out.join('\n\n')}
+    else if(ext==='docx'){await importLibrary('mammoth','https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js');S.edit.text=(await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()})).value.trim();}
+    else if(ext==='pdf'){await importLibrary('pdfjsLib','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';let pdf=await pdfjsLib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise,out=[];for(let i=1;i<=pdf.numPages;i++){let c=await(await pdf.getPage(i)).getTextContent();out.push(c.items.map(x=>x.str).join(' '))}S.edit.text=out.join('\n\n')}
     else toast('DOC antiguo: guardo el archivo, pero pegá el texto para conservarlo exacto.');
     toast('Archivo cargado ✓')
   }catch{toast('No pude extraer ese archivo. Podés pegar el texto manualmente.')}

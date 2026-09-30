@@ -48,6 +48,25 @@
   function date(value, options={day:'numeric',month:'short'}) { if(!value)return ''; const d=new Date(value.length===10?value+'T12:00:00Z':value);return Number.isNaN(d.valueOf())?'':new Intl.DateTimeFormat('es-AR',{timeZone:'America/Argentina/Buenos_Aires',hourCycle:'h23',...options}).format(d); }
   function time(value) { return value?date(value,{hour:'2-digit',minute:'2-digit'}):''; }
   const completed = t => ['done','completed','cancelled'].includes(typeof t==='string'?t:t?.status);
+  function accessInfo(account={}, grants=[], mod, scope='*', now=Date.now()) {
+    const none={level:'none',source:'none'};
+    if(account.enabled===false)return none;
+    if(account.system_role==='admin'&&mod!=='efe')return {level:'manage',source:'admin'};
+    if(account.system_role!=='admin'&&account.staff_status!=='approved')return none;
+    if(mod==='chat'&&account.staff_status==='approved')return {level:'view',source:'staff'};
+    const exact=grants.filter(g=>g.module===mod&&g.scope===scope);
+    const candidates=exact.length?exact:grants.filter(g=>g.module===mod&&g.scope==='*');
+    const rank={none:0,view:1,user:1,edit:2,editor:2,manage:3,manager:3,admin:4};
+    return candidates.filter(g=>g.enabled&&(!g.valid_from||Date.parse(g.valid_from)<=now)&&(!g.valid_until||Date.parse(g.valid_until)>=now))
+      .reduce((best,g)=>rank[g.access_level]>rank[best.level]?{level:g.access_level,source:'grant'}:best,none);
+  }
+  // A programmatic overlay close consumes its own history entry. Parent dialogs
+  // and module navigation must not interpret that popstate as a second Back.
+  function backOverlay() {
+    const consume=e=>{e.stopImmediatePropagation();root.removeEventListener('popstate',consume,true);};
+    root.addEventListener('popstate',consume,true);
+    root.history.back();
+  }
   function modal(title, body, wide=false) {
     const old=root.document.querySelector('.tnt-overlay'),replacing=!!old;old?._tntDisposeBack?.();old?.remove();
     const previous=root.document.activeElement, dialog=root.document.createElement('dialog');
@@ -55,8 +74,8 @@
     dialog.innerHTML=`<section class="tnt-sheet ${wide?'wide':''}"><header class="tnt-sheet-head"><h2>${esc(title)}</h2><button class="tnt-close" type="button" aria-label="Cerrar">${icon('close')}</button></header>${body}</section>`;
     root.document.body.append(dialog);
     if(!replacing&&root.history?.pushState)root.history.pushState({...root.history.state,tntSharedOverlay:true},'');
-    const onBack=()=>{root.removeEventListener('popstate',onBack);if(dialog.isConnected){dialog.remove();previous?.focus?.();}};root.addEventListener('popstate',onBack);dialog._tntDisposeBack=()=>root.removeEventListener('popstate',onBack);
-    const close=()=>{dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();if(root.history?.state?.tntSharedOverlay)root.history.back();};
+    const onBack=e=>{if(e.state?.tntSharedOverlay)return;root.removeEventListener('popstate',onBack);if(dialog.isConnected){dialog.remove();previous?.focus?.();}};root.addEventListener('popstate',onBack);dialog._tntDisposeBack=()=>root.removeEventListener('popstate',onBack);
+    const close=()=>{dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();if(root.history?.state?.tntSharedOverlay)backOverlay();};
     dialog.querySelector('.tnt-close').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
     dialog.addEventListener('click',e=>{if(e.target===dialog)close();});
     if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');
@@ -69,13 +88,16 @@
   function enhanceSelects(scope=root.document) {
     const choices=scope.matches?.('select')?[scope]:[...scope.querySelectorAll?.('select')||[]];
     for(const select of choices){
-      if(select.dataset.tntEnhanced||select.multiple||select.size>1||select.closest('.tnt-select-dialog'))continue;
+      if(select.dataset.tntEnhanced){select._tntSync?.();continue;}
+      if(select.multiple||select.size>1||select.closest('.tnt-select-dialog'))continue;
       select.dataset.tntEnhanced='true';select.classList.add('tnt-native-select');
       const button=root.document.createElement('button');button.type='button';button.className='tnt-select-trigger';
       const label=select.labels?.[0]?.textContent?.trim()||select.getAttribute('aria-label')||select.closest('.field')?.querySelector('label')?.textContent?.trim()||select.previousElementSibling?.matches?.('label')&&select.previousElementSibling.textContent.trim()||'Seleccionar';
       button.setAttribute('aria-label',label);button.setAttribute('aria-haspopup','dialog');
       const sync=()=>{button.innerHTML=`<span>${esc(select.options[select.selectedIndex]?.textContent?.trim()||label)}</span><span class="tnt-select-chevron" aria-hidden="true">⌄</span>`;button.disabled=select.disabled;};
       const field=root.document.createElement('span');field.className='tnt-select-field';select.before(field);field.append(select,button);select.addEventListener('change',sync);sync();
+      select._tntSync=sync;
+      new root.MutationObserver(sync).observe(select,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','selected','label']});
       button.onclick=()=>{
         sync();const options=[...select.options],previous=root.document.activeElement;
         const dialog=root.document.createElement('dialog');dialog.className='tnt-select-dialog';dialog.setAttribute('aria-label',label);
@@ -83,7 +105,7 @@
         root.document.body.append(dialog);
         if(root.history?.pushState)root.history.pushState({...root.history.state,tntSelectOverlay:true},'');
         const onBack=()=>{dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();};root.addEventListener('popstate',onBack);
-        const close=()=>{dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();if(root.history?.state?.tntSelectOverlay)root.history.back();};
+        const close=()=>{dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();if(root.history?.state?.tntSelectOverlay)backOverlay();};
         dialog.querySelector('.tnt-select-close').onclick=close;
         dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
         dialog.addEventListener('click',e=>{if(e.target===dialog)close();});
@@ -94,7 +116,7 @@
       };
     }
   }
-  const api={esc,icon,safeUrl,initials,avatar,avatarStack,dateKey,addDays,date,time,completed,modal,toast,enhanceSelects};
+  const api={esc,icon,safeUrl,initials,avatar,avatarStack,dateKey,addDays,date,time,completed,modal,toast,enhanceSelects,backOverlay,accessInfo};
   root.TNTUI=api;
   if(root.document){const init=()=>{enhanceSelects();if(root.MutationObserver){new root.MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1)enhanceSelects(node);}).observe(root.document.body,{childList:true,subtree:true});}};if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init,{once:true});else init();}
   root.document?.addEventListener('error',e=>{if(e.target?.matches?.('.tnt-person-avatar img'))e.target.remove();},true);

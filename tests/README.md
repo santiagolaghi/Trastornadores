@@ -20,3 +20,10 @@ Validated on 26 September 2026:
 - Existing Supabase advisor warnings concern the bootstrap table, pg_trgm extension schema, existing guarded public helpers and password protection. No new public definer function was added. See https://supabase.com/docs/guides/database/database-linter for the existing notices.
 
 Authenticated Google login is preserved. Browser UI review uses a separate synthetic fixture; it does not impersonate the user's session or send real messages.
+
+## Verificación del 30 de septiembre de 2026
+
+- 38 pruebas de interfaz con jsdom: se ejecuta el alta con el runtime real y una base simulada; cambios de selector esperan el popstate asíncrono; administración muestra permisos heredados; comunidad no recibe módulos de staff; Glosario y Prédicas renderizan sin lectores de PDF/Word.
+- `tests/staff-permissions.sql` se ejecutó en una transacción revertida: nueva cuenta sin privilegios, petición de Pastor/a sin acceso, bloqueo de autoaprobación, corrección a Timoteo por administrador, directorio restringido, exclusión de EFE y chat solo por membresía.
+- El navegador Chromium local no pudo iniciarse por restricciones del entorno. No se afirma una prueba visual en Android ni un ingreso real por Google en esta revisión.
+- Pendiente externo: las APIs originales de Lista Sábados y EFE requieren sus credenciales anteriores. No se ha migrado el historial faltante. No se borraron ni sustituyeron esos datos.
