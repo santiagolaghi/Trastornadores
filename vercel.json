@@ -7,18 +7,6 @@
       "destination": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.min.js"
     },
     {
-      "source": "/api/efe/auth",
-      "destination": "https://lista-efe.vercel.app/api/auth"
-    },
-    {
-      "source": "/api/efe/sync",
-      "destination": "https://lista-efe.vercel.app/api/sync"
-    },
-    {
-      "source": "/api/lista/sync",
-      "destination": "https://lista-sabados.vercel.app/api/sync"
-    },
-    {
       "source": "/api/lista/import-analyze",
       "destination": "https://lista-sabados.vercel.app/api/import-analyze"
     },
@@ -37,7 +25,7 @@
         },
         {
           "key": "X-TNT-Deployment",
-          "value": "module-recovery-2026-09-30"
+          "value": "attendance-direct-2026-09-30"
         }
       ]
     },
