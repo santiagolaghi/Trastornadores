@@ -14,15 +14,43 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const requestFetch=async(url,options={})=>{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);const abort=()=>controller.abort();options.signal?.addEventListener('abort',abort,{once:true});try{return await fetch(url,{...options,signal:controller.signal});}finally{clearTimeout(timer);options.signal?.removeEventListener('abort',abort);}};
 const sb=window.supabase?.createClient?.(SUPABASE_URL,SUPABASE_KEY,{global:{fetch:requestFetch},auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const readyResolve=[];
-const TNT=window.TNT={sb,identity:null,person:null,account:null,grants:[],module:moduleName,scope:moduleScope,isAdmin:false,ready:new Promise(r=>readyResolve.push(r))};
+const TNT=window.TNT={sb,identity:null,person:null,account:null,grants:[],rolePermissions:[],personPermissions:[],module:moduleName,scope:moduleScope,isAdmin:false,ready:new Promise(r=>readyResolve.push(r))};
 TNT.withTimeout=(promise,label='La conexión',ms=25000)=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error(label+' tardó demasiado. Reintentá.')),ms);Promise.resolve(promise).then(resolve,reject).finally(()=>clearTimeout(timer));});
 function initials(n){return String(n||'TNT').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase()||'T'}
 function theme(){let t=localStorage.getItem('tnt-theme')||'dark';if(t==='system')t=matchMedia('(prefers-color-scheme:light)').matches?'light':'dark';document.documentElement.dataset.tntTheme=t;return t}
 TNT.setTheme=function(t){localStorage.setItem('tnt-theme',t);theme();document.dispatchEvent(new CustomEvent('tnt:theme',{detail:{theme:t}}))};
 TNT.toggleTheme=function(){const current=document.documentElement.dataset.tntTheme||theme();TNT.setTheme(current==='dark'?'light':'dark')};
 function rank(x){return levelRank[String(x||'none').toLowerCase()]||0}
-TNT.accessLevel=(mod,scope='*')=>TNTUI.accessInfo(TNT.account||{},TNT.grants,mod,scope).level;
+function permissionMatch(rows,mod,scope,action){
+ const exact=rows.find(x=>x.module===mod&&x.scope===scope&&x.action===action);
+ return exact||rows.find(x=>x.module===mod&&x.scope==='*'&&x.action===action)||null;
+}
+TNT.accessLevel=(mod,scope='*')=>{
+ const account=TNT.account||{};
+ if(account.enabled===false)return 'none';
+ if(account.system_role==='admin'&&mod!=='efe')return 'manage';
+ const override=permissionMatch(TNT.personPermissions||[],mod,scope,'view');
+ if(override)return override.allowed?'view':'none';
+ const base=TNTUI.accessInfo(account,TNT.grants,mod,scope).level;
+ if(base!=='none')return base;
+ const preset=permissionMatch(TNT.rolePermissions||[],mod,scope,'view');
+ return account.staff_status==='approved'&&preset?.allowed?'view':'none';
+};
 TNT.hasAccess=(mod,scope='*',min='view')=>rank(TNT.accessLevel(mod,scope))>=rank(min);
+TNT.canAction=(mod,action,scope='*')=>{
+ const account=TNT.account||{};
+ if(account.enabled===false)return false;
+ if(account.system_role==='admin'&&mod!=='efe')return true;
+ if(action==='view')return TNT.hasAccess(mod,scope,'view');
+ if(!TNT.hasAccess(mod,scope,'view'))return false;
+ const override=permissionMatch(TNT.personPermissions||[],mod,scope,action);
+ if(override)return !!override.allowed;
+ const preset=permissionMatch(TNT.rolePermissions||[],mod,scope,action);
+ if(preset)return !!preset.allowed;
+ const editActions=new Set(['edit','attendance','send_message','update_own_activity','create_activity','edit_activity','assign_people','edit_people','sell','edit_stock']);
+ const manageActions=new Set(['manage','create_saturday','edit_event','manage_people','templates','create_chat','manage_members','delete_chat','history','reports','delete']);
+ return editActions.has(action)?TNT.hasAccess(mod,scope,'edit'):manageActions.has(action)?TNT.hasAccess(mod,scope,'manage'):false;
+};
 TNT.displayName=function(){return TNT.identity?.display_name||TNT.account?.nickname||TNT.person?.full_name||TNT.identity?.email||'TNT'};
 TNT.avatar=function(){return TNT.account?.avatar_url||TNT.identity?.avatar_url||''};
 TNT.logout=async function(){await sb?.auth?.signOut?.();localStorage.removeItem('tnt-central-user');location.replace('/?v=14')};
@@ -35,6 +63,11 @@ async function ensureIdentity(session){
  const pr=await sb.from('tnt_people').select('*').eq('id',ar.data.person_id).single();if(pr.error)throw pr.error;
  const gr=await sb.from('tnt_access_grants').select('*').eq('person_id',ar.data.person_id);TNT.grants=gr.data||[];
  const legacy=await sb.from('tnt_module_access').select('*').eq('person_id',ar.data.person_id);for(const g of legacy.data||[]){if(g.module!=='efe'&&!TNT.grants.some(x=>x.module===g.module&&x.scope==='*'))TNT.grants.push({module:g.module,scope:'*',enabled:g.enabled,access_level:g.access_level});}
+ const [rp,pp]=await Promise.all([
+   ar.data.ministry_role?sb.from('tnt_role_permission_presets').select('*').eq('role',ar.data.ministry_role):Promise.resolve({data:[]}),
+   sb.from('tnt_person_permission_overrides').select('*').eq('person_id',ar.data.person_id)
+ ]);
+ TNT.rolePermissions=rp.data||[];TNT.personPermissions=pp.data||[];
  TNT.account=ar.data;TNT.person=pr.data;TNT.isAdmin=ar.data.system_role==='admin';TNT.isStaff=ar.data.staff_status==='approved';
  TNT.identity={person_id:pr.data.id,auth_user_id:session.user.id,email:session.user.email||ar.data.email||'',full_name:pr.data.full_name||'',nickname:ar.data.nickname||'',display_name:ar.data.nickname||pr.data.full_name||session.user.email||'TNT',system_role:ar.data.system_role,ministry_role:ar.data.ministry_role||'',avatar_url:ar.data.avatar_url||session.user.user_metadata?.avatar_url||session.user.user_metadata?.picture||''};
  localStorage.setItem('tnt-central-user',JSON.stringify(TNT.identity));
