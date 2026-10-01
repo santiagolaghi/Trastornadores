@@ -31,10 +31,10 @@ TNT.accessLevel=(mod,scope='*')=>{
  if(account.system_role==='admin'&&mod!=='efe')return 'manage';
  const override=permissionMatch(TNT.personPermissions||[],mod,scope,'view');
  if(override)return override.allowed?'view':'none';
- const base=TNTUI.accessInfo(account,TNT.grants,mod,scope).level;
- if(base!=='none')return base;
  const preset=permissionMatch(TNT.rolePermissions||[],mod,scope,'view');
- return account.staff_status==='approved'&&preset?.allowed?'view':'none';
+ if(account.staff_status==='approved'&&preset)return preset.allowed?'view':'none';
+ const base=TNTUI.accessInfo(account,TNT.grants,mod,scope).level;
+ return base;
 };
 TNT.hasAccess=(mod,scope='*',min='view')=>rank(TNT.accessLevel(mod,scope))>=rank(min);
 TNT.canAction=(mod,action,scope='*')=>{
