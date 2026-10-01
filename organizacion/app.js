@@ -194,7 +194,7 @@ async function cycleRunStatus(id){let i=S.items.find(x=>x.id===id),next=i.run_st
 
 function eventMembersModal(eventId){
  const e=eventBy(eventId),current=eventMembers(eventId),map=new Map(current.map(m=>[m.person_id,m]));
- const lockSelf=!isAdmin()&&!isPastor()&&current.some(m=>m.person_id===currentPersonId()&&m.event_role==='organizer');
+ const organizers=current.filter(m=>m.event_role==='organizer'),lockSelf=organizers.length===1&&organizers[0]?.person_id===currentPersonId()&&!isAdmin()&&!TNT.canAction?.('organizacion','manage_people','*');
  const showGroups=e.kind!=='saturday';
  modal(`${sheetHead(e.kind==='saturday'?'Personas del sábado':'Personas del evento',e.kind==='saturday'?'Elegí quién forma parte y quién coordina. Puede haber más de un coordinador.':'Elegí participantes y coordinadores.')}`
    +`<form class="form member-manager" id="membersForm">
@@ -228,9 +228,7 @@ function eventMembersModal(eventId){
    const fd=new FormData(ev.target),ids=fd.getAll('person');if(lockSelf&&!ids.includes(currentPersonId()))ids.push(currentPersonId());
    const rows=ids.map(person_id=>({event_id:eventId,person_id,event_role:(lockSelf&&person_id===currentPersonId())?'organizer':(fd.get('role_'+person_id)||'participant'),include_in_groups:showGroups?fd.get('games_'+person_id)==='on':false}));
    try{
-     if(rows.length){const r=await sb.from('tnt_event_members').upsert(rows,{onConflict:'event_id,person_id'});if(r.error)throw r.error;}
-     const remove=current.filter(m=>!ids.includes(m.person_id)).map(m=>m.person_id);
-     if(remove.length){const d=await sb.from('tnt_event_members').delete().eq('event_id',eventId).in('person_id',remove);if(d.error)throw d.error;}
+     const r=await sb.rpc('tnt_save_event_members',{p_event:eventId,p_members:rows});if(r.error)throw r.error;
      clearOrgModal();await loadAll();render();toast('Personas actualizadas');
    }catch(error){toast(errMsg(error));submit.disabled=false;}
  };
