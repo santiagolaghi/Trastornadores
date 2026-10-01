@@ -164,7 +164,7 @@ function eventCreateModal(templateId=''){
 
 function eventDetailModal(id){
  let e=eventBy(id);if(!e)return;
- let tasks=eventTasks(id),members=eventMembers(id),orgs=members.filter(m=>m.event_role==='organizer'),manager=canManageEvent(id);
+ let tasks=eventTasks(id),members=eventMembers(id),orgs=members.filter(m=>m.event_role==='organizer'),manager=canManageEvent(id),canPeople=canManagePeople(id),canCreate=canCreateActivity(id);
  const statusClass='event-status-'+e.status;
  modal(`${sheetHead(e.name,`${fmtDate(e.start_date)}${e.end_date!==e.start_date?' → '+fmtDate(e.end_date):''}`)}
    <section class="event-overview">
@@ -172,8 +172,8 @@ function eventDetailModal(id){
      <div class="event-people-card"><span>Coordina</span><div class="event-organizers">${orgs.length?orgs.map(m=>`<button class="personLink" data-person-open="${m.person_id}">${avatarHtml(m.person_id)}<span>${esc(displayName(m.person_id))}</span></button>`).join(''):'<small>Sin coordinadores</small>'}</div></div>
      <div class="event-people-card"><span>Equipo</span><strong>${members.length}</strong><small>${members.length===1?'persona incluida':'personas incluidas'}</small></div>
    </section>
-   <div class="sectionHead event-task-head"><div><span class="eyebrow">ACTIVIDADES</span><h2>${tasks.length?tasks.length+' cargadas':'Todavía no hay actividades'}</h2></div>${manager?`<div class="actions"><button class="btn" id="manageEventMembers">Personas</button><button class="btn" id="suggestTask">Sugerencias</button><button class="btn primary" id="newTask">+ Actividad</button></div>`:''}</div>
-   ${tasks.length?`<div class="list">${tasks.map(t=>taskRow(t,myAssignment(t))).join('')}</div>`:`<div class="event-empty"><div class="event-empty-icon">＋</div><h3>Armá este sábado desde acá</h3><p>Agregá bienvenida, juegos, palabra, merienda o cualquier actividad. La fecha ya está tomada del encuentro.</p>${manager?'<button class="btn primary" id="newTaskEmpty">Agregar primera actividad</button>':''}</div>`}
+   <div class="sectionHead event-task-head"><div><span class="eyebrow">ACTIVIDADES</span><h2>${tasks.length?tasks.length+' cargadas':'Todavía no hay actividades'}</h2></div>${canPeople||canCreate?`<div class="actions">${canPeople?'<button class="btn" id="manageEventMembers">Personas</button>':''}${canCreate?'<button class="btn" id="suggestTask">Sugerencias</button><button class="btn primary" id="newTask">+ Actividad</button>':''}</div>`:''}</div>
+   ${tasks.length?`<div class="list">${tasks.map(t=>taskRow(t,myAssignment(t))).join('')}</div>`:`<div class="event-empty"><div class="event-empty-icon">＋</div><h3>${e.kind==='saturday'?'Armá este sábado desde acá':'Armá este encuentro desde acá'}</h3><p>Agregá bienvenida, juegos, palabra, merienda o cualquier actividad. ${e.kind==='saturday'?'La fecha ya está tomada del sábado.':'El cronograma se va armando a medida que agregás actividades.'}</p>${canCreate?'<button class="btn primary" id="newTaskEmpty">Agregar primera actividad</button>':''}</div>`}
  `,true);
  $$('[data-task-open]').forEach(b=>b.onclick=()=>taskDetailModal(b.dataset.taskOpen));
  $$('[data-person-open]').forEach(b=>b.onclick=()=>personResponsibilitiesModal(b.dataset.personOpen));
