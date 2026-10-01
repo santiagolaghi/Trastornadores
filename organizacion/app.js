@@ -252,7 +252,7 @@ async function moveGroupMember(personId,fromId,toId){if(fromId===toId)return;let
 
 /* organizacion/org4b.js */
 function taskEditModal(task=null,eventId=S.selectedEvent,parentId=null,suggestion=null){
- let e=eventBy(eventId),manager=task?canEditActivity(eventId):canCreateActivity(eventId);if(!manager){toast('No tenés permiso para '+(task?'editar':'crear')+' actividades.');return;}
+ let e=eventBy(eventId),manager=task?canEditActivity(eventId):canCreateActivity(eventId),canAssign=canAssignPeople(eventId);if(!manager){toast('No tenés permiso para '+(task?'editar':'crear')+' actividades.');return;}
  let selected=task?taskPeople(task.id):[];const draft=task||suggestion||{};
  let pool=[...new Set([...staffPeople().map(p=>p.id),...selected])];
  const initialMode=draft.assignee_mode||(selected.length>1?'multiple':'single');
@@ -273,12 +273,20 @@ function taskEditModal(task=null,eventId=S.selectedEvent,parentId=null,suggestio
  </form>`,true);
  let savedTaskId=task?.id||null,savedReference='',savedAttachment=false,savedChecklist=false;
  const taskForm=$('#taskForm');
+ if(!canAssign){
+   taskForm.querySelectorAll('input[name="assignee_mode"],input[name="assignee"]').forEach(x=>x.disabled=true);
+   const modeHidden=document.createElement('input');modeHidden.type='hidden';modeHidden.name='assignee_mode';modeHidden.value=initialMode;taskForm.append(modeHidden);
+   selected.forEach(pid=>{const h=document.createElement('input');h.type='hidden';h.name='assignee';h.value=pid;taskForm.append(h);});
+   taskForm.querySelector('.responsibility-box')?.classList.add('is-readonly');
+   const hint=$('#responsibilityHint');if(hint)hint.textContent='Podés editar la actividad, pero los responsables los cambia alguien con ese permiso.';
+ }
  function adjust(){
    const kind=taskForm.elements.type.value;
    taskForm.querySelectorAll('[data-task-detail]').forEach(el=>el.hidden=kind==='simple');
    const budget=taskForm.querySelector('[name=budget]')?.closest('.field');if(budget)budget.hidden=kind!=='logistics';
  }
  function syncAssignees(){
+   if(!canAssign)return;
    const single=taskForm.elements.assignee_mode.value==='single',boxes=[...taskForm.querySelectorAll('input[name="assignee"]')],checked=boxes.filter(x=>x.checked);
    if(single&&checked.length>1){checked.slice(1).forEach(x=>x.checked=false);}
    const active=boxes.find(x=>x.checked);
