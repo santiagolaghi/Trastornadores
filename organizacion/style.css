@@ -171,3 +171,9 @@ dialog.modal{position:fixed;inset:0;padding:0;max-width:min(960px,calc(100vw - 2
   .event-status-card{grid-column:auto}
   .responsibility-options{grid-template-columns:1fr}
 }
+
+.responsibility-box.is-readonly{opacity:.72;background:var(--panel2)}
+.responsibility-box.is-readonly .responsibility-options span{cursor:not-allowed}
+.responsibility-box.is-readonly+ .field .checkRow{opacity:.58}
+.readonly-assignees{display:flex;flex-wrap:wrap;gap:8px}
+.readonly-assignees>span{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);font-size:12px}
