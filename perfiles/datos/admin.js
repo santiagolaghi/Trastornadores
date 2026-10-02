@@ -587,7 +587,7 @@
 
   function setDeleteLoading(active) {
     $("confirmDeleteBtn").disabled = active;
-    $("confirmDeleteText").textContent = active ? "Eliminando…" : "Sí, eliminar";
+    $("confirmDeleteText").textContent = active ? "Archivando…" : "Sí, archivar";
     $("deleteSpinner").hidden = !active;
   }
 
@@ -877,7 +877,7 @@
       showToast(deletedName + " fue archivado sin perder su historial.");
     } catch (error) {
       console.error(error);
-      showToast("No se pudo eliminar el perfil.");
+      showToast("No se pudo archivar el perfil.");
     } finally {
       setDeleteLoading(false);
     }
