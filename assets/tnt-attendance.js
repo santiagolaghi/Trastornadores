@@ -2,7 +2,7 @@
 'use strict';
 const U=TNTUI,sb=TNT.sb,E=U.esc,app=document.getElementById('attendance-app');
 const qs=new URLSearchParams(location.search);
-const S={mode:qs.get('mode')||'',people:[],groups:[],members:[],events:[],meetings:[],attendance:[],followups:[],audit:[],group:null,date:'',tab:'attendance',query:'',filter:'all',loading:false,busy:new Set(),deck:null};
+const S={mode:qs.get('mode')||'',people:[],groups:[],members:[],saturdayMembers:[],events:[],meetings:[],attendance:[],followups:[],audit:[],group:null,date:'',tab:'attendance',query:'',filter:'all',loading:false,busy:new Set(),deck:null};
 const labels={present:'Presente',absent:'Ausente',pending:'Sin registrar'};
 const followLabels={pending:'Pendiente',contacted:'Le hablé',waiting:'Esperando respuesta',talking:'Conversando',no_response:'No respondió',resolved:'Cerrado'};
 const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
@@ -42,7 +42,10 @@ async function loadMeetings(){
  if(!groupMeetings().some(m=>m.meeting_date===S.date))S.date=defaultEfeDate();
 }
 function eligiblePeople(){
- if(S.mode==='sabados')return S.people.filter(p=>p.active);
+ if(S.mode==='sabados'){
+   const ids=new Set(S.saturdayMembers.filter(m=>m.active).map(m=>m.person_id));
+   return S.people.filter(p=>p.active&&ids.has(p.id));
+ }
  if(!S.group)return[];
  const ids=new Set(S.members.filter(m=>m.group_id===S.group&&m.active).map(m=>m.person_id));
  return S.people.filter(p=>p.active&&ids.has(p.id));
@@ -54,13 +57,14 @@ function modeAllowed(mode){
 async function loadBase(){
  await TNT.ready;
  if(!TNT.identity){location.replace('/?login=1&next='+encodeURIComponent('/asistencia/'+location.search));return}
- const [people,groups,members,events]=await Promise.all([
+ const [people,groups,members,saturdayMembers,events]=await Promise.all([
    checked(sb.from('tnt_people').select('*').order('full_name')),
    checked(sb.from('tnt_efe_groups').select('*').order('name')),
    checked(sb.from('tnt_efe_memberships').select('*')),
+   checked(sb.from('tnt_saturday_members').select('*')),
    checked(sb.from('tnt_events').select('*').eq('kind','saturday').order('start_date'))
  ]);
- S.people=people;S.groups=groups;S.members=members;S.events=events;
+ S.people=people;S.groups=groups;S.members=members;S.saturdayMembers=saturdayMembers;S.events=events;
  if(!S.mode||!['efe','sabados'].includes(S.mode)||!modeAllowed(S.mode))S.mode=modeAllowed('efe')?'efe':modeAllowed('sabados')?'sabados':'';
  if(!S.mode){renderNoAccess();return}
  if(S.mode==='efe'){
@@ -117,14 +121,16 @@ function render(){
  const dateOptions=S.mode==='sabados'?saturdayDates():[];
  app.innerHTML=topShell(`
  <section class="attendance-hero">
-   <div class="hero-copy"><span class="context-pill">${S.mode==='efe'?'Encuentro EFE':'Encuentro general'}</span><h2>${E(context)}</h2><p>${S.mode==='efe'?'Acompañamiento, asistencia y contacto.':'Todos los perfiles TNT en una sola lista.'}</p></div>
+   <div class="hero-copy"><span class="context-pill">${S.mode==='efe'?'Encuentro EFE':'Encuentro general'}</span><h2>${E(context)}</h2><p>${S.mode==='efe'?'Acompañamiento, asistencia y contacto.':'Solo quienes forman parte de la lista de Sábados.'}</p></div>
    <div class="hero-progress" style="--p:${pct}"><b>${pct}%</b><small>registrado</small></div>
  </section>
  <section class="date-panel">
    ${S.mode==='efe'?groupChooser():''}
    <label><span>${S.mode==='efe'?'Encuentro':'Sábado'}</span>${S.mode==='efe'?`<select id="att-efe-meeting">${efeMeetingOptions()}</select>`:dateOptions.length?`<select id="att-event">${dateOptions.map(e=>`<option value="${e.start_date}" ${e.start_date===S.date?'selected':''}>${E(e.name)} · ${U.date(e.start_date+'T12:00:00-03:00',{day:'numeric',month:'short'})}</option>`).join('')}</select>`:`<input id="att-date" type="date" value="${S.date}">`}</label>
  </section>
- ${S.mode==='efe'?`<div class="efe-date-actions">${can('manage_meetings')?'<button id="manageEfeMeetings">Gestionar miércoles</button>':''}${can('attendance')?'<button id="resetEfeList" class="danger">Resetear lista</button>':''}<span>Los miércoles se crean automáticamente y están separados por mes.</span></div>`:''}
+ ${S.mode==='efe'
+   ?`<div class="efe-date-actions">${can('manage_meetings')?'<button id="manageEfeMeetings">Gestionar miércoles</button>':''}${can('attendance')?'<button id="resetEfeList" class="danger">Resetear lista</button>':''}<span>Los miércoles se crean automáticamente y están separados por mes.</span></div>`
+   :`<div class="efe-date-actions">${can('edit_people')?'<button id="manageSaturdayPeople">Gestionar integrantes</button>':''}${can('attendance')?'<button id="resetSaturdayList" class="danger">Resetear lista</button>':''}<span>Perfiles es la base central; solo aparecen quienes agregues a Sábados.</span></div>`}
  <section class="stats-row">
    <button data-filter-stat="present"><b>${counts.present}</b><span>Presentes</span></button>
    <button data-filter-stat="absent"><b>${counts.absent}</b><span>Ausentes</span></button>
@@ -145,7 +151,7 @@ function groupChooser(){
  return `<label><span>Grupo</span><select id="att-group">${allowed.map(g=>`<option value="${g.id}" ${g.id===S.group?'selected':''}>${E(g.name)}</option>`).join('')}</select></label>`;
 }
 function tabs(){
- const out=[['attendance','Asistencia'],['people',S.mode==='efe'?'Integrantes':'Personas']];
+ const out=[['attendance','Asistencia'],['people','Integrantes']];
  if(S.mode==='efe'&&can('history'))out.push(['followups','Seguimiento']);
  if(can('history'))out.push(['history','Historial']);
  out.push(['birthdays','Cumpleaños']);return out;
@@ -158,6 +164,8 @@ function bindBase(){
  app.querySelector('#att-date')?.addEventListener('change',async e=>{S.date=e.target.value;await loadDate();render()});
  app.querySelector('#manageEfeMeetings')?.addEventListener('click',manageEfeMeetingsModal);
  app.querySelector('#resetEfeList')?.addEventListener('click',resetEfeList);
+ app.querySelector('#manageSaturdayPeople')?.addEventListener('click',()=>{S.tab='people';render();});
+ app.querySelector('#resetSaturdayList')?.addEventListener('click',resetSaturdayList);
  app.querySelector('#att-search').oninput=e=>{S.query=e.target.value;paintContent()};
  app.querySelector('#att-filter').onchange=e=>{S.filter=e.target.value;paintContent()};
  app.querySelectorAll('[data-filter-stat]').forEach(b=>b.onclick=()=>{S.tab='attendance';S.filter=b.dataset.filterStat;render()});
@@ -251,17 +259,19 @@ async function copyAttendance(kind){
  U.toast(kind==='all'?'Resumen copiado':(kind==='present'?'Presentes copiados':'Ausentes copiados'));
 }
 function paintPeople(host){
- const rows=filteredRows();
- const add=S.mode==='efe'&&can('edit_people')?'<button class="section-action" id="addEfePerson">+ Agregar desde Perfiles</button>':'';
- host.innerHTML=`<div class="section-title"><div><span class="att-kicker">${S.mode==='efe'?'INTEGRANTES':'BASE CENTRAL'}</span><h3>${rows.length} personas</h3>${S.mode==='efe'?'<p class="section-note">Solo aparecen quienes pertenecen a este EFE. Quitar a alguien de acá no borra su perfil ni su historial.</p>':''}</div>${add}</div><div class="people-list">${rows.map(p=>`<article class="person-row"><div class="person-avatar">${initials(p.full_name)}</div><div class="person-copy"><b>${E(p.full_name)}</b><small>${E(p.phone||'Sin teléfono')} · ${E(p.instagram||'Sin Instagram')}${S.mode==='efe'?' · '+E(membership(p.id)?.leader_name||'Sin responsable'):''}</small></div>${S.mode==='efe'&&can('edit_people')?`<div class="member-actions"><button class="mini-action" data-member-edit="${p.id}">Responsable</button><button class="mini-action danger" data-member-remove="${p.id}">Quitar</button></div>`:canProfiles()?`<a class="mini-action" href="/perfiles/datos/">Perfil</a>`:''}</article>`).join('')||'<div class="att-empty">Todavía no hay integrantes en este EFE.</div>'}</div>`;
- host.querySelector('#addEfePerson')?.addEventListener('click',addEfePersonModal);
+ const rows=filteredRows(),isEfe=S.mode==='efe',canEdit=can('edit_people');
+ const add=canEdit?`<button class="section-action" id="addRosterPerson">+ Agregar desde Perfiles</button>`:'';
+ const context=isEfe?(group()?.name||'este EFE'):'Sábados';
+ host.innerHTML=`<div class="section-title"><div><span class="att-kicker">INTEGRANTES</span><h3>${rows.length} personas</h3><p class="section-note">Solo aparecen quienes pertenecen a ${E(context)}. Perfiles sigue siendo la base central: quitar a alguien de acá no borra su perfil ni su historial.</p></div>${add}</div><div class="people-list">${rows.map(p=>`<article class="person-row"><div class="person-avatar">${initials(p.full_name)}</div><div class="person-copy"><b>${E(p.full_name)}</b><small>${E(p.phone||'Sin teléfono')} · ${E(p.instagram||'Sin Instagram')}${isEfe?' · '+E(membership(p.id)?.leader_name||'Sin responsable'):''}</small></div>${canEdit?`<div class="member-actions">${isEfe?`<button class="mini-action" data-member-edit="${p.id}">Responsable</button>`:''}<button class="mini-action danger" data-member-remove="${p.id}">Quitar</button></div>`:canProfiles()?`<a class="mini-action" href="/perfiles/datos/">Perfil</a>`:''}</article>`).join('')||'<div class="att-empty">Todavía no hay integrantes cargados acá.</div>'}</div>`;
+ host.querySelector('#addRosterPerson')?.addEventListener('click',addRosterPersonModal);
  host.querySelectorAll('[data-member-edit]').forEach(b=>b.onclick=()=>editMembershipModal(b.dataset.memberEdit));
- host.querySelectorAll('[data-member-remove]').forEach(b=>b.onclick=()=>removeEfeMember(b.dataset.memberRemove));
+ host.querySelectorAll('[data-member-remove]').forEach(b=>b.onclick=()=>isEfe?removeEfeMember(b.dataset.memberRemove):removeSaturdayMember(b.dataset.memberRemove));
 }
-function addEfePersonModal(){
- const current=new Set(eligiblePeople().map(p=>p.id)),available=S.people.filter(p=>p.active&&!current.has(p.id));
- const o=U.modal('Agregar a '+(group()?.name||'EFE'),`<div class="picker-search"><input id="profilePickSearch" type="search" placeholder="Buscar en Perfiles..."></div><div class="profile-picker" id="profilePicker">${available.map(p=>profilePickRow(p)).join('')||'<div class="att-empty">Todas las personas activas ya están en este EFE.</div>'}</div>`);
- const paint=()=>{const q=norm(o.querySelector('#profilePickSearch').value);o.querySelector('#profilePicker').innerHTML=available.filter(p=>!q||norm(p.full_name+' '+(p.phone||'')).includes(q)).map(p=>profilePickRow(p)).join('')||'<div class="att-empty">Sin resultados.</div>';o.querySelectorAll('[data-profile-pick]').forEach(b=>b.onclick=()=>saveMembership(b.dataset.profilePick,true,'' ,o))};
+function addRosterPersonModal(){
+ const current=new Set(eligiblePeople().map(p=>p.id)),available=S.people.filter(p=>p.active&&!current.has(p.id)),isEfe=S.mode==='efe';
+ const title='Agregar a '+(isEfe?(group()?.name||'EFE'):'Sábados');
+ const o=U.modal(title,`<div class="picker-search"><input id="profilePickSearch" type="search" placeholder="Buscar en Perfiles..."></div><div class="profile-picker" id="profilePicker"></div>`);
+ const paint=()=>{const q=norm(o.querySelector('#profilePickSearch').value),rows=available.filter(p=>!q||norm(p.full_name+' '+(p.phone||'')+' '+(p.instagram||'')).includes(q));o.querySelector('#profilePicker').innerHTML=rows.map(p=>profilePickRow(p)).join('')||'<div class="att-empty">No hay más perfiles para agregar.</div>';o.querySelectorAll('[data-profile-pick]').forEach(b=>b.onclick=()=>isEfe?saveMembership(b.dataset.profilePick,true,'',o):saveSaturdayMembership(b.dataset.profilePick,true,o))};
  o.querySelector('#profilePickSearch').oninput=paint;paint();
 }
 function profilePickRow(p){return `<button class="profile-pick" data-profile-pick="${p.id}"><span class="person-avatar">${initials(p.full_name)}</span><span><b>${E(p.full_name)}</b><small>${E(p.phone||'Sin teléfono')}</small></span><i>＋</i></button>`}
@@ -280,6 +290,27 @@ async function removeEfeMember(id){
 async function saveMembership(id,active,leader,o){
  const r=await sb.rpc('tnt_set_efe_membership',{p_person:id,p_group:S.group,p_active:active,p_leader:leader||null});
  if(r.error){U.toast(r.error.message,true);return}U.closeModal(o);const m=await checked(sb.from('tnt_efe_memberships').select('*'));S.members=m;render();
+}
+async function removeSaturdayMember(id){
+ const p=person(id);if(!p?.id)return;
+ if(!await U.confirm('¿Quitar a '+p.full_name+' de Sábados? Su perfil y toda la asistencia histórica se conservan.'))return;
+ const r=await sb.rpc('tnt_set_saturday_membership',{p_person:id,p_active:false});
+ if(r.error)return U.toast(r.error.message,true);
+ S.saturdayMembers=await checked(sb.from('tnt_saturday_members').select('*'));render();U.toast('Integrante quitado de Sábados');
+}
+async function saveSaturdayMembership(id,active,o){
+ const r=await sb.rpc('tnt_set_saturday_membership',{p_person:id,p_active:active});
+ if(r.error){U.toast(r.error.message,true);return}
+ if(o)U.closeModal(o);
+ S.saturdayMembers=await checked(sb.from('tnt_saturday_members').select('*'));render();U.toast('Integrante agregado a Sábados');
+}
+async function resetSaturdayList(){
+ if(S.mode!=='sabados'||!can('attendance'))return;
+ if(!S.attendance.length){U.toast('Esta lista ya está limpia');return}
+ if(!await U.confirm('¿Resetear la asistencia del '+U.date(S.date+'T12:00:00-03:00',{day:'numeric',month:'long'})+'? Los integrantes de Sábados no cambian.'))return;
+ const r=await sb.rpc('tnt_reset_saturday_attendance',{p_date:S.date});
+ if(r.error)return U.toast(r.error.message,true);
+ await loadDate();render();U.toast('Lista del sábado reseteada');
 }
 function manageEfeMeetingsModal(){
  const rows=groupMeetings(),removed=groupMeetings(true).filter(m=>!m.active),months=new Map();
