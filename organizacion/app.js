@@ -469,16 +469,9 @@ function editEvent(id){
    ev.preventDefault();const btn=ev.target.querySelector('[type=submit]'),fd=new FormData(ev.target);
    const payload={name:String(fd.get('name')).trim(),description:fd.get('description')||null,location:fd.get('location')||null,start_date:e.kind==='saturday'?e.start_date:fd.get('start'),end_date:e.kind==='saturday'?e.end_date:(fd.get('end')||fd.get('start')),status:fd.get('status')};
    btn.disabled=true;
-   const r=await sb.rpc('tnt_update_event',{p_event:id,p_values:payload});
+   const days=e.kind==='saturday'?[]:[...o.querySelectorAll('.event-day-row')].map((row,idx)=>({id:row.dataset.dayId||null,label:row.querySelector('[name=day_label]').value.trim()||'Día '+(idx+1),date:row.querySelector('[name=day_date]').value||null}));
+   const r=await sb.rpc('tnt_update_event_config',{p_event:id,p_values:payload,p_days:days});
    if(r.error){btn.disabled=false;o.querySelector('[role=alert]').textContent=errMsg(r.error);return;}
-   if(e.kind!=='saturday'){
-     const days=[...o.querySelectorAll('.event-day-row')].map((row,idx)=>({id:row.dataset.dayId||null,label:row.querySelector('[name=day_label]').value.trim()||'Día '+(idx+1),date:row.querySelector('[name=day_date]').value||null}));
-     const dr=await sb.rpc('tnt_save_event_days',{p_event:id,p_days:days});
-     if(dr.error){btn.disabled=false;o.querySelector('[role=alert]').textContent=errMsg(dr.error);return;}
-   }else{
-     const dr=await sb.rpc('tnt_save_event_days',{p_event:id,p_days:[]});
-     if(dr.error){btn.disabled=false;o.querySelector('[role=alert]').textContent=errMsg(dr.error);return;}
-   }
    U.closeModal(o);await loadAll();render();eventDetailModal(id);toast('Encuentro actualizado');
  };
 }
