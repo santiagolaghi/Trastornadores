@@ -802,12 +802,8 @@
       $("editMessage").textContent = "Revisá el apellido.";
       return;
     }
-    if (!fecha) {
-      $("editMessage").textContent = "Elegí la fecha de nacimiento.";
-      return;
-    }
-    if (telefono.replace(/\D/g, "").length < 6) {
-      $("editMessage").textContent = "Revisá el número de teléfono.";
+    if (telefono && telefono.replace(/\D/g, "").length < 6) {
+      $("editMessage").textContent = "Revisá el número de teléfono o dejalo vacío.";
       return;
     }
     if (!genero) {
