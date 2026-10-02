@@ -2,7 +2,7 @@
 'use strict';
 const U=TNTUI,sb=TNT.sb,E=U.esc,app=document.getElementById('attendance-app');
 const qs=new URLSearchParams(location.search);
-const S={mode:qs.get('mode')||'',people:[],groups:[],members:[],events:[],attendance:[],followups:[],audit:[],group:null,date:'',tab:'attendance',query:'',filter:'all',loading:false,busy:new Set(),deck:null};
+const S={mode:qs.get('mode')||'',people:[],groups:[],members:[],events:[],meetings:[],attendance:[],followups:[],audit:[],group:null,date:'',tab:'attendance',query:'',filter:'all',loading:false,busy:new Set(),deck:null};
 const labels={present:'Presente',absent:'Ausente',pending:'Sin registrar'};
 const followLabels={pending:'Pendiente',contacted:'Le hablé',waiting:'Esperando respuesta',talking:'Conversando',no_response:'No respondió',resolved:'Cerrado'};
 const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
@@ -10,8 +10,8 @@ const person=id=>S.people.find(p=>p.id===id)||{};
 const group=()=>S.groups.find(g=>g.id===S.group);
 const currentMod=()=>S.mode==='efe'?'efe':'lista-sabados';
 const currentScope=()=>S.mode==='efe'?(group()?.code||'__none__'):'*';
-const can=(action)=>currentMod()==='efe'?!!TNT.canAction?.('efe',action,currentScope()):(TNT.isAdmin||!!TNT.canAction?.('lista-sabados',action,'*'));
-const has=(mod,scope='*')=>mod==='efe'?(TNT.hasAccess(mod,scope,'view')||!!TNT.canAction?.(mod,'attendance',scope)):(TNT.isAdmin||TNT.hasAccess(mod,scope,'view')||!!TNT.canAction?.(mod,'attendance',scope));
+const can=(action)=>currentMod()==='efe'?(TNT.isAdmin||!!TNT.canAction?.('efe',action,currentScope())):(TNT.isAdmin||!!TNT.canAction?.('lista-sabados',action,'*'));
+const has=(mod,scope='*')=>TNT.isAdmin||(mod==='efe'?(TNT.hasAccess(mod,scope,'view')||!!TNT.canAction?.(mod,'attendance',scope)):(TNT.hasAccess(mod,scope,'view')||!!TNT.canAction?.(mod,'attendance',scope)));
 const canProfiles=()=>TNT.isAdmin||!!TNT.hasAccess?.('perfiles','*','view');
 const age=(p,date=S.date)=>{if(!p.birthday)return null;const d=new Date(p.birthday+'T12:00:00'),at=new Date((date||U.dateKey())+'T12:00:00');let n=at.getFullYear()-d.getFullYear();if(at.getMonth()<d.getMonth()||(at.getMonth()===d.getMonth()&&at.getDate()<d.getDate()))n--;return n};
 const status=id=>S.attendance.find(a=>a.person_id===id)?.status||'pending';
@@ -21,6 +21,26 @@ async function checked(q){const r=await q;if(r.error)throw r.error;return r.data
 function latestWednesday(){const d=new Date();const delta=(d.getDay()-3+7)%7;d.setDate(d.getDate()-delta);return U.dateKey(d)}
 function saturdayDates(){return [...S.events].filter(e=>e.kind==='saturday'&&e.status!=='cancelled').sort((a,b)=>a.start_date.localeCompare(b.start_date))}
 function defaultSaturday(){const dates=saturdayDates(),today=U.dateKey();return dates.find(e=>e.start_date>=today)?.start_date||dates.at(-1)?.start_date||today}
+function groupMeetings(includeInactive=false){return S.meetings.filter(m=>m.group_id===S.group&&(includeInactive||m.active)).sort((a,b)=>a.meeting_date.localeCompare(b.meeting_date))}
+function defaultEfeDate(){
+ const rows=groupMeetings(),today=U.dateKey(),past=rows.filter(m=>m.meeting_date<=today);
+ return past.at(-1)?.meeting_date||rows[0]?.meeting_date||latestWednesday();
+}
+function monthKey(date){return String(date||'').slice(0,7)}
+function monthLabel(date){return U.date(date+'T12:00:00-03:00',{month:'long',year:'numeric'}).replace(/^./,x=>x.toUpperCase())}
+function efeMeetingOptions(){
+ const rows=groupMeetings(),months=new Map();
+ rows.forEach(m=>{const key=monthKey(m.meeting_date);if(!months.has(key))months.set(key,[]);months.get(key).push(m)});
+ return [...months.entries()].map(([,items])=>`<optgroup label="${E(monthLabel(items[0].meeting_date))}">${items.map(m=>`<option value="${m.meeting_date}" ${m.meeting_date===S.date?'selected':''}>${E(U.date(m.meeting_date+'T12:00:00-03:00',{weekday:'short',day:'numeric'}))}${m.title&&m.title!=='Miércoles EFE'?' · '+E(m.title):''}</option>`).join('')}</optgroup>`).join('');
+}
+async function loadMeetings(){
+ if(!S.group)return;
+ const now=new Date(),from=new Date(now.getFullYear(),now.getMonth()-6,1),to=new Date(now.getFullYear(),now.getMonth()+13,0);
+ const ensure=await sb.rpc('tnt_ensure_efe_wednesdays',{p_group:S.group,p_from:U.dateKey(from),p_to:U.dateKey(to)});
+ if(ensure.error)throw ensure.error;
+ S.meetings=await checked(sb.from('tnt_efe_meetings').select('*').eq('group_id',S.group).order('meeting_date'));
+ if(!groupMeetings().some(m=>m.meeting_date===S.date))S.date=defaultEfeDate();
+}
 function eligiblePeople(){
  if(S.mode==='sabados')return S.people.filter(p=>p.active);
  if(!S.group)return[];
@@ -47,6 +67,7 @@ async function loadBase(){
    const requested=qs.get('group');
    S.group=S.groups.find(g=>g.code===requested&&has('efe',g.code))?.id||S.groups.find(g=>has('efe',g.code))?.id||null;
    S.date=qs.get('date')||latestWednesday();
+   await loadMeetings();
  }else S.date=qs.get('date')||defaultSaturday();
  await loadDate();render();
 }
@@ -67,13 +88,13 @@ async function loadDate(){
    [S.attendance,S.followups,S.audit]=await Promise.all(jobs);
  }finally{S.loading=false}
 }
-function setMode(mode){
+async function setMode(mode){
  if(!modeAllowed(mode))return U.toast('No tenés acceso a ese submódulo.',true);
  S.mode=mode;S.tab='attendance';S.query='';S.filter='all';
- if(mode==='efe'){S.group=S.groups.find(g=>has('efe',g.code))?.id||null;S.date=latestWednesday()}
+ if(mode==='efe'){S.group=S.groups.find(g=>has('efe',g.code))?.id||null;S.date=latestWednesday();await loadMeetings()}
  else S.date=defaultSaturday();
  const url=new URL(location.href);url.searchParams.set('mode',mode);url.searchParams.delete('group');url.searchParams.delete('date');history.replaceState(null,'',url);
- loadDate().then(render);
+ await loadDate();render();
 }
 function renderNoAccess(){app.innerHTML='<div class="att-noaccess"><h1>Asistencia TNT</h1><p>No tenés habilitado EFE ni Lista Sábados.</p><a class="tnt-button" href="/">Volver a TNT</a></div>'}
 function topShell(inner){
@@ -101,8 +122,9 @@ function render(){
  </section>
  <section class="date-panel">
    ${S.mode==='efe'?groupChooser():''}
-   <label><span>${S.mode==='efe'?'Miércoles':'Sábado'}</span>${S.mode==='sabados'&&dateOptions.length?`<select id="att-event">${dateOptions.map(e=>`<option value="${e.start_date}" ${e.start_date===S.date?'selected':''}>${E(e.name)} · ${U.date(e.start_date+'T12:00:00-03:00',{day:'numeric',month:'short'})}</option>`).join('')}</select>`:`<input id="att-date" type="date" value="${S.date}">`}</label>
+   <label><span>${S.mode==='efe'?'Encuentro':'Sábado'}</span>${S.mode==='efe'?`<select id="att-efe-meeting">${efeMeetingOptions()}</select>`:dateOptions.length?`<select id="att-event">${dateOptions.map(e=>`<option value="${e.start_date}" ${e.start_date===S.date?'selected':''}>${E(e.name)} · ${U.date(e.start_date+'T12:00:00-03:00',{day:'numeric',month:'short'})}</option>`).join('')}</select>`:`<input id="att-date" type="date" value="${S.date}">`}</label>
  </section>
+ ${S.mode==='efe'?`<div class="efe-date-actions">${can('manage_meetings')?'<button id="manageEfeMeetings">Gestionar miércoles</button>':''}${can('attendance')?'<button id="resetEfeList" class="danger">Resetear lista</button>':''}<span>Los miércoles se crean automáticamente y están separados por mes.</span></div>`:''}
  <section class="stats-row">
    <button data-filter-stat="present"><b>${counts.present}</b><span>Presentes</span></button>
    <button data-filter-stat="absent"><b>${counts.absent}</b><span>Ausentes</span></button>
@@ -130,9 +152,12 @@ function tabs(){
 }
 function bindBase(){
  app.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
- app.querySelector('#att-group')?.addEventListener('change',async e=>{S.group=e.target.value;S.tab='attendance';const url=new URL(location.href);url.searchParams.set('group',group()?.code||'');history.replaceState(null,'',url);await loadDate();render()});
+ app.querySelector('#att-group')?.addEventListener('change',async e=>{S.group=e.target.value;S.tab='attendance';S.date=latestWednesday();const url=new URL(location.href);url.searchParams.set('group',group()?.code||'');url.searchParams.delete('date');history.replaceState(null,'',url);await loadMeetings();await loadDate();render()});
+ app.querySelector('#att-efe-meeting')?.addEventListener('change',async e=>{S.date=e.target.value;const url=new URL(location.href);url.searchParams.set('date',S.date);history.replaceState(null,'',url);await loadDate();render()});
  app.querySelector('#att-event')?.addEventListener('change',async e=>{S.date=e.target.value;await loadDate();render()});
  app.querySelector('#att-date')?.addEventListener('change',async e=>{S.date=e.target.value;await loadDate();render()});
+ app.querySelector('#manageEfeMeetings')?.addEventListener('click',manageEfeMeetingsModal);
+ app.querySelector('#resetEfeList')?.addEventListener('click',resetEfeList);
  app.querySelector('#att-search').oninput=e=>{S.query=e.target.value;paintContent()};
  app.querySelector('#att-filter').onchange=e=>{S.filter=e.target.value;paintContent()};
  app.querySelectorAll('[data-filter-stat]').forEach(b=>b.onclick=()=>{S.tab='attendance';S.filter=b.dataset.filterStat;render()});
@@ -228,9 +253,10 @@ async function copyAttendance(kind){
 function paintPeople(host){
  const rows=filteredRows();
  const add=S.mode==='efe'&&can('edit_people')?'<button class="section-action" id="addEfePerson">+ Agregar desde Perfiles</button>':'';
- host.innerHTML=`<div class="section-title"><div><span class="att-kicker">${S.mode==='efe'?'INTEGRANTES':'BASE CENTRAL'}</span><h3>${rows.length} personas</h3></div>${add}</div><div class="people-list">${rows.map(p=>`<article class="person-row"><div class="person-avatar">${initials(p.full_name)}</div><div class="person-copy"><b>${E(p.full_name)}</b><small>${E(p.phone||'Sin teléfono')} · ${E(p.instagram||'Sin Instagram')}${S.mode==='efe'?' · '+E(membership(p.id)?.leader_name||'Sin responsable'):''}</small></div>${S.mode==='efe'&&can('edit_people')?`<button class="mini-action" data-member-edit="${p.id}">Editar EFE</button>`:canProfiles()?`<a class="mini-action" href="/perfiles/datos/">Perfil</a>`:''}</article>`).join('')}</div>`;
+ host.innerHTML=`<div class="section-title"><div><span class="att-kicker">${S.mode==='efe'?'INTEGRANTES':'BASE CENTRAL'}</span><h3>${rows.length} personas</h3>${S.mode==='efe'?'<p class="section-note">Solo aparecen quienes pertenecen a este EFE. Quitar a alguien de acá no borra su perfil ni su historial.</p>':''}</div>${add}</div><div class="people-list">${rows.map(p=>`<article class="person-row"><div class="person-avatar">${initials(p.full_name)}</div><div class="person-copy"><b>${E(p.full_name)}</b><small>${E(p.phone||'Sin teléfono')} · ${E(p.instagram||'Sin Instagram')}${S.mode==='efe'?' · '+E(membership(p.id)?.leader_name||'Sin responsable'):''}</small></div>${S.mode==='efe'&&can('edit_people')?`<div class="member-actions"><button class="mini-action" data-member-edit="${p.id}">Responsable</button><button class="mini-action danger" data-member-remove="${p.id}">Quitar</button></div>`:canProfiles()?`<a class="mini-action" href="/perfiles/datos/">Perfil</a>`:''}</article>`).join('')||'<div class="att-empty">Todavía no hay integrantes en este EFE.</div>'}</div>`;
  host.querySelector('#addEfePerson')?.addEventListener('click',addEfePersonModal);
  host.querySelectorAll('[data-member-edit]').forEach(b=>b.onclick=()=>editMembershipModal(b.dataset.memberEdit));
+ host.querySelectorAll('[data-member-remove]').forEach(b=>b.onclick=()=>removeEfeMember(b.dataset.memberRemove));
 }
 function addEfePersonModal(){
  const current=new Set(eligiblePeople().map(p=>p.id)),available=S.people.filter(p=>p.active&&!current.has(p.id));
@@ -244,9 +270,37 @@ function editMembershipModal(id){
  o.querySelector('form').onsubmit=async e=>{e.preventDefault();await saveMembership(id,true,e.target.elements.leader.value,o)};
  o.querySelector('#removeMember').onclick=async()=>{if(await U.confirm('¿Quitar a '+p.full_name+' de este EFE? Su perfil y su historial no se borran.'))await saveMembership(id,false,m?.leader_name||'',o)};
 }
+async function removeEfeMember(id){
+ const p=person(id),m=membership(id);if(!p?.id)return;
+ if(!await U.confirm('¿Quitar a '+p.full_name+' de '+(group()?.name||'este EFE')+'? No se borra su perfil ni el historial anterior.'))return;
+ const r=await sb.rpc('tnt_set_efe_membership',{p_person:id,p_group:S.group,p_active:false,p_leader:m?.leader_name||null});
+ if(r.error)return U.toast(r.error.message,true);
+ S.members=await checked(sb.from('tnt_efe_memberships').select('*'));render();U.toast('Integrante quitado de este EFE');
+}
 async function saveMembership(id,active,leader,o){
  const r=await sb.rpc('tnt_set_efe_membership',{p_person:id,p_group:S.group,p_active:active,p_leader:leader||null});
  if(r.error){U.toast(r.error.message,true);return}U.closeModal(o);const m=await checked(sb.from('tnt_efe_memberships').select('*'));S.members=m;render();
+}
+function manageEfeMeetingsModal(){
+ const rows=groupMeetings(),removed=groupMeetings(true).filter(m=>!m.active),months=new Map();
+ rows.forEach(m=>{const key=monthKey(m.meeting_date);if(!months.has(key))months.set(key,[]);months.get(key).push(m)});
+ const o=U.modal('Miércoles · '+(group()?.name||'EFE'),`<div class="meeting-manager"><p>Los miércoles se crean solos. Acá podés mover una fecha, cambiar su nombre o quitarla del calendario de este EFE.</p>${[...months.entries()].map(([,items])=>`<section class="meeting-month"><h3>${E(monthLabel(items[0].meeting_date))}</h3><div>${items.map(m=>`<article class="meeting-row ${m.meeting_date===S.date?'selected':''}"><div><b>${E(U.date(m.meeting_date+'T12:00:00-03:00',{weekday:'long',day:'numeric'}))}</b><small>${E(m.title||'Miércoles EFE')}${m.auto_generated?' · automático':' · editado'}</small></div><button data-meeting-edit="${m.id}">Editar</button><button class="danger" data-meeting-delete="${m.id}">Eliminar</button></article>`).join('')}</div></section>`).join('')}${removed.length?`<section class="meeting-month removed"><h3>Eliminados</h3><div>${removed.map(m=>`<article class="meeting-row"><div><b>${E(U.date(m.meeting_date+'T12:00:00-03:00',{day:'numeric',month:'long'}))}</b><small>Se puede restaurar</small></div><button data-meeting-restore="${m.id}">Restaurar</button></article>`).join('')}</div></section>`:''}</div>`,true);
+ o.querySelectorAll('[data-meeting-edit]').forEach(b=>b.onclick=()=>editEfeMeetingModal(S.meetings.find(m=>m.id===b.dataset.meetingEdit),o));
+ o.querySelectorAll('[data-meeting-delete]').forEach(b=>b.onclick=async()=>{const m=S.meetings.find(x=>x.id===b.dataset.meetingDelete);if(!m)return;if(!await U.confirm('¿Eliminar este miércoles de '+(group()?.name||'EFE')+'? La asistencia histórica se conserva y podés restaurarlo después.'))return;const r=await sb.rpc('tnt_delete_efe_meeting',{p_meeting:m.id});if(r.error)return U.toast(r.error.message,true);U.closeModal(o);await loadMeetings();await loadDate();render();U.toast('Miércoles eliminado')});
+ o.querySelectorAll('[data-meeting-restore]').forEach(b=>b.onclick=async()=>{const r=await sb.rpc('tnt_restore_efe_meeting',{p_meeting:b.dataset.meetingRestore});if(r.error)return U.toast(r.error.message,true);U.closeModal(o);await loadMeetings();await loadDate();render();U.toast('Miércoles restaurado')});
+}
+function editEfeMeetingModal(m,parent){
+ if(!m)return;const o=U.modal('Editar miércoles',`<form class="tnt-form"><label>Fecha<input type="date" name="date" value="${m.meeting_date}" required></label><label>Nombre / nota<input name="title" value="${E(m.title||'Miércoles EFE')}" maxlength="80"></label><p>Si ya hay asistencia cargada, al mover la fecha también se mueve ese historial.</p><button class="tnt-button primary" type="submit">Guardar cambios</button><p role="alert"></p></form>`);
+ o.querySelector('form').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target),newDate=fd.get('date'),r=await sb.rpc('tnt_update_efe_meeting',{p_meeting:m.id,p_date:newDate,p_title:fd.get('title')||null});if(r.error){e.target.querySelector('[role=alert]').textContent=r.error.message;return}U.closeModal(o);if(parent)U.closeModal(parent);if(S.date===m.meeting_date)S.date=newDate;await loadMeetings();await loadDate();render();U.toast('Miércoles actualizado')};
+}
+async function resetEfeList(){
+ if(S.mode!=='efe'||!can('attendance'))return;
+ const marked=S.attendance.length;
+ if(!marked){U.toast('Esta lista ya está limpia');return}
+ if(!await U.confirm('¿Resetear la lista del '+U.date(S.date+'T12:00:00-03:00',{day:'numeric',month:'long'})+'? Se borran las marcas de asistencia y el seguimiento de ese día, pero no los integrantes del EFE.'))return;
+ const r=await sb.rpc('tnt_reset_efe_attendance',{p_group:S.group,p_date:S.date});
+ if(r.error)return U.toast(r.error.message,true);
+ await loadDate();render();U.toast('Lista reseteada');
 }
 function paintFollowups(host){
  const rows=filteredRows();host.innerHTML=`<div class="section-title"><div><span class="att-kicker">AUSENTES</span><h3>Seguimiento del miércoles</h3></div></div><div class="people-list">${rows.map(p=>{const f=S.followups.find(x=>x.person_id===p.id),wa=phoneUrl(p);return`<article class="follow-row"><div class="person-avatar">${initials(p.full_name)}</div><div><b>${E(p.full_name)}</b><small>${E(followLabels[f?.status]||'Pendiente')} · ${E(f?.note||'Sin nota')}</small></div><div class="follow-actions">${wa?`<button data-wa="${wa}">WhatsApp</button>`:''}<button data-follow="${p.id}">Seguimiento</button></div></article>`}).join('')||'<div class="att-empty">No hay ausentes para seguir.</div>'}</div>`;
