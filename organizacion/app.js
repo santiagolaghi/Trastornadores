@@ -421,7 +421,7 @@ async function openActivityChat(taskId,eventId){
  const eid=eventId||taskBy(taskId)?.event_id||null,e=eventBy(eid);if(!eid)return;
  try{
    const existing=await sb.rpc('tnt_get_event_chat',{p_event:eid});if(existing.error)throw existing.error;
-   if(existing.data){location.href='/chat/?thread='+encodeURIComponent(existing.data);return;}
+   if(existing.data){const open=await sb.rpc('tnt_open_activity_chat',{p_task:null,p_event:eid});if(open.error)throw open.error;location.href='/chat/?thread='+encodeURIComponent(open.data);return;}
    if(!canCreateEventChat(eid)){U.toast('Todavía no hay chat para este encuentro. No tenés permiso para crearlo.',true);return;}
    const o=U.modal('Crear chat del '+(e?.kind==='saturday'?'sábado':'evento'),`<div class="chat-create-confirm"><div class="chat-create-icon">${U.icon('chat')}</div><h3>Todavía no existe</h3><p>¿Querés crear ahora el chat de <b>${esc(e?.name||'este encuentro')}</b>? No se crea nada hasta que confirmes.</p><div class="actions"><button class="tnt-button" id="cancelEventChat">Ahora no</button><button class="tnt-button primary" id="confirmEventChat">Crear chat</button></div></div>`);
    o.querySelector('#cancelEventChat').onclick=()=>U.closeModal(o);
