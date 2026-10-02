@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b0d12">
   <meta name="robots" content="noindex,nofollow,noarchive">
-  <meta name="description" content="Base central de personas TNT.">
+  <meta name="description" content="Base central de todas las personas TNT.">
   <title>Base TNT</title>
   <link rel="icon" href="/perfiles/icon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -42,8 +42,8 @@
         <div class="login-card">
           <div class="login-icon">🔒</div>
           <span class="eyebrow-pill">Base central TNT</span>
-          <h1>Tu gente,<br><span>en un solo lugar.</span></h1>
-          <p>Accedé a los perfiles registrados con tu cuenta de administrador TNT.</p>
+          <h1>Toda TNT,<br><span>en una sola base.</span></h1>
+          <p>EFE, sábados y perfiles usan estas mismas personas.</p>
 
           <form id="loginForm" novalidate>
             <label class="field-label" for="password" hidden>Contraseña</label>
@@ -255,7 +255,7 @@
 
       <div class="management-actions">
         <button class="manage-btn edit-btn" id="editProfileBtn" type="button">✎ Editar perfil</button>
-        <button class="manage-btn delete-btn" id="deleteProfileBtn" type="button">Eliminar perfil</button>
+        <button class="manage-btn delete-btn" id="deleteProfileBtn" type="button">Archivar perfil</button>
       </div>
     </section>
 
@@ -327,12 +327,12 @@
     <section class="bottom-sheet delete-sheet" id="deleteSheet" aria-hidden="true" aria-labelledby="deleteTitle">
       <div class="sheet-handle"></div>
       <div class="danger-icon">!</div>
-      <h2 id="deleteTitle">¿Eliminar perfil?</h2>
-      <p>Vas a eliminar a <strong id="deleteProfileName">esta persona</strong> de la Base TNT. Esta acción no se puede deshacer.</p>
+      <h2 id="deleteTitle">¿Archivar perfil?</h2>
+      <p>Vas a archivar a <strong id="deleteProfileName">esta persona</strong>. Su historial de EFE y sábados se conserva.</p>
       <div class="delete-actions">
         <button id="cancelDeleteBtn" type="button">Cancelar</button>
         <button id="confirmDeleteBtn" type="button">
-          <span id="confirmDeleteText">Sí, eliminar</span>
+          <span id="confirmDeleteText">Sí, archivar</span>
           <span class="spinner" id="deleteSpinner" hidden></span>
         </button>
       </div>
@@ -343,6 +343,6 @@
 
   <script src="/supabase-lite.js?v=12"></script>
   <script src="/assets/tnt-components.js?v=34"></script><script src="/assets/tnt-core.js?v=34" data-module="perfiles" data-label="Perfiles" data-shell="off"></script>
-  <script src="/perfiles/datos/admin.js?v=34"></script>
+  <script src="/perfiles/datos/admin.js?v=40"></script>
 </body>
 </html>
