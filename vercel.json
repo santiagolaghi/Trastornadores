@@ -25,7 +25,7 @@
         },
         {
           "key": "X-TNT-Deployment",
-          "value": "attendance-direct-2026-09-30"
+          "value": "unified-attendance-2026-10-02"
         }
       ]
     },
@@ -48,7 +48,7 @@
       ]
     }
   ],
-  "buildCommand": "mkdir -p public && cp -r assets admin buffet campamento chat efe glosario icons organizacion lista-sabados perfiles manifest.webmanifest index.html sw.js public/",
+  "buildCommand": "mkdir -p public && cp -r assets admin asistencia buffet campamento chat efe glosario icons organizacion lista-sabados perfiles manifest.webmanifest index.html sw.js public/",
   "outputDirectory": "public",
   "installCommand": "echo skip-install"
 }
