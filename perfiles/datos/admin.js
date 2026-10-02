@@ -667,7 +667,7 @@
 
     if (!options.silent) setRefreshLoading(true);
     try {
-      const { data, error } = await sb.from("perfiles_registros").select("*").order("creado_en", { ascending: false });
+      const { data, error } = await sb.from("tnt_profiles_central").select("*").eq("active", true).order("actualizado_en", { ascending: false });
       if (error) throw error;
 
       records = Array.isArray(data) ? data : [];
@@ -820,22 +820,25 @@
       const sb = window.TNT?.sb;
       if (!sb) throw new Error("No se pudo conectar con la base.");
 
-      const years=ageFromBirthdate(fecha);
-      const { data, error } = await sb.from("perfiles_registros").update({nombre,apellido,fecha_nacimiento:fecha,edad:years,categoria:years<18?"Adolescente":"Joven",instagram,telefono,genero,actualizado_en:new Date().toISOString()}).eq("id",record.id).select().single();
+      const { error } = await sb.rpc("tnt_save_central_profile", {
+        p_person: record.id,
+        p_values: {
+          first_name: nombre,
+          last_name: apellido,
+          full_name: [nombre, apellido].filter(Boolean).join(" "),
+          birthday: fecha,
+          instagram: instagram || null,
+          phone: telefono || null,
+          sex: genero === "Mujer" ? "F" : "M"
+        }
+      });
 
       if (error) throw error;
 
-      const updated = Array.isArray(data) ? data[0] : data;
-      if (!updated?.id) throw new Error("No se recibió el perfil actualizado.");
-
-      records = records.map((item) =>
-        String(item.id) === String(updated.id) ? { ...item, ...updated } : item
-      );
-
-      renderStats();
-      renderList();
+      await loadData("central", { silent: true });
+      const updated = records.find((item) => String(item.id) === String(record.id));
       closeEdit();
-      openDetail(updated.id);
+      if (updated) openDetail(updated.id);
       showToast("Perfil actualizado.");
     } catch (error) {
       console.error(error);
@@ -857,7 +860,7 @@
       const sb = window.TNT?.sb;
       if (!sb) throw new Error("No se pudo conectar con la base.");
 
-      const { error } = await sb.from("perfiles_registros").delete().eq("id", record.id).select("id").single();
+      const { error } = await sb.rpc("tnt_set_profile_active", { p_person: record.id, p_active: false });
       if (error) throw error;
 
       const deletedName = [record.nombre, record.apellido].filter(Boolean).join(" ");
@@ -866,13 +869,12 @@
       renderStats();
       renderList();
       closeDelete();
-      // El detalle queda debajo: al volver no se muestra un registro eliminado.
-      $("detailName").textContent = "Perfil eliminado";
+      $("detailName").textContent = "Perfil archivado";
       $("detailData").innerHTML = "";
       $("detailActions").innerHTML = "";
       $("editProfileBtn").hidden = true;
       $("deleteProfileBtn").hidden = true;
-      showToast(deletedName + " fue eliminado.");
+      showToast(deletedName + " fue archivado sin perder su historial.");
     } catch (error) {
       console.error(error);
       showToast("No se pudo eliminar el perfil.");
