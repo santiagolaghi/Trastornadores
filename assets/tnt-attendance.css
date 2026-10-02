@@ -78,3 +78,30 @@
 .attendance-share{display:flex;gap:7px;flex-wrap:wrap}
 .attendance-share button{min-height:38px;padding:0 12px;border:1px solid var(--att-line);border-radius:13px;background:var(--att-panel);color:var(--att-muted);font-size:10px;font-weight:800}
 .attendance-share button:hover{color:var(--att-ink);border-color:color-mix(in srgb,var(--att-accent) 34%,var(--att-line))}
+
+/* EFE roster + automatic Wednesdays · 2026-10-02 */
+.efe-date-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:-6px}
+.efe-date-actions button{min-height:38px;padding:0 12px;border:1px solid var(--att-line);border-radius:13px;background:var(--att-panel);color:var(--att-ink);font-size:10px;font-weight:850}
+.efe-date-actions button.danger{color:var(--tnt-bad);border-color:color-mix(in srgb,var(--tnt-bad) 24%,var(--att-line));background:color-mix(in srgb,var(--tnt-bad) 6%,var(--att-panel))}
+.efe-date-actions span{font-size:9px;color:var(--att-muted)}
+.section-note{margin:4px 0 0;color:var(--att-muted);font-size:10px;line-height:1.45;max-width:520px}
+.member-actions{display:flex;gap:6px;align-items:center}
+.mini-action.danger{color:var(--tnt-bad);border-color:color-mix(in srgb,var(--tnt-bad) 24%,var(--att-line));background:color-mix(in srgb,var(--tnt-bad) 6%,var(--att-panel))}
+.meeting-manager{display:grid;gap:14px}
+.meeting-manager>p{margin:0;color:var(--att-muted);font-size:11px;line-height:1.5}
+.meeting-month{display:grid;gap:7px}
+.meeting-month>h3{position:sticky;top:0;z-index:1;margin:0;padding:7px 3px;background:var(--tnt-panel);font-size:12px;text-transform:capitalize;letter-spacing:-.01em}
+.meeting-month>div{display:grid;gap:6px}
+.meeting-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;align-items:center;padding:10px 11px;border:1px solid var(--att-line);border-radius:15px;background:var(--att-panel2)}
+.meeting-row.selected{border-color:color-mix(in srgb,var(--att-accent) 50%,var(--att-line));box-shadow:inset 3px 0 0 var(--att-accent)}
+.meeting-row b{display:block;font-size:11px;text-transform:capitalize}
+.meeting-row small{display:block;margin-top:2px;color:var(--att-muted);font-size:9px}
+.meeting-row button{min-height:34px;padding:0 10px;border:1px solid var(--att-line);border-radius:10px;background:var(--att-panel);color:var(--att-ink);font-size:9px;font-weight:850}
+.meeting-row button.danger{color:var(--tnt-bad)}
+.meeting-month.removed{opacity:.78}
+@media(max-width:620px){
+ .efe-date-actions{display:grid;grid-template-columns:1fr 1fr}
+ .efe-date-actions button{width:100%}.efe-date-actions span{grid-column:1/-1}
+ .member-actions{grid-column:1/-1;width:100%}.member-actions .mini-action{flex:1}
+ .meeting-row{grid-template-columns:minmax(0,1fr) auto}.meeting-row button.danger{grid-column:2}
+}
