@@ -149,17 +149,15 @@
     setLoading(true);
 
     try {
-      const payload = {
-        nombre: nombre.value,
-        apellido: apellido.value,
-        fecha_nacimiento: fecha.value,
-        instagram: instagram.value.trim() || null,
-        telefono: telefono.value.trim(),
-        genero,
-        consentimiento: true
-      };
-
-      const { error } = await client.from("perfiles_registros").insert(payload);
+      const { error } = await client.rpc("tnt_create_public_profile", {
+        p_first_name: nombre.value,
+        p_last_name: apellido.value,
+        p_birthday: fecha.value,
+        p_instagram: instagram.value.trim() || null,
+        p_phone: telefono.value.trim(),
+        p_gender: genero,
+        p_consent: true
+      });
       if (error) throw error;
 
       $("successName").textContent = nombre.value;
