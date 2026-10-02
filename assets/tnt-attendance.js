@@ -108,6 +108,7 @@ function render(){
    <button data-filter-stat="absent"><b>${counts.absent}</b><span>Ausentes</span></button>
    <button data-filter-stat="pending"><b>${counts.pending}</b><span>Sin marcar</span></button>
  </section>
+ <div class="attendance-share"><button data-copy-att="present">Copiar presentes</button><button data-copy-att="absent">Copiar ausentes</button><button data-copy-att="all">Copiar resumen</button></div>
  <section class="take-attendance">
    <div><span class="att-kicker">PASAR LISTA</span><h3>${counts.pending?'Te faltan '+counts.pending:'Lista completa'}</h3><p>Usá tarjetas para hacerlo rápido o la lista para corregir.</p></div>
    <button class="start-deck" id="startDeck" ${!can('attendance')||!rows.length?'disabled':''}>▶ Modo swipe</button>
@@ -135,6 +136,7 @@ function bindBase(){
  app.querySelector('#att-search').oninput=e=>{S.query=e.target.value;paintContent()};
  app.querySelector('#att-filter').onchange=e=>{S.filter=e.target.value;paintContent()};
  app.querySelectorAll('[data-filter-stat]').forEach(b=>b.onclick=()=>{S.tab='attendance';S.filter=b.dataset.filterStat;render()});
+ app.querySelectorAll('[data-copy-att]').forEach(b=>b.onclick=()=>copyAttendance(b.dataset.copyAtt));
  app.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;paintContent();app.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('on',x.dataset.tab===S.tab))});
  app.querySelector('#startDeck')?.addEventListener('click',startDeck);
 }
@@ -171,13 +173,17 @@ function attendanceRow(p){
  </article>`;
 }
 async function mark(id,value){
- if(!can('attendance')||S.busy.has(id))return;S.busy.add(id);
+ if(!can('attendance')||S.busy.has(id))return false;S.busy.add(id);
  const old=status(id);const idx=S.attendance.findIndex(a=>a.person_id===id);
  if(idx>=0)S.attendance[idx]={...S.attendance[idx],status:value};else S.attendance.push({person_id:id,status:value});
  paintContent();
  const r=await sb.rpc('tnt_mark_attendance',{p_mode:S.mode,p_person:id,p_date:S.date,p_status:value,p_group:S.mode==='efe'?S.group:null});
- if(r.error){if(idx>=0)S.attendance[idx].status=old;else S.attendance=S.attendance.filter(a=>a.person_id!==id);U.toast(r.error.message,true)}else if(can('history'))await loadAuditOnly();
- S.busy.delete(id);paintContent();
+ if(r.error){
+   if(idx>=0)S.attendance[idx].status=old;else S.attendance=S.attendance.filter(a=>a.person_id!==id);
+   U.toast(r.error.message,true);S.busy.delete(id);paintContent();return false;
+ }
+ if(can('history'))await loadAuditOnly();
+ S.busy.delete(id);paintContent();return true;
 }
 async function loadAuditOnly(){
  let q=sb.from('tnt_attendance_audit').select('*').eq('mode',S.mode).eq('attendance_date',S.date).order('created_at',{ascending:false}).limit(120);
@@ -195,18 +201,29 @@ function renderDeck(){
  host.innerHTML=`<header class="deck-head"><button id="deckClose">×</button><div><b>${S.mode==='efe'?E(group()?.name):'Sábado TNT'}</b><small>${d.index+1} de ${d.queue.length}</small></div><button id="deckUndo" ${!d.history.length?'disabled':''}>↶</button></header><div class="deck-bar"><i style="width:${pct}%"></i></div><main class="deck-stage"><article class="swipe-card" id="swipeCard"><div><div class="big-avatar">${initials(p.full_name)}</div><h2>${E(p.full_name)}</h2><div class="person-tags"><span>${age(p)??'—'} años</span>${S.mode==='efe'?'<span>'+E(membership(p.id)?.leader_name||'Sin responsable')+'</span>':''}${st!=='pending'?'<span>Antes: '+E(labels[st])+'</span>':''}</div></div><footer><span>← faltó</span><b>${E(p.phone||'Sin teléfono')}</b><span>vino →</span></footer></article></main><div class="deck-buttons"><button class="deck-no" data-deck-answer="absent">← Faltó</button><button class="deck-yes" data-deck-answer="present">Vino →</button></div>`;
  document.body.append(host);
  host.querySelector('#deckClose').onclick=()=>{host.remove();S.deck=null;render()};
- host.querySelector('#deckUndo').onclick=async()=>{const h=d.history.pop();if(!h)return;d.index=Math.max(0,d.index-1);await mark(h.id,h.prev);host.remove();renderDeck()};
+ host.querySelector('#deckUndo').onclick=async()=>{const h=d.history.at(-1);if(!h)return;const ok=await mark(h.id,h.prev);if(!ok)return;d.history.pop();d.index=Math.max(0,d.index-1);host.remove();renderDeck()};
  host.querySelectorAll('[data-deck-answer]').forEach(b=>b.onclick=()=>answerDeck(p,b.dataset.deckAnswer,host));
  bindSwipe(host.querySelector('#swipeCard'),p,host);
 }
 async function answerDeck(p,value,host){
- const prev=status(p.id);S.deck.history.push({id:p.id,prev});await mark(p.id,value);S.deck.index++;host.remove();renderDeck();
+ const prev=status(p.id),ok=await mark(p.id,value);if(!ok)return;
+ S.deck.history.push({id:p.id,prev});S.deck.index++;host.remove();renderDeck();
 }
 function bindSwipe(card,p,host){
  let sx=0,x=0,drag=false;card.onpointerdown=e=>{drag=true;sx=e.clientX;card.setPointerCapture(e.pointerId)};
  card.onpointermove=e=>{if(!drag)return;x=e.clientX-sx;card.style.transform=`translate3d(${x}px,0,0) rotate(${x/28}deg)`;card.dataset.dir=x>0?'yes':'no'};
  const end=()=>{if(!drag)return;drag=false;if(Math.abs(x)>72)answerDeck(p,x>0?'present':'absent',host);else{card.style.transform='';delete card.dataset.dir}x=0};
  card.onpointerup=end;card.onpointercancel=end;
+}
+async function copyAttendance(kind){
+ const rows=eligiblePeople().filter(p=>kind==='all'||status(p.id)===kind);
+ const title=S.mode==='efe'?(group()?.name||'EFE'):'Sábado TNT';
+ const lines=kind==='all'
+   ? ['📋 '+title+' · '+U.date(S.date+'T12:00:00-03:00',{day:'numeric',month:'long',year:'numeric'}),'',...['present','absent','pending'].flatMap(k=>{const list=eligiblePeople().filter(p=>status(p.id)===k);return [labels[k]+' ('+list.length+')',...list.map(p=>'• '+p.full_name),'']})]
+   : [(kind==='present'?'✅ Presentes':'❌ Ausentes')+' · '+title+' · '+U.date(S.date+'T12:00:00-03:00',{day:'numeric',month:'long'}),'',...rows.map(p=>'• '+p.full_name)];
+ const value=lines.join('\n').trim();
+ try{await navigator.clipboard.writeText(value)}catch(_){const ta=document.createElement('textarea');ta.value=value;document.body.append(ta);ta.select();document.execCommand('copy');ta.remove()}
+ U.toast(kind==='all'?'Resumen copiado':(kind==='present'?'Presentes copiados':'Ausentes copiados'));
 }
 function paintPeople(host){
  const rows=filteredRows();
