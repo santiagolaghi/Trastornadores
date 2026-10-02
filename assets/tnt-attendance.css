@@ -74,3 +74,7 @@
  .date-panel{grid-template-columns:1fr}.stats-row button{min-height:72px;padding:12px}.stats-row b{font-size:22px}.take-attendance{grid-template-columns:1fr}.start-deck{width:100%}
  .attendance-toolbar{grid-template-columns:1fr 128px}.person-row,.follow-row{grid-template-columns:44px minmax(0,1fr)}.person-avatar{width:44px;height:44px}.status-actions,.follow-actions,.mini-action{grid-column:1/-1;width:100%}.status-actions button{flex:1}.follow-actions button{flex:1}.mini-action{min-height:38px}
 }
+
+.attendance-share{display:flex;gap:7px;flex-wrap:wrap}
+.attendance-share button{min-height:38px;padding:0 12px;border:1px solid var(--att-line);border-radius:13px;background:var(--att-panel);color:var(--att-muted);font-size:10px;font-weight:800}
+.attendance-share button:hover{color:var(--att-ink);border-color:color-mix(in srgb,var(--att-accent) 34%,var(--att-line))}
