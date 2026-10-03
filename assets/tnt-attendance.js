@@ -142,7 +142,7 @@ function render(){
    <button class="start-deck" id="startDeck" ${!can('attendance')||!rows.length?'disabled':''}>▶ Modo swipe</button>
  </section>
  <nav class="attendance-tabs">${tabs().map(([id,label])=>`<button data-tab="${id}" class="${S.tab===id?'on':''}">${label}</button>`).join('')}</nav>
- <div class="attendance-toolbar"><input id="att-search" type="search" placeholder="Buscar persona..." value="${E(S.query)}"><select id="att-filter"><option value="all">Todos</option>${Object.entries(labels).map(([k,v])=>`<option value="${k}" ${S.filter===k?'selected':''}>${v}</option>`).join('')}</select></div>
+ <div class="attendance-toolbar"><input id="att-search" type="search" placeholder="Buscar persona..." value="${E(S.query)}"><label class="sr-only" for="att-filter">Estado de asistencia</label><select id="att-filter" aria-label="Estado de asistencia"><option value="all">Todos</option>${Object.entries(labels).map(([k,v])=>`<option value="${k}" ${S.filter===k?'selected':''}>${v}</option>`).join('')}</select></div>
  <section id="attendanceContent"></section>`);
  bindBase();paintContent();
 }

@@ -126,7 +126,8 @@
       if(select.multiple||select.size>1||select.closest('.tnt-select-dialog'))continue;
       select.dataset.tntEnhanced='true';select.classList.add('tnt-native-select');
       const button=root.document.createElement('button');button.type='button';button.className='tnt-select-trigger';
-      const label=select.labels?.[0]?.textContent?.trim()||select.getAttribute('aria-label')||select.closest('.field')?.querySelector('label')?.textContent?.trim()||select.previousElementSibling?.matches?.('label')&&select.previousElementSibling.textContent.trim()||'Seleccionar';
+      const cleanLabel=node=>{if(!node)return'';const copy=node.cloneNode(true);copy.querySelectorAll('select,input,textarea,button,option').forEach(x=>x.remove());return copy.textContent.replace(/\s+/g,' ').trim();};
+      const label=select.getAttribute('aria-label')?.trim()||cleanLabel(select.labels?.[0])||cleanLabel(select.closest('.field')?.querySelector('label'))||cleanLabel(select.previousElementSibling?.matches?.('label')?select.previousElementSibling:null)||'Seleccionar';
       button.setAttribute('aria-label',label);button.setAttribute('aria-haspopup','dialog');
       const sync=()=>{button.innerHTML=`<span>${esc(select.options[select.selectedIndex]?.textContent?.trim()||label)}</span><span class="tnt-select-chevron" aria-hidden="true">⌄</span>`;button.disabled=select.disabled;};
       const field=root.document.createElement('span');field.className='tnt-select-field';select.before(field);field.append(select,button);select.addEventListener('change',sync);sync();
@@ -134,8 +135,10 @@
       new root.MutationObserver(sync).observe(select,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','selected','label']});
       button.onclick=()=>{
         sync();const options=[...select.options],previous=root.document.activeElement;
+        const entries=options.map((option,index)=>({option,index,group:option.parentElement?.tagName==='OPTGROUP'?option.parentElement.label:''}));
+        const groups=[];entries.forEach(entry=>{let group=groups.find(x=>x.label===entry.group);if(!group){group={label:entry.group,items:[]};groups.push(group);}group.items.push(entry);});
         const dialog=root.document.createElement('dialog');dialog.className='tnt-select-dialog';dialog.setAttribute('aria-label',label);
-        dialog.innerHTML=`<div class="tnt-select-sheet"><header><h2>${esc(label)}</h2><button type="button" class="tnt-select-close" aria-label="Cerrar">${icon('close')}</button></header>${options.length>8?'<input type="search" class="tnt-select-search" placeholder="Buscar opción…" aria-label="Buscar opción">':''}<div class="tnt-select-list" role="listbox">${options.map((option,index)=>`<button type="button" role="option" data-option="${index}" aria-selected="${option.selected}" ${option.disabled?'disabled':''}><span>${esc(option.textContent.trim())}</span>${option.selected?icon('check'):''}</button>`).join('')}</div></div>`;
+        dialog.innerHTML=`<div class="tnt-select-sheet"><header><h2>${esc(label)}</h2><button type="button" class="tnt-select-close" aria-label="Cerrar">${icon('close')}</button></header>${options.length>8?'<input type="search" class="tnt-select-search" placeholder="Buscar opción…" aria-label="Buscar opción">':''}<div class="tnt-select-list" role="listbox">${groups.map(group=>`${group.label?`<div class="tnt-select-group" role="presentation">${esc(group.label)}</div>`:''}${group.items.map(({option,index})=>`<button type="button" role="option" data-option="${index}" data-search="${esc(`${group.label} ${option.textContent.trim()}`)}" aria-selected="${option.selected}" ${option.disabled?'disabled':''}><span>${esc(option.textContent.trim())}</span>${option.selected?icon('check'):''}</button>`).join('')}`).join('')}</div></div>`;
         root.document.body.append(dialog);
         if(root.history?.pushState)root.history.pushState({...root.history.state,tntSelectOverlay:true},'');
         const onBack=()=>{dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();};root.addEventListener('popstate',onBack);
@@ -144,7 +147,7 @@
         dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
         dialog.addEventListener('click',e=>{if(e.target===dialog)close();});
         dialog.querySelectorAll('[data-option]').forEach(item=>item.onclick=()=>{select.selectedIndex=Number(item.dataset.option);select.dispatchEvent(new root.Event('change',{bubbles:true}));sync();close();});
-        const search=dialog.querySelector('.tnt-select-search');if(search)search.oninput=()=>{const term=search.value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();dialog.querySelectorAll('[data-option]').forEach(item=>{const value=item.textContent.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();item.hidden=!value.includes(term);});};
+        const search=dialog.querySelector('.tnt-select-search');if(search)search.oninput=()=>{const term=search.value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();dialog.querySelectorAll('[data-option]').forEach(item=>{const value=(item.dataset.search||item.textContent).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();item.hidden=!value.includes(term);});};
         if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');
         (search||dialog.querySelector('[aria-selected=true]')||dialog.querySelector('[data-option]'))?.focus();
       };
