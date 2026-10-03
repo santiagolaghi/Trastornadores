@@ -1,4 +1,162 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');const {JSDOM,VirtualConsole}=require('jsdom');const root=path.resolve(__dirname,'..');
+function campFixture(w){
+ Object.assign(w.__fixtureDB,{
+  tnt_camp_editions:[{id:'camp-one',name:'Prueba',public_slug:'camp-one',start_date:'2026-12-01',end_date:'2026-12-03',capacity:120,fee:100}],
+  tnt_camp_registrations:[{id:'reg-one',camp_id:'camp-one',person_id:w.TNT.person.id,status:'pending',fee:100,email:'camp@example.invalid'}],
+  tnt_camp_settings:[{camp_id:'camp-one',form_open:true}],
+  tnt_camp_payment_plans:[{id:'plan-one',camp_id:'camp-one',name:'Dos cuotas',total_amount:100,active:true}],
+  tnt_camp_plan_installments:[{id:'i-one',plan_id:'plan-one',installment_no:1,label:'Primera',amount:50,due_date:'2026-11-01',grace_days:2},{id:'i-two',plan_id:'plan-one',installment_no:2,label:'Segunda',amount:50,due_date:'2026-12-01',grace_days:2}],
+  tnt_camp_form_fields:[{id:'field-one',camp_id:'camp-one',field_key:'extra',label:'Pregunta',field_type:'text',active:true,sort_order:1}]
+ });
+}
+
+test('Todos los scripts publicados, incluido el formulario aislado, tienen sintaxis válida',()=>{
+ for(const file of [...active,'campamento/inscripcion/index.html','perfiles/datos/index.html']){
+  const page=new JSDOM(fs.readFileSync(path.join(root,file),'utf8'));
+  for(const tag of page.window.document.querySelectorAll('script')){
+   const src=tag.getAttribute('src');
+   if(src?.startsWith('/')&&!src.includes('supabase-lite'))require('acorn').parse(fs.readFileSync(path.join(root,src.split('?')[0]),'utf8'),{ecmaVersion:'latest',sourceType:'script'});
+  }
+  page.window.close();
+ }
+});
+
+test('Campamento conserva las cuotas escritas al agregar y quitar filas, y guarda por una sola operación',async()=>{
+ const a=await inlinePage('campamento/index.html',campFixture);
+ try{
+  await until(()=>a.d.querySelector('#camp-settings'));a.d.querySelector('#camp-settings').click();a.d.querySelector('[data-plan-edit]').click();
+  const o=a.d.querySelector('.tnt-overlay'),f=o.querySelector('form');
+  o.querySelector('[data-i-label="0"]').value='Reserva';o.querySelector('[data-i-amount="0"]').value='60';
+  o.querySelector('#add-installment').click();assert.equal(o.querySelector('[data-i-label="0"]').value,'Reserva');assert.equal(o.querySelector('[data-i-amount="0"]').value,'60');
+  o.querySelector('[data-i-amount="1"]').value='40';o.querySelector('[data-i-remove="2"]').click();assert.equal(o.querySelector('[data-i-amount="1"]').value,'40');
+  a.w.__fixtureFailures['rpc:tnt_camp_save_payment_plan']='Sin conexión';
+  f.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>f.querySelector('[role=alert]').textContent.includes('Sin conexión'));
+  assert(o.isConnected);assert.equal(a.w.__fixtureDB.tnt_camp_plan_installments.length,2);
+  const call=a.w.__fixtureCalls.find(x=>x.rpc==='tnt_camp_save_payment_plan');assert.equal(call.args.p_installments[0].label,'Reserva');assert.equal(call.args.p_installments[1].amount,40);
+  assert(!a.w.__fixtureCalls.some(x=>x.table==='tnt_camp_plan_installments'&&x.action==='delete'));assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
+test('Campamento vuelve del pago a la ficha actualizada y Atrás cierra una ventana por vez',async()=>{
+ const a=await inlinePage('campamento/index.html',campFixture);
+ try{
+  await until(()=>a.d.querySelector('#camp-settings'));a.w.CampApp.actions.openRegistration('reg-one');
+  const detail=a.d.querySelector('.tnt-overlay');detail.querySelector('#detail-pay').click();
+  assert.equal(a.d.querySelectorAll('.tnt-overlay').length,2);a.w.history.back();await until(()=>a.d.querySelectorAll('.tnt-overlay').length===1);assert(detail.isConnected);
+  detail.querySelector('#detail-pay').click();const form=[...a.d.querySelectorAll('.tnt-overlay')].at(-1).querySelector('form');form.elements.amount.value='40';form.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));
+  await until(()=>detail.querySelector('.camp-detail-grid .accent b')?.textContent.includes('60'));
+  assert.equal(a.d.querySelectorAll('.tnt-overlay').length,1);assert(detail.textContent.includes('Anular'));assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
+test('Campamento muestra un error al fallar una eliminación y conserva la lista de campos',async()=>{
+ const a=await inlinePage('campamento/index.html',campFixture);
+ try{
+  await until(()=>a.d.querySelector('#camp-settings'));a.d.querySelector('#camp-settings').click();a.d.querySelector('#form-fields').click();const manager=a.d.querySelector('.tnt-overlay');
+  a.w.__fixtureFailures['tnt_camp_form_fields:delete']='Permiso rechazado';manager.querySelector('[data-field-delete]').click();await until(()=>a.d.querySelector('.tnt-question [type=submit]'));a.d.querySelector('.tnt-question [type=submit]').click();
+  await until(()=>a.d.querySelector('#tnt-toast')?.textContent.includes('No se eliminó'));assert(manager.isConnected);assert(manager.querySelector('[data-field-edit]'));assert.equal(a.w.__fixtureDB.tnt_camp_form_fields.length,1);
+  manager.querySelector('[data-field-edit]').click();const child=[...a.d.querySelectorAll('.tnt-overlay')].at(-1);child.querySelector('[name=label]').value='Pregunta mejorada';child.querySelector('form').dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));
+  await until(()=>manager.textContent.includes('Pregunta mejorada'));assert.equal(a.d.querySelectorAll('.tnt-overlay').length,1);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
+test('Campamento muestra el aporte disponible al elegir un padrino y conserva la ficha',async()=>{
+ const a=await inlinePage('campamento/index.html',w=>{
+  campFixture(w);w.__fixtureDB.tnt_camp_sponsors=[{id:'sponsor-one',camp_id:'camp-one',name:'Primer padrino',budget:100,active:true},{id:'sponsor-two',camp_id:'camp-one',name:'Segundo padrino',budget:0,active:true}];
+  w.__fixtureDB.tnt_camp_sponsorships=[{id:'help-one',sponsor_id:'sponsor-one',registration_id:'reg-one',amount:80}];
+ });
+ try{
+  await until(()=>a.d.querySelector('#camp-settings'));a.w.CampApp.actions.openRegistration('reg-one');const detail=a.d.querySelector('.tnt-overlay');detail.querySelector('#detail-sponsor').click();
+  const child=[...a.d.querySelectorAll('.tnt-overlay')].at(-1),form=child.querySelector('form');assert.equal(form.elements.amount.max,'20');assert(child.querySelector('#sponsor-available').textContent.includes('20'));
+  form.elements.sponsor.value='sponsor-two';form.elements.sponsor.dispatchEvent(new a.w.Event('change'));assert.equal(form.elements.amount.getAttribute('max'),null);assert(child.textContent.includes('Sin límite'));assert(detail.isConnected);
+  a.w.history.back();await until(()=>a.d.querySelectorAll('.tnt-overlay').length===1);assert(detail.isConnected);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
+test('Buffet suma toda la jornada aunque supere 500 ventas',async()=>{
+ const a=await inlinePage('buffet/index.html',w=>{
+  w.supabase={};const date=w.TNTUI.dateKey();w.__fixtureDB.tnt_shifts=[{id:'shift-one',shift_date:date,status:'open'}];w.__fixtureDB.tnt_sales=Array.from({length:501},(_,i)=>({id:'sale-'+i,shift_id:'shift-one',total:10,total_cost:0,method:'cash',created_at:date+'T12:00:00Z'}));
+ });
+ try{
+  await until(()=>a.d.querySelector('.prodgrid'));a.d.querySelector('[data-tab=cash]').click();assert(a.d.querySelector('#screen .stat strong').textContent.includes('5.010'));assert.equal(a.d.querySelectorAll('.sale-main').length,20);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
+test('Buffet conserva el pedido y bloquea cambios mientras confirma el cobro',async()=>{
+ let finish;
+ const a=await inlinePage('buffet/index.html',w=>{
+  w.supabase={};const date=w.TNTUI.dateKey(),product={id:'prod-one',name:'Agua',emoji:'💧',active:true};w.__fixtureDB.tnt_shifts=[{id:'shift-one',shift_date:date,status:'open'}];w.__fixtureDB.tnt_menu_items=[{id:'menu-one',shift_id:'shift-one',product_id:product.id,price:10,remaining_qty:5,active:true,tnt_products:product}];
+  const rpc=w.TNT.sb.rpc;w.TNT.sb.rpc=(name,args)=>{if(name==='tnt_create_sale'){w.__chargedItems=args.p_items;return new Promise(resolve=>finish=resolve);}return rpc(name,args);};
+ });
+ try{
+  await until(()=>a.d.querySelector('.product'));a.d.querySelector('.product').click();a.d.querySelector('#received').value='10';a.d.querySelector('#customer').value='Pedido conservado';a.d.querySelector('#charge').click();
+  assert(a.d.querySelector('[data-act=plus]').disabled);assert(a.d.querySelector('[data-pay=transfer]').disabled);assert(a.d.querySelector('#customer').disabled);
+  finish({error:{message:'Sin conexión'}});await until(()=>!a.d.querySelector('#charge').disabled);
+  assert.equal(a.d.querySelector('#customer').value,'Pedido conservado');assert.equal(a.d.querySelector('.qty b').textContent,'1');assert.equal(a.w.__chargedItems[0].qty,1);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
+test('Buffet no sobrescribe stock que cambió mientras se editaba el menú',async()=>{
+ const a=await inlinePage('buffet/index.html',w=>{
+  w.supabase={};const date=w.TNTUI.dateKey(),product={id:'prod-one',name:'Agua',emoji:'💧',active:true,default_price:10,default_cost:1};w.__fixtureDB.tnt_shifts=[{id:'shift-one',shift_date:date,status:'open'}];w.__fixtureDB.tnt_products=[product];w.__fixtureDB.tnt_menu_items=[{id:'menu-one',shift_id:'shift-one',product_id:product.id,price:10,cost:1,initial_qty:5,remaining_qty:5,active:true,tnt_products:product}];
+ });
+ try{
+  await until(()=>a.d.querySelector('.prodgrid'));a.d.querySelector('[data-tab=menu]').click();const row=a.d.querySelector('.menurow');a.w.__fixtureDB.tnt_menu_items[0].remaining_qty=4;row.querySelector('.mi-price').value='15';row.querySelector('.mi-price').dispatchEvent(new a.w.Event('change'));
+  await until(()=>row.querySelector('[role=status]')?.textContent.includes('Cambió el stock'));assert.equal(a.w.__fixtureDB.tnt_menu_items[0].remaining_qty,4);assert.equal(a.w.__fixtureDB.tnt_menu_items[0].price,10);assert.equal(row.querySelector('.mi-price').value,'15');assert.equal(row.querySelector('.mi-rem').value,'4');row.querySelector('.mi-price').dispatchEvent(new a.w.Event('change'));await until(()=>a.w.__fixtureDB.tnt_menu_items[0].price===15);assert.equal(a.w.__fixtureDB.tnt_menu_items[0].remaining_qty,4);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
+test('Chat recupera un envío confirmado sin duplicarlo tras perder la respuesta',async()=>{
+ const a=await app('chat','?thread=00000000-0000-4000-8000-000000000060',w=>{
+  w.URL.createObjectURL=()=>'/audio-preview';w.URL.revokeObjectURL=()=>{};
+  const from=w.TNT.sb.from;let lost=true;
+  w.TNT.sb.from=table=>{const q=from(table);if(table==='tnt_chat_messages'){const then=q.then;q.then=(resolve,reject)=>then.call(q,result=>{if(q.action==='insert'&&lost&&!result.error){lost=false;const sent=w.__fixtureDB.tnt_chat_messages.at(-1);sent.attachments=sent.attachments.map(f=>Object.fromEntries(Object.entries(f).reverse()));return resolve({data:null,error:{message:'Respuesta interrumpida'}});}return resolve(result);},reject);}return q;};
+ });
+ try{
+  const fileInput=a.d.querySelector('#chat-file');Object.defineProperty(fileInput,'files',{configurable:true,value:[new a.w.File(['audio'],'nota.webm',{type:'audio/webm'})]});fileInput.dispatchEvent(new a.w.Event('change'));
+  const f=a.d.querySelector('#chat-composer'),text=a.d.querySelector('#chat-text');text.value='Llegó una sola vez';f.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>a.d.querySelector('#chat-composer-status').textContent.includes('No se envió'));
+  assert.equal(a.w.__fixtureDB.tnt_chat_messages.filter(m=>m.body===text.value).length,1);f.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>text.value==='');assert.equal(a.w.__fixtureDB.tnt_chat_messages.filter(m=>m.body==='Llegó una sola vez').length,1);assert.equal(a.w.__fixtureDB.tnt_chat_messages.at(-1).attachments[0].type,'audio/webm');assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
+test('Chat descarta la grabación al volver a conversaciones y permite abrir otra',async()=>{
+ let tracksStopped=0;
+ const a=await app('chat','?thread=00000000-0000-4000-8000-000000000060',w=>{
+  Object.defineProperty(w.navigator,'mediaDevices',{value:{getUserMedia:async()=>({getTracks:()=>[{stop(){tracksStopped++;}}]})}});
+  w.MediaRecorder=class{static isTypeSupported(){return true}constructor(){this.mimeType='audio/webm';this.state='inactive'}start(){this.state='recording'}stop(){this.state='inactive';this.onstop()}};
+ });
+ try{
+  a.d.querySelector('#chat-voice').click();await until(()=>a.d.querySelector('#record-cancel'));a.w.history.back();await until(()=>!a.d.querySelector('#chat-app').classList.contains('room-open'));assert(tracksStopped>0);assert(!a.d.querySelector('#record-cancel'));a.d.querySelector('[data-thread="00000000-0000-4000-8000-000000000061"]').click();await until(()=>a.d.querySelector('.chat-welcome h2')?.textContent==='Sin mensajes todavía');assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
+test('Una solicitud de micrófono cancelada no interrumpe la grabación de otra conversación',async()=>{
+ let rejectOld,calls=0;
+ const a=await app('chat','?thread=00000000-0000-4000-8000-000000000060',w=>{
+  Object.defineProperty(w.navigator,'mediaDevices',{value:{getUserMedia:()=>++calls===1?new Promise((resolve,reject)=>{rejectOld=reject;}):Promise.resolve({getTracks:()=>[{stop(){}}]})}});
+  w.MediaRecorder=class{static isTypeSupported(){return true}constructor(){this.mimeType='audio/webm';this.state='inactive'}start(){this.state='recording'}stop(){this.state='inactive';this.onstop()}};
+ });
+ try{
+  a.d.querySelector('#chat-voice').click();await until(()=>calls===1);a.w.history.back();await until(()=>!a.d.querySelector('#chat-app').classList.contains('room-open'));a.d.querySelector('[data-thread="00000000-0000-4000-8000-000000000061"]').click();await until(()=>a.d.querySelector('.chat-welcome h2')?.textContent==='Sin mensajes todavía');
+  a.d.querySelector('#chat-voice').click();await until(()=>a.d.querySelector('#record-cancel'));rejectOld(Object.assign(new Error('Permiso anterior cancelado'),{name:'NotAllowedError'}));await sleep(30);assert(a.d.querySelector('#record-cancel'));assert(a.d.querySelector('#chat-compose-wrap').classList.contains('is-recording'));assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
+async function campPublicPage(query){
+ const errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
+ const dom=new JSDOM(fs.readFileSync(path.join(root,'campamento/inscripcion/index.html'),'utf8'),{url:'https://tnt-test.example/campamento/inscripcion/'+query,runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc}),w=dom.window;
+ w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.eval(fs.readFileSync(path.join(root,'assets/tnt-components.js'),'utf8'));
+ w.supabase={createClient:()=>({rpc:async name=>name==='tnt_camp_public_status'?{data:{found:true,camp:'Prueba',name:'Persona',start_date:'2026-12-01',balance:100,fee:100}}:{data:{available:true,camp:{name:'Prueba',start_date:'2026-12-01'},settings:{},churches:[{id:'church-one',name:'Iglesia'}],fields:[{key:'permit',type:'checkbox',label:'Permiso especial',required:true}]}}})};
+ w.eval(fs.readFileSync(path.join(root,'campamento/inscripcion/app.js'),'utf8'));await until(()=>w.document.querySelector('.public-shell'));return {w,d:w.document,errors,close:()=>dom.window.close()};
+}
+test('El formulario público carga, conserva el selector y exige los campos obligatorios',async()=>{
+ const a=await campPublicPage('?camp=prueba');try{
+  const form=a.d.querySelector('#public-form');assert(form);await until(()=>form.elements.sex.parentElement.querySelector('.tnt-select-trigger'));form.elements.sex.parentElement.querySelector('.tnt-select-trigger').click();a.d.querySelector('[data-option="1"]').click();await until(()=>!a.d.querySelector('.tnt-select-dialog'));assert.equal(form.elements.sex.value,'F');assert(form.isConnected);assert(form.elements.custom_permit.required);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+test('La ficha pública del campamento funciona sin soporte de notificaciones del navegador',async()=>{
+ const a=await campPublicPage('?token=prueba');try{assert(a.d.querySelector('.status-grid'));assert(a.d.querySelector('#enable-phone'));assert.deepEqual(a.errors,[]);}finally{a.close();}
+});
 const active=['index.html','organizacion/index.html','chat/index.html','admin/index.html','asistencia/index.html','campamento/index.html','glosario/index.html','buffet/index.html','perfiles/index.html'];
 test('All active module scripts parse and resolve their shared runtime once',()=>{for(const file of active){const html=fs.readFileSync(path.join(root,file),'utf8');const dom=new JSDOM(html);const scripts=[...dom.window.document.querySelectorAll('script')];const core=scripts.filter(x=>x.src.includes('/assets/tnt-core.js'));assert.equal(core.length,1,file+' has one central runtime');const utilities=scripts.findIndex(x=>x.src.includes('tnt-components.js'));assert(utilities>=0&&utilities<scripts.indexOf(core[0]),file+' utilities before core');for(const s of scripts){if(s.src){if(s.getAttribute('src').startsWith('/')&&!s.src.includes('supabase-lite'))assert(fs.existsSync(path.join(root,s.getAttribute('src').split('?')[0])),file+' '+s.src);}else if(s.textContent.trim())require('acorn').parse(s.textContent,{ecmaVersion:'latest',sourceType:s.type==='module'?'module':'script'});}dom.window.close();}});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));async function until(fn){for(let i=0;i<80;i++){if(fn())return;await sleep(15);}assert.fail('UI did not reach expected state');}

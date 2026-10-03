@@ -74,12 +74,21 @@
       root.addEventListener('popstate',consume,true);root.history.back();
     });
   }
-  function modal(title, body, wide=false) {
-    const old=root.document.querySelector('.tnt-overlay'),replacing=!!old;old?._tntDisposeBack?.();old?.remove();
+  function modal(title, body, wide=false, {stack=false}={}) {
+    const old=stack?null:[...root.document.querySelectorAll('.tnt-overlay')].at(-1),replacing=!!old;old?._tntDisposeBack?.();old?.remove();
     const previous=root.document.activeElement, dialog=root.document.createElement('dialog');
     dialog.className='tnt-overlay';dialog.setAttribute('aria-label',title);
     dialog.innerHTML=`<section class="tnt-sheet ${wide?'wide':''}"><header class="tnt-sheet-head"><h2>${esc(title)}</h2><button class="tnt-close" type="button" aria-label="Cerrar">${icon('close')}</button></header>${body}</section>`;
     root.document.body.append(dialog);
+    if(stack){
+      trackOverlay(dialog);
+      const close=()=>dialog._tntClose();
+      dialog.querySelector('.tnt-close').onclick=close;
+      dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
+      dialog.addEventListener('click',e=>{if(e.target===dialog)close();});
+      if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');
+      return dialog;
+    }
     if(!replacing&&root.history?.pushState)root.history.pushState({...root.history.state,tntSharedOverlay:true},'');
     const onBack=e=>{if(e.state?.tntSharedOverlay)return;root.removeEventListener('popstate',onBack);if(dialog.isConnected){dialog.remove();previous?.focus?.();}};root.addEventListener('popstate',onBack);dialog._tntDisposeBack=()=>root.removeEventListener('popstate',onBack);
     const close=()=>{if(!dialog.isConnected)return;dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();if(root.history?.state?.tntSharedOverlay)return backOverlay();};
@@ -104,13 +113,14 @@
   }
   function ask(message, text=false) {
     return new Promise(resolve=>{
-      let result=text?null:false;
+      let result=text?null:false,closing=false;
       const dialog=root.document.createElement('dialog');dialog.className='tnt-question';
       dialog.innerHTML=`<section class="tnt-sheet"><header class="tnt-sheet-head"><h2>${esc(text?'Tu respuesta':'Confirmar acción')}</h2><button class="tnt-close" type="button" aria-label="Cerrar">${icon('close')}</button></header><form class="tnt-form"><p>${esc(message)}</p>${text?'<label>Respuesta<textarea name="answer" maxlength="2000"></textarea></label>':''}<div class="tnt-actions"><button type="button" data-cancel class="tnt-button">Cancelar</button><button type="submit" class="tnt-button primary">${text?'Continuar':'Confirmar'}</button></div></form></section>`;
-      root.document.body.append(dialog);trackOverlay(dialog,()=>{dialog.remove();resolve(result);});
-      dialog.querySelector('.tnt-close').onclick=dialog.querySelector('[data-cancel]').onclick=()=>closeModal(dialog);
-      dialog.querySelector('form').onsubmit=e=>{e.preventDefault();result=text?dialog.querySelector('textarea').value:true;closeModal(dialog);};
-      dialog.addEventListener('cancel',e=>{e.preventDefault();closeModal(dialog);});
+      root.document.body.append(dialog);trackOverlay(dialog,()=>{dialog.remove();if(!closing)resolve(result);});
+      const finish=async()=>{if(closing)return;closing=true;await closeModal(dialog);resolve(result);};
+      dialog.querySelector('.tnt-close').onclick=dialog.querySelector('[data-cancel]').onclick=finish;
+      dialog.querySelector('form').onsubmit=e=>{e.preventDefault();result=text?dialog.querySelector('textarea').value:true;finish();};
+      dialog.addEventListener('cancel',e=>{e.preventDefault();finish();});
       dialog.showModal?.();
     });
   }
