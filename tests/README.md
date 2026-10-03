@@ -3,7 +3,7 @@
 Run DOM tests from the repository root with Node 22 or later and jsdom 26.1.0 / acorn 8.15.0 on NODE_PATH:
 
 ```sh
-node --test tests/regression.cjs
+node --test tests/regression.cjs tests/permissions-and-cache.cjs
 ```
 
 The browser fixtures contain synthetic people and in-memory data only. `__preview__` is temporary and is removed before production. The Vercel deployment excludes tests and database migrations.
@@ -27,3 +27,13 @@ Authenticated Google login is preserved. Browser UI review uses a separate synth
 - `tests/staff-permissions.sql` se ejecutó en una transacción revertida: nueva cuenta sin privilegios, petición de Pastor/a sin acceso, bloqueo de autoaprobación, corrección a Timoteo por administrador, directorio restringido, exclusión de EFE y chat solo por membresía.
 - El navegador Chromium local no pudo iniciarse por restricciones del entorno. No se afirma una prueba visual en Android ni un ingreso real por Google en esta revisión.
 - Pendiente externo: las APIs originales de Lista Sábados y EFE requieren sus credenciales anteriores. No se ha migrado el historial faltante. No se borraron ni sustituyeron esos datos.
+
+
+## Verificación del 3 de octubre de 2026
+
+- 64 pruebas de interfaz y caché: alta inicial completa, solicitud de rol pendiente, selectores conservados, permisos efectivos por rol y excepciones, archivados/restauración, nombres coincidentes sin fusión automática, revisión de cambios públicos y verificación de identidad antes de vincular Google.
+- Cinco transacciones de prueba en Supabase, revertidas: `profile-review.sql`, `profile-lifecycle.sql`, `profile-link-conflicts.sql`, `effective-permissions.sql` y `staff-permissions.sql`. Cubren aislamiento de comunidad, bloqueo de autoaprobación, aprobación efectiva de acceso, historial transferido sin ampliar permisos, conflictos sin pérdida de datos, archivado/restauración, Perfiles de lectura y operaciones de Buffet con stock y vuelto.
+- Recuento real después de las pruebas: 62 personas, 127 registros de asistencia de Sábados, 21 registros de EFE y ninguna cuenta sintética restante. Las dos cuentas de Santiago siguen separadas para pruebas.
+- Sábados ya usa los registros originales recuperados. El resto del historial de la aplicación anterior de EFE sigue protegido por contraseña o patrón; se necesita una sesión de su grupo para importarlo.
+- Perfiles retira su antiguo worker: elimina solo su caché y no almacena respuestas privadas de Supabase. El worker compartido conserva cachés ajenas.
+- La revisión visual de los módulos privados y la grabación en un teléfono real requieren iniciar sesión. Estas pruebas automáticas no sustituyen esa comprobación.

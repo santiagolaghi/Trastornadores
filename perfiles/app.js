@@ -168,7 +168,7 @@
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       console.error("Perfiles insert error:", error);
-      showError("No pudimos guardar el perfil. Revisá los datos e intentá de nuevo.");
+      showError(error.message || "No pudimos guardar el perfil. Revisá los datos e intentá de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -202,6 +202,12 @@
   });
 
   if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => navigator.serviceWorker.register("/perfiles/sw.js").catch(() => {}));
+    window.addEventListener("load", async () => {
+      try {
+        const previous = await navigator.serviceWorker.getRegistration("/perfiles/");
+        if (previous?.active && new URL(previous.active.scriptURL).pathname === "/perfiles/sw.js") await previous.unregister();
+        await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+      } catch {}
+    });
   }
 })();

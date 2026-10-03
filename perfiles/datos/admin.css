@@ -1157,6 +1157,11 @@ body.perfiles-admin #baseTnt #cancelDeleteBtn{
   background:var(--surface-3)!important;
   border:1px solid var(--line)!important
 }
+body.perfiles-admin #baseTnt .profile-duplicates{
+  margin:0 16px 16px;padding:12px 16px;border:1px solid var(--line);border-radius:16px;
+  background:var(--surface-3);color:var(--text);font-size:13px;line-height:1.5
+}
+body.perfiles-admin #baseTnt .profile-duplicates p{margin:4px 0}
 body.perfiles-admin #baseTnt #confirmDeleteBtn{
   color:#fff!important;
   background:var(--danger)!important

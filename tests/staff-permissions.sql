@@ -15,7 +15,7 @@ set local role authenticated;
 do $$ begin
  if public.tnt_is_staff() or public.tnt_has_access('chat') or public.tnt_has_access('organizacion') then raise exception 'Una cuenta nueva obtuvo acceso de staff'; end if;
  if (select count(*) from public.tnt_accounts)<>1 then raise exception 'La comunidad puede leer cuentas ajenas'; end if;
- perform public.tnt_complete_onboarding(true,'Pastor/a','2005-04-12','F');
+ perform public.tnt_finish_onboarding('{"first_name":"Prueba","last_name":"Staff Temporal","birthday":"2005-04-12","sex":"F","phone":"1112345678"}'::jsonb,true,'Pastor/a');
  if public.tnt_is_staff() or public.tnt_is_pastor_or_admin() then raise exception 'Pedir ser pastor otorgó privilegios'; end if;
  if not exists(select 1 from public.tnt_role_requests where person_id=public.tnt_current_person_id() and status='pending' and requested_role='Pastor/a') then raise exception 'Falta la solicitud'; end if;
  begin update public.tnt_accounts set staff_status='approved' where person_id=public.tnt_current_person_id();raise exception 'Se permitió autoaprobarse';exception when insufficient_privilege then null;end;
@@ -62,6 +62,8 @@ select set_config('tnt.test_profile',gen_random_uuid()::text,true);
 insert into public.perfiles_registros(id,nombre,apellido,fecha_nacimiento,genero,telefono,consentimiento)
 values(current_setting('tnt.test_profile')::uuid,'Prueba','Temporal','2005-04-12','Mujer','1112345678',true);
 insert into public.tnt_access_grants(person_id,module,scope,access_level,enabled) values(current_setting('tnt.test_person')::uuid,'perfiles','*','view',true);
+insert into public.tnt_person_permission_overrides(person_id,module,scope,action,allowed)
+values(current_setting('tnt.test_person')::uuid,'perfiles','*','view',true);
 select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('tnt.test_user'),'role','authenticated')::text,true);
 set local role authenticated;
 do $$ declare n integer; begin

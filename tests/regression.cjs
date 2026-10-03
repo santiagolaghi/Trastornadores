@@ -52,7 +52,7 @@ test('Glosario y Prédicas renderizan sin cargar los lectores de archivos',async
 
 test('Administración mantiene el formulario al cambiar un permiso y muestra accesos heredados',async()=>{const a=await inlinePage('admin/index.html');try{a.d.querySelector('#refresh').click();await until(()=>a.d.querySelector('[data-manage]'));a.d.querySelector('[data-manage="00000000-0000-4000-8000-000000000001"]').click();await until(()=>a.d.querySelector('[data-perm]')?.parentElement.querySelector('.tnt-select-trigger'));const modal=a.d.querySelector('.tnt-overlay');assert(modal.textContent.includes('Administrar · por ser administrador'));assert.equal(modal.querySelector('[data-perm][data-module=organizacion]'),null);const sel=modal.querySelector('[data-perm][data-module=efe][data-scope=varones]');sel.parentElement.querySelector('.tnt-select-trigger').click();a.d.querySelector('[data-option="2"]').click();await sleep(80);assert(modal.isConnected);assert.equal(sel.value,'edit');assert(modal.querySelector('[role=status]').textContent.includes('guardado'));assert.equal(a.w.__fixtureDB.tnt_access_grants.find(g=>g.scope==='varones').access_level,'edit');assert.deepEqual(a.errors,[]);}finally{a.close();}});
 
-test('El alta real conserva los selectores y deja el rol solicitado pendiente, sin acceso al chat',async()=>{const a=await inlinePage('index.html',w=>{const account=w.__fixtureDB.tnt_accounts[0];Object.assign(account,{system_role:'user',staff_status:'community',ministry_role:null,onboarding_completed_at:null});const original=w.TNT.sb.rpc;w.TNT.sb.rpc=async(name,args)=>{if(name==='tnt_complete_onboarding'){w.__fixtureCalls.push({rpc:name,args});account.staff_status=args.p_staff?'pending':'community';account.requested_ministry_role=args.p_role;account.onboarding_completed_at=new Date().toISOString();w.__fixtureDB.tnt_people[0].sex=args.p_sex;return{data:null,error:null};}return original(name,args);};},true);try{await a.w.TNT.ready;a.w.eval(fs.readFileSync(path.join(root,'assets/tnt-hub.js'),'utf8'));await until(()=>a.d.querySelector('#tnt-membership'));const f=a.d.querySelector('#tnt-membership');f.querySelector('[name=staff][value=yes]').click();f.elements.birthday.value='2010-09-15';await until(()=>f.elements.sex.parentElement.querySelector('.tnt-select-trigger'));f.elements.sex.parentElement.querySelector('.tnt-select-trigger').click();a.d.querySelector('[data-option="1"]').click();await sleep(60);assert(f.isConnected);assert.equal(f.elements.sex.value,'M');assert.equal(f.elements.birthday.value,'2010-09-15');f.elements.role.value='Pastor/a';f.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>!f.isConnected);assert.equal(a.w.TNT.account.staff_status,'pending');assert.equal(a.w.TNT.account.ministry_role,null);assert.equal(a.w.TNT.hasAccess('chat'),false);assert.equal(a.d.querySelectorAll('.module-card').length,0);assert(a.d.body.textContent.includes('Estamos revisando tu función'));assert.equal(a.w.__fixtureCalls.find(x=>x.rpc==='tnt_complete_onboarding').args.p_role,'Pastor/a');assert.deepEqual(a.errors,[]);}finally{a.close();}});
+test('El alta real conserva los selectores y deja el rol solicitado pendiente, sin acceso al chat',async()=>{const a=await inlinePage('index.html',w=>{const account=w.__fixtureDB.tnt_accounts[0];Object.assign(account,{system_role:'user',staff_status:'community',ministry_role:null,onboarding_completed_at:null});const original=w.TNT.sb.rpc;w.TNT.sb.rpc=async(name,args)=>{if(name==='tnt_finish_onboarding'){w.__fixtureCalls.push({rpc:name,args});account.staff_status=args.p_staff?'pending':'community';account.requested_ministry_role=args.p_role;account.onboarding_completed_at=new Date().toISOString();w.__fixtureDB.tnt_people[0].sex=args.p_values.sex;return{data:null,error:null};}return original(name,args);};},true);try{await a.w.TNT.ready;a.w.eval(fs.readFileSync(path.join(root,'assets/tnt-hub.js'),'utf8'));await until(()=>a.d.querySelector('#tnt-membership'));const f=a.d.querySelector('#tnt-membership');f.querySelector('[name=staff][value=yes]').click();f.elements.birthday.value='2010-09-15';f.elements.first_name.value='Nora';f.elements.last_name.value='Pérez';f.elements.phone.value='1112345678';await until(()=>f.elements.sex.parentElement.querySelector('.tnt-select-trigger'));f.elements.sex.parentElement.querySelector('.tnt-select-trigger').click();a.d.querySelector('[data-option="1"]').click();await sleep(60);assert(f.isConnected);assert.equal(f.elements.sex.value,'M');assert.equal(f.elements.birthday.value,'2010-09-15');f.elements.role.value='Pastor/a';f.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>!f.isConnected);assert.equal(a.w.TNT.account.staff_status,'pending');assert.equal(a.w.TNT.account.ministry_role,null);assert.equal(a.w.TNT.hasAccess('chat'),false);assert.equal(a.d.querySelectorAll('.module-card').length,0);assert(a.d.body.textContent.includes('Estamos revisando tu función'));assert.equal(a.w.__fixtureCalls.find(x=>x.rpc==='tnt_finish_onboarding').args.p_role,'Pastor/a');assert.deepEqual(a.errors,[]);}finally{a.close();}});
 
 
 test('Una tarea simple muestra horario y responsables sin planificación vacía',async()=>{const a=await app('organization','?view=activities');try{a.d.querySelector('.encounter-card').click();a.d.querySelectorAll('#modal .activity-card')[1].click();await until(()=>a.d.querySelector('#editTask'));const text=a.d.querySelector('#modal').textContent;assert(text.includes('Horario:'));assert(!text.includes('Checklist'));assert(!text.includes('Sin descripción'));assert(!text.includes('Presupuesto'));assert.deepEqual(a.errors,[]);}finally{a.close();}});
@@ -77,3 +77,123 @@ test('Campamento carga pagos solo para quienes tienen una inscripción activa',a
 test('Asistencia respeta la exclusión de EFE también para un administrador',async()=>{const a=await inlinePage('asistencia/index.html',w=>{w.__fixtureDB.tnt_access_grants=[{person_id:w.TNT.person.id,module:'efe',scope:'varones',access_level:'manage',enabled:true},{person_id:w.TNT.person.id,module:'efe',scope:'mujeres18',access_level:'manage',enabled:false}];w.__fixtureDB.tnt_efe_groups=[{id:'group-one',code:'varones',name:'Varones'},{id:'group-two',code:'mujeres18',name:'Mujeres +18'}];w.__fixtureDB.tnt_efe_memberships=[];w.__fixtureDB.tnt_efe_meetings=[];w.history.replaceState({},'', '/asistencia/?mode=efe&group=mujeres18');},true);try{await a.w.TNT.ready;a.w.eval(fs.readFileSync(path.join(root,'assets/tnt-attendance.js'),'utf8'));await until(()=>a.d.querySelector('[data-mode=efe]'));assert(!a.d.querySelector('option[value="group-two"]'));assert(a.d.body.textContent.includes('Varones'));assert.equal(a.w.TNT.hasAccess('efe','mujeres18'),false);assert.deepEqual(a.errors,[]);}finally{a.close();}});
 
 test('Configuración permite ocultar DNI en el perfil propio',async()=>{const a=await inlinePage('index.html',w=>{const rpc=w.TNT.sb.rpc;w.TNT.sb.rpc=async(name,args)=>name==='tnt_profile_fields'?{data:{dni:{visible:false},instagram:{visible:true,required:true}},error:null}:rpc(name,args);},true);try{await a.w.TNT.ready;await a.w.TNT.editProfile();const f=a.d.querySelector('#tnt-personal-profile');assert.equal(f.elements.dni.type,'hidden');assert.equal(f.elements.instagram.required,true);assert.deepEqual(a.errors,[]);}finally{a.close();}});
+
+test('Perfiles permite restaurar archivados con permiso y conserva la vista al fallar', async () => {
+ const a=await inlinePage('perfiles/datos/index.html',w=>{
+  w.__fixtureDB.tnt_profiles_central=[{id:'archived-one',nombre:'Ana',apellido:'Paz',fecha_nacimiento:'2000-02-10',genero:'Mujer',active:false,actualizado_en:'2026-10-01'}];
+  const rpc=w.TNT.sb.rpc;
+  w.TNT.sb.rpc=async(name,args)=>{if(name==='tnt_set_profile_active'){w.__fixtureCalls.push({rpc:name,args});w.__fixtureDB.tnt_profiles_central[0].active=args.p_active;return{error:null};}return rpc(name,args);};
+ });
+ try {
+  a.w.eval(fs.readFileSync(path.join(root,'perfiles/datos/admin.js'),'utf8'));
+  await until(()=>!a.d.querySelector('#dashboardView').hidden);
+  assert.equal(a.d.querySelectorAll('[data-view-id]').length,0);
+  a.w.__fixtureFailures.tnt_profiles_central='Sin conexión';
+  a.d.querySelector('[data-profile-state=archived]').click();
+  await until(()=>!a.d.querySelector('[data-profile-state=archived]').disabled);
+  assert(a.d.querySelector('[data-profile-state=active]').classList.contains('active'));
+  delete a.w.__fixtureFailures.tnt_profiles_central;
+  a.d.querySelector('[data-profile-state=archived]').click();
+  await until(()=>a.d.querySelector('[data-view-id]'));
+  a.d.querySelector('[data-view-id]').click();
+  assert.equal(a.d.querySelector('#editProfileBtn').hidden,true);
+  assert.equal(a.d.querySelector('#deleteProfileBtn').textContent,'Restaurar perfil');
+  a.d.querySelector('#deleteProfileBtn').click();
+  await until(()=>a.w.__fixtureCalls.some(c=>c.rpc==='tnt_set_profile_active'));
+  assert.equal(a.w.__fixtureCalls.find(c=>c.rpc==='tnt_set_profile_active').args.p_active,true);
+  await until(()=>!a.d.querySelector('[data-view-id]'));
+  assert.deepEqual(a.errors,[]);
+ } finally { a.close(); }
+});
+
+test('Perfiles no clasifica nacimientos desconocidos como adolescentes y señala coincidencias', async () => {
+ const a=await inlinePage('perfiles/datos/index.html',w=>{
+  w.__fixtureDB.tnt_profiles_central=[{id:'unknown',nombre:'Sin',apellido:'Fecha',active:true},{id:'one',nombre:'José',apellido:'Paz',fecha_nacimiento:'2000-02-10',active:true},{id:'two',nombre:'Jose',apellido:'Paz',fecha_nacimiento:'2000-02-10',active:true}];
+ });
+ try {
+  a.w.eval(fs.readFileSync(path.join(root,'perfiles/datos/admin.js'),'utf8'));
+  await until(()=>!a.d.querySelector('#dashboardView').hidden);
+  assert.equal(a.d.querySelector('#statAdolescentes').textContent,'0');
+  assert.equal(a.d.querySelector('#statJovenes').textContent,'2');
+  assert(a.d.querySelector('#cardsList').textContent.includes('Nacimiento sin completar'));
+  assert(!a.d.querySelector('#cardsList').textContent.includes('0 años'));
+  assert.equal(a.d.querySelector('#profileDuplicates').hidden,false);
+  assert(a.d.querySelector('#profileDuplicates').textContent.includes('2 registros coincidentes'));
+  assert.deepEqual(a.errors,[]);
+ } finally { a.close(); }
+});
+
+test('Administración exige revisar la identidad antes de vincular Google con un perfil', async () => {
+ const a=await inlinePage('admin/index.html',w=>{
+  w.__fixtureDB.tnt_profile_link_requests=[{id:'link-one',person_id:w.__fixtureDB.tnt_people[0].id,target_person_id:w.__fixtureDB.tnt_people[1].id,status:'pending'}];
+  const rpc=w.TNT.sb.rpc;
+  w.TNT.sb.rpc=async(name,args)=>{if(name==='tnt_profile_link_preview')return{data:{source:w.__fixtureDB.tnt_people[0],target:w.__fixtureDB.tnt_people[1],history:{saturdays:12,efe:5,camps:1,messages:0}},error:null};if(name==='tnt_review_profile_link'){w.__fixtureCalls.push({rpc:name,args});w.__fixtureDB.tnt_profile_link_requests[0].status='approved';return{error:null};}return rpc(name,args);};
+ });
+ try {
+  a.d.querySelector('#refresh').click();await until(()=>a.d.querySelector('[data-manage]'));
+  a.d.querySelector('[data-tab=requests]').click();a.d.querySelector('[data-profile-link]').click();
+  await until(()=>a.d.querySelector('#profile-link-form'));
+  const form=a.d.querySelector('#profile-link-form');
+  assert(form.parentElement.textContent.includes('12 asistencias'));
+  form.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));await sleep(20);
+  assert(!a.w.__fixtureCalls.some(c=>c.rpc==='tnt_review_profile_link'));
+  form.elements.same_person.checked=true;
+  form.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));
+  await until(()=>a.w.__fixtureCalls.some(c=>c.rpc==='tnt_review_profile_link'));
+  assert.equal(a.w.__fixtureCalls.find(c=>c.rpc==='tnt_review_profile_link').args.p_approve,true);
+  await until(()=>!a.d.querySelector('[data-profile-link]'));
+  assert.deepEqual(a.errors,[]);
+ } finally { a.close(); }
+});
+
+test('Un envío público se identifica y se revisa mediante su propio flujo', async () => {
+ const a=await inlinePage('admin/index.html',w=>{w.__fixtureDB.tnt_profile_public_requests=[{id:'public-one',person_id:w.TNT.person.id,status:'pending',before_values:{phone:'1111111111'},proposed_values:{phone:'2222222222'}}];});
+ try {
+  a.d.querySelector('#refresh').click();await until(()=>a.d.querySelector('[data-manage]'));
+  a.d.querySelector('[data-tab=requests]').click();
+  assert(a.d.body.textContent.includes('formulario público'));
+  const reviewButton=a.d.querySelector('[data-profile-review=public-one][data-approve=false]');reviewButton.click();
+  await until(()=>a.w.__fixtureCalls.some(c=>c.rpc==='tnt_review_public_profile'));
+  assert.equal(a.w.__fixtureCalls.find(c=>c.rpc==='tnt_review_public_profile').args.p_approve,false);
+  await until(()=>a.d.querySelector('[data-profile-review=public-one][data-approve=false]')!==reviewButton);
+  assert.deepEqual(a.errors,[]);
+ } finally { a.close(); }
+});
+
+test('Administración muestra el acceso del rol y su bloqueo personal sin selectores ineficaces',async()=>{
+ const a=await inlinePage('admin/index.html',w=>{
+  const account=w.__fixtureDB.tnt_accounts[1];account.ministry_role='Colaborador';account.staff_status='approved';
+  w.__fixtureDB.tnt_role_permission_presets=[{role:'Colaborador',module:'buffet',scope:'*',action:'view',allowed:true}];
+  w.__fixtureDB.tnt_person_permission_overrides=[];
+ });
+ try{
+  a.d.querySelector('#refresh').click();await until(()=>a.d.querySelector('[data-manage]'));
+  const pid=a.w.__fixtureDB.tnt_accounts[1].person_id;
+  a.d.querySelector('[data-manage="'+pid+'"]').click();
+  const modal=a.d.querySelector('.tnt-overlay');
+  assert(modal.textContent.includes('Con acceso · según rol'));
+  assert.equal(modal.querySelector('[data-perm][data-module=buffet]'),null);
+  a.w.__fixtureDB.tnt_person_permission_overrides.push({person_id:pid,module:'buffet',scope:'*',action:'view',allowed:false});
+  a.d.querySelector('#refresh').click();await sleep(40);
+  a.d.querySelector('[data-manage="'+pid+'"]').click();
+  assert(a.d.querySelector('.tnt-overlay').textContent.includes('Bloqueado · excepción personal'));
+  a.d.querySelector('[data-tab=modules]').click();
+  const buffet=[...a.d.querySelectorAll('#view article')].find(c=>c.querySelector('h3')?.textContent==='Buffet');
+  assert(!buffet.textContent.includes('Bruno'));
+  assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
+test('Un permiso detallado fallido conserva la elección anterior y su formulario',async()=>{
+ const a=await inlinePage('admin/index.html');
+ try{
+  a.d.querySelector('#refresh').click();await until(()=>a.d.querySelector('[data-manage]'));
+  a.d.querySelector('[data-manage]').click();a.d.querySelector('#finePermissions').click();
+  const modal=a.d.querySelector('.tnt-overlay'),sel=modal.querySelector('[data-person-action][data-module=efe][data-action=view]');
+  a.w.__fixtureFailures['tnt_person_permission_overrides:upsert']='Guardado interrumpido';
+  const previous=sel.value;sel.value='deny';sel.dispatchEvent(new a.w.Event('change',{bubbles:true}));
+  await until(()=>a.d.querySelector('#tnt-toast')?.textContent.includes('Guardado interrumpido'));
+  assert.equal(sel.value,previous);assert.equal(sel.disabled,false);assert(modal.isConnected);
+  assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});

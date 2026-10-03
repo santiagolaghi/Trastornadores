@@ -33,6 +33,9 @@
   let accessToken = "";
   let toastTimer = null;
   let currentDetailId = "";
+  let profileState = "active";
+  const canEdit = () => window.TNT.canAction('perfiles', 'edit');
+  const canArchive = () => window.TNT.canAction('perfiles', 'delete');
 
   const SESSION_KEY = "tnt_base_admin_session_v1";
   const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
@@ -82,9 +85,9 @@
   }
 
   function ageFromBirthdate(value) {
-    if (!value) return 0;
+    if (!value) return null;
     const parts = value.split("-").map(Number);
-    if (parts.length !== 3 || parts.some(Number.isNaN)) return 0;
+    if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
     const [year, month, day] = parts;
     const today = new Date();
     let age = today.getFullYear() - year;
@@ -96,7 +99,8 @@
   }
 
   function groupFor(record) {
-    return ageFromBirthdate(record.fecha_nacimiento) < 18 ? "Adolescente" : "Joven";
+    const age = ageFromBirthdate(record.fecha_nacimiento);
+    return age === null ? 'Sin fecha de nacimiento' : age < 18 ? "Adolescente" : "Joven";
   }
 
   function formatDate(value, withTime = false) {
@@ -234,10 +238,10 @@
         );
       }
       if (filters.sort === "ageAsc") {
-        return ageFromBirthdate(a.fecha_nacimiento) - ageFromBirthdate(b.fecha_nacimiento);
+        return (ageFromBirthdate(a.fecha_nacimiento) ?? Infinity) - (ageFromBirthdate(b.fecha_nacimiento) ?? Infinity);
       }
       if (filters.sort === "ageDesc") {
-        return ageFromBirthdate(b.fecha_nacimiento) - ageFromBirthdate(a.fecha_nacimiento);
+        return (ageFromBirthdate(b.fecha_nacimiento) ?? -Infinity) - (ageFromBirthdate(a.fecha_nacimiento) ?? -Infinity);
       }
       if (filters.sort === "oldest") {
         return new Date(a.creado_en || 0) - new Date(b.creado_en || 0);
@@ -248,7 +252,7 @@
 
   function renderStats() {
     const adolescentes = records.filter((record) => groupFor(record) === "Adolescente").length;
-    const jovenes = records.length - adolescentes;
+    const jovenes = records.filter(record => groupFor(record) === 'Joven').length;
     const mujeres = records.filter((record) => record.genero === "Mujer").length;
     const varones = records.filter((record) => record.genero === "Varón").length;
 
@@ -374,7 +378,7 @@
             <strong>${escapeHtml(record.nombre)} ${escapeHtml(record.apellido)}</strong>
             <small>${escapeHtml(instagram || "Sin Instagram")}</small>
           </td>
-          <td><strong>${age}</strong></td>
+          <td><strong>${age ?? '—'}</strong></td>
           <td><span class="mini-badge ${group === "Adolescente" ? "teen" : "young"}">${group}</span></td>
           <td>${escapeHtml(record.genero || "—")}</td>
           <td class="contact-cell">
@@ -396,7 +400,7 @@
             <div class="person-card-head">
               <div>
                 <strong class="person-name">${escapeHtml(record.nombre)} ${escapeHtml(record.apellido)}</strong>
-                <p class="person-subtitle">${age} años · ${group} · ${escapeHtml(record.genero || "Sin género")}</p>
+                <p class="person-subtitle">${age === null ? 'Nacimiento sin completar' : age + ' años · ' + group} · ${escapeHtml(record.genero || "Sexo sin definir")}</p>
               </div>
               <span class="mini-badge ${group === "Adolescente" ? "teen" : "young"}">${group}</span>
             </div>
@@ -411,12 +415,24 @@
     visibleCount.textContent = filtered.length === 1 ? "1 persona" : filtered.length + " personas";
     listSubtext.textContent = (searchInput.value.trim() || activeFilters.hidden === false)
       ? "Resultados de tu búsqueda y filtros"
-      : "Todos los perfiles";
+      : profileState === 'archived' ? "Perfiles archivados · historial conservado" : "Todos los perfiles activos";
 
     emptyState.hidden = filtered.length !== 0;
     clearSearchBtn.hidden = !searchInput.value.trim();
     syncQuickFilters();
     renderActiveFilters();
+    const grouped = new Map();
+    for (const record of records) {
+      if (!record.fecha_nacimiento) continue;
+      const key = normalize(record.nombre + ' ' + record.apellido).replace(/[^a-z0-9]/g, '') + ':' + record.fecha_nacimiento;
+      const matches = grouped.get(key) || [];
+      matches.push(record);
+      grouped.set(key, matches);
+    }
+    const duplicates = [...grouped.values()].filter(group => group.length > 1);
+    const panel = $('profileDuplicates');
+    panel.hidden = profileState !== 'active' || !duplicates.length;
+    panel.innerHTML = duplicates.map(group => `<p><strong>${escapeHtml(group[0].nombre)} ${escapeHtml(group[0].apellido)}</strong> · ${group.length} registros coincidentes. Se conservan separados hasta verificar su identidad.</p>`).join('');
   }
 
   function syncChoiceButtons() {
@@ -487,10 +503,10 @@
     $("detailAvatar").textContent =
       ((record.nombre || "P").charAt(0) + (record.apellido || "").charAt(0)).toUpperCase();
     $("detailName").textContent = [record.nombre, record.apellido].filter(Boolean).join(" ");
-    $("detailSummary").textContent = age + " años · " + group + " · " + (record.genero || "Sin género");
+    $("detailSummary").textContent = (age === null ? 'Nacimiento sin completar' : age + ' años · ' + group) + " · " + (record.genero || "Sexo sin definir");
     $("detailData").innerHTML = [
       detailItem("Fecha de nacimiento", formatDate(record.fecha_nacimiento)),
-      detailItem("Edad actual", age + " años"),
+      detailItem("Edad actual", age === null ? 'Sin fecha de nacimiento' : age + " años"),
       detailItem("Grupo", group),
       detailItem("Género", record.genero || "—"),
       detailItem("Teléfono", phone || "—"),
@@ -504,8 +520,9 @@
       <button class="detail-action copy-detail ${phone ? "" : "disabled"}" type="button" data-copy-phone="${escapeHtml(phone)}">${icons.copy}<span>Copiar teléfono</span></button>
     `;
 
-    $("editProfileBtn").hidden = !window.TNT.hasAccess('perfiles','*','edit');
-    $("deleteProfileBtn").hidden = !window.TNT.hasAccess('perfiles','*','edit');
+    $("editProfileBtn").hidden = !canEdit() || profileState === 'archived';
+    $("deleteProfileBtn").hidden = !canArchive();
+    $("deleteProfileBtn").textContent = profileState === 'archived' ? 'Restaurar perfil' : 'Archivar perfil';
     detailBackdrop.hidden = false;
     detailSheet.classList.add("open");
     detailSheet.setAttribute("aria-hidden", "false");
@@ -532,7 +549,7 @@
 
   function openEdit() {
     const record = currentRecord();
-    if (!record || !window.TNT.hasAccess('perfiles','*','edit')) return;
+    if (!record || !canEdit() || profileState === 'archived') return;
 
 
     $("editNombre").value = record.nombre || "";
@@ -570,7 +587,18 @@
 
   function openDelete() {
     const record = currentRecord();
-    if (!record || !window.TNT.hasAccess('perfiles','*','edit')) return;
+    if (!record || !canArchive()) return;
+    if (profileState === 'archived') {
+      const button = $("deleteProfileBtn");
+      button.disabled = true;
+      window.TNT.sb.rpc('tnt_set_profile_active', { p_person: record.id, p_active: true }).then(async result => {
+        if (result.error) throw result.error;
+        await loadData('central', { silent: true });
+        closeDetail();
+        showToast('Perfil restaurado. Su historial se conserva.');
+      }).catch(error => showToast(error.message || 'No se pudo restaurar.')).finally(() => button.disabled = false);
+      return;
+    }
 
     $("deleteProfileName").textContent = [record.nombre, record.apellido].filter(Boolean).join(" ");
     $("deleteBackdrop").hidden = false;
@@ -667,10 +695,10 @@
 
     if (!options.silent) setRefreshLoading(true);
     try {
-      const { data, error } = await sb.from("tnt_profiles_central").select("*").eq("active", true).order("actualizado_en", { ascending: false });
+      const { data, error } = await sb.from("tnt_profiles_central").select("*").eq("active", profileState === 'active').order("actualizado_en", { ascending: false });
       if (error) throw error;
 
-      records = Array.isArray(data) ? data : [];
+      records = Array.isArray(data) ? data.filter(p => !p.data_notes?.linked_to) : [];
       renderStats();
       renderList();
 
@@ -707,6 +735,20 @@
   });
 
   searchInput.addEventListener("input", renderList);
+  document.querySelectorAll('[data-profile-state]').forEach(button => button.addEventListener('click', async () => {
+    if (!accessToken || button.dataset.profileState === profileState) return;
+    const previous = profileState;
+    const controls = [...document.querySelectorAll('[data-profile-state]')];
+    controls.forEach(b => b.disabled = true);
+    profileState = button.dataset.profileState;
+    try {
+      await loadData('central');
+      controls.forEach(b => b.classList.toggle('active', b.dataset.profileState === profileState));
+    } catch (error) {
+      profileState = previous;
+      showToast('No se pudieron cargar los perfiles. Reintentá.');
+    } finally { controls.forEach(b => b.disabled = false); }
+  }));
   clearSearchBtn.addEventListener("click", () => {
     searchInput.value = "";
     renderList();
@@ -838,7 +880,7 @@
       showToast("Perfil actualizado.");
     } catch (error) {
       console.error(error);
-      $("editMessage").textContent = "No se pudieron guardar los cambios.";
+      $("editMessage").textContent = error.message || "No se pudieron guardar los cambios.";
     } finally {
       setEditLoading(false);
     }
@@ -873,7 +915,7 @@
       showToast(deletedName + " fue archivado sin perder su historial.");
     } catch (error) {
       console.error(error);
-      showToast("No se pudo archivar el perfil.");
+      showToast(error.message || "No se pudo archivar el perfil.");
     } finally {
       setDeleteLoading(false);
     }
@@ -919,6 +961,8 @@
       accessToken="central";
       loginView.hidden=true;
       dashboardView.hidden=false;
+      $("newProfileBtn").hidden = !canEdit();
+      $("mobileNewProfileBtn").hidden = !canEdit();
     } catch (error) { console.error("No se pudieron cargar los perfiles",error); loginMessage.textContent="No se pudo cargar la base. Reintentá."; loginView.hidden=false; }
   }
 

@@ -48,17 +48,23 @@
   function date(value, options={day:'numeric',month:'short'}) { if(!value)return ''; const d=new Date(value.length===10?value+'T12:00:00Z':value);return Number.isNaN(d.valueOf())?'':new Intl.DateTimeFormat('es-AR',{timeZone:'America/Argentina/Buenos_Aires',hourCycle:'h23',...options}).format(d); }
   function time(value) { return value?date(value,{hour:'2-digit',minute:'2-digit'}):''; }
   const completed = t => ['done','completed','cancelled'].includes(typeof t==='string'?t:t?.status);
-  function accessInfo(account={}, grants=[], mod, scope='*', now=Date.now()) {
+  function accessInfo(account={}, grants=[], mod, scope='*', now=Date.now(), rolePermissions=[], personPermissions=[]) {
     const none={level:'none',source:'none'};
     if(account.enabled===false)return none;
     if(account.system_role==='admin'&&mod!=='efe')return {level:'manage',source:'admin'};
     if(account.system_role!=='admin'&&account.staff_status!=='approved')return none;
-    if(mod==='chat'&&account.staff_status==='approved')return {level:'view',source:'staff'};
+    const match=rows=>rows.find(x=>x.module===mod&&x.scope===scope&&x.action==='view')||rows.find(x=>x.module===mod&&x.scope==='*'&&x.action==='view');
+    const override=match(personPermissions),preset=account.staff_status==='approved'?match(rolePermissions):null;
+    if(override&&!override.allowed)return {level:'none',source:'person'};
+    if(!override&&preset&&!preset.allowed)return {level:'none',source:'role'};
     const exact=grants.filter(g=>g.module===mod&&g.scope===scope);
     const candidates=exact.length?exact:grants.filter(g=>g.module===mod&&g.scope==='*');
     const rank={none:0,view:1,user:1,edit:2,editor:2,manage:3,manager:3,admin:4};
-    return candidates.filter(g=>g.enabled&&(!g.valid_from||Date.parse(g.valid_from)<=now)&&(!g.valid_until||Date.parse(g.valid_until)>=now))
+    const base=candidates.filter(g=>g.enabled&&(!g.valid_from||Date.parse(g.valid_from)<=now)&&(!g.valid_until||Date.parse(g.valid_until)>=now))
       .reduce((best,g)=>rank[g.access_level]>rank[best.level]?{level:g.access_level,source:'grant'}:best,none);
+    if(override||preset)return {level:base.level==='none'?'view':base.level,source:override?'person':'role'};
+    if(mod==='chat'&&account.staff_status==='approved'&&base.level==='none')return {level:'view',source:'staff'};
+    return base;
   }
   // A programmatic overlay close consumes its own history entry. Parent dialogs
   // and module navigation must not interpret that popstate as a second Back.

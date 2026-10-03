@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/tnt-ui.css?v=34"><link rel="stylesheet" href="/perfiles/datos/admin.css?v=5">
+  <link rel="stylesheet" href="/assets/tnt-ui.css?v=34"><link rel="stylesheet" href="/perfiles/datos/admin.css?v=48">
 </head>
 <body class="perfiles-admin">
   <div id="baseTnt">
@@ -121,6 +121,10 @@
             </button>
           </div>
 
+          <div class="quick-chips" aria-label="Estado de los perfiles">
+            <button class="quick-chip active" type="button" data-profile-state="active">Activos</button>
+            <button class="quick-chip" type="button" data-profile-state="archived">Archivados</button>
+          </div>
           <div class="quick-chips" aria-label="Filtros rápidos">
             <button class="quick-chip active" type="button" data-quick="all">Todos</button>
             <button class="quick-chip" type="button" data-quick="Adolescente">Adolescentes</button>
@@ -141,6 +145,7 @@
             <span class="sync-status" id="updatedBadge">Actualizado ahora</span>
           </div>
 
+          <div id="profileDuplicates" class="profile-duplicates" hidden></div>
           <div class="desktop-table-wrap">
             <table class="people-table">
               <thead>
@@ -342,7 +347,7 @@
   </div>
 
   <script src="/supabase-lite.js?v=12"></script>
-  <script src="/assets/tnt-components.js?v=34"></script><script src="/assets/tnt-core.js?v=47" data-module="perfiles" data-label="Perfiles" data-shell="off"></script>
-  <script src="/perfiles/datos/admin.js?v=41"></script>
+  <script src="/assets/tnt-components.js?v=35"></script><script src="/assets/tnt-core.js?v=48" data-module="perfiles" data-label="Perfiles" data-shell="off"></script>
+  <script src="/perfiles/datos/admin.js?v=48"></script>
 </body>
 </html>

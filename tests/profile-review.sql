@@ -7,8 +7,8 @@ select set_config('tnt.test_person',(select person_id::text from public.tnt_acco
 select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('tnt.test_uid'),'role','authenticated')::text,true);
 set local role authenticated;
 do $$ declare rid uuid; begin
- begin perform public.tnt_complete_onboarding(false,null,'2005-02-10','U');raise exception 'Se aceptó sexo indefinido';exception when raise_exception then if sqlerrm='Se aceptó sexo indefinido' then raise;end if;end;
- perform public.tnt_complete_onboarding(false,null,'2005-02-10','F');
+ begin perform public.tnt_finish_onboarding('{"first_name":"Prueba","last_name":"Perfil","birthday":"2005-02-10","sex":"U","phone":"1111111111"}',false,null);raise exception 'Se aceptó sexo indefinido';exception when raise_exception then if sqlerrm='Se aceptó sexo indefinido' then raise;end if;end;
+ perform public.tnt_finish_onboarding('{"first_name":"Prueba","last_name":"Perfil","birthday":"2005-02-10","sex":"F","phone":"1111111111"}',false,null);
  begin update public.tnt_people set phone='999999999' where id=public.tnt_current_person_id();raise exception 'Se permitió cambiar sin revisión';exception when insufficient_privilege then null;end;
  rid:=public.tnt_request_profile_change('{"first_name":"Prueba","last_name":"Corregida","birthday":"2005-02-10","sex":"F","phone":"1112345678","instagram":"@Prueba","dni":"12345678"}');
  perform set_config('tnt.test_request',rid::text,true);
