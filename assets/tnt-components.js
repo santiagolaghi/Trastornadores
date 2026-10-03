@@ -136,9 +136,9 @@
       if(select.multiple||select.size>1||select.closest('.tnt-select-dialog'))continue;
       select.dataset.tntEnhanced='true';select.classList.add('tnt-native-select');
       const button=root.document.createElement('button');button.type='button';button.className='tnt-select-trigger';
-      const cleanLabel=node=>{if(!node)return'';const copy=node.cloneNode(true);copy.querySelectorAll('select,input,textarea,button,option').forEach(x=>x.remove());return copy.textContent.replace(/\s+/g,' ').trim();};
+      const cleanLabel=node=>{if(!node)return'';const copy=node.cloneNode(true);copy.querySelectorAll('select,input,textarea,button,option,small,.field-help,.camp-help').forEach(x=>x.remove());return copy.textContent.replace(/\s+/g,' ').trim();};
       const label=select.getAttribute('aria-label')?.trim()||cleanLabel(select.labels?.[0])||cleanLabel(select.closest('.field')?.querySelector('label'))||cleanLabel(select.previousElementSibling?.matches?.('label')?select.previousElementSibling:null)||'Seleccionar';
-      button.setAttribute('aria-label',label);button.setAttribute('aria-haspopup','dialog');
+      select.setAttribute('aria-label',label);button.setAttribute('aria-label',label);button.setAttribute('aria-haspopup','dialog');
       const sync=()=>{button.innerHTML=`<span>${esc(select.options[select.selectedIndex]?.textContent?.trim()||label)}</span><span class="tnt-select-chevron" aria-hidden="true">⌄</span>`;button.disabled=select.disabled;};
       const field=root.document.createElement('span');field.className='tnt-select-field';select.before(field);field.append(select,button);select.addEventListener('change',sync);sync();
       select._tntSync=sync;
@@ -152,11 +152,11 @@
         root.document.body.append(dialog);
         if(root.history?.pushState)root.history.pushState({...root.history.state,tntSelectOverlay:true},'');
         const onBack=()=>{dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();};root.addEventListener('popstate',onBack);
-        const close=()=>{dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();if(root.history?.state?.tntSelectOverlay)backOverlay();};
+        let closing=false;const close=async()=>{if(closing)return;closing=true;dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();if(root.history?.state?.tntSelectOverlay)await backOverlay();};
         dialog.querySelector('.tnt-select-close').onclick=close;
         dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
         dialog.addEventListener('click',e=>{if(e.target===dialog)close();});
-        dialog.querySelectorAll('[data-option]').forEach(item=>item.onclick=()=>{select.selectedIndex=Number(item.dataset.option);select.dispatchEvent(new root.Event('change',{bubbles:true}));sync();close();});
+        dialog.querySelectorAll('[data-option]').forEach(item=>item.onclick=async()=>{if(closing)return;select.selectedIndex=Number(item.dataset.option);sync();await close();if(select.isConnected)select.dispatchEvent(new root.Event('change',{bubbles:true}));});
         const search=dialog.querySelector('.tnt-select-search');if(search)search.oninput=()=>{const term=search.value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();dialog.querySelectorAll('[data-option]').forEach(item=>{const value=(item.dataset.search||item.textContent).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();item.hidden=!value.includes(term);});};
         if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');
         (search||dialog.querySelector('[aria-selected=true]')||dialog.querySelector('[data-option]'))?.focus();
