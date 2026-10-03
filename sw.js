@@ -1,7 +1,7 @@
 // Bump this whenever the shell or a module changes. Older caches are removed
 // during activate so a phone cannot keep rendering a previous TNT build.
-const CACHE='tnt-v46-campamento-final';
-const CORE=['/','/index.html','/manifest.webmanifest','/icons/icon.svg','/icons/notification-badge.svg','/supabase-lite.js?v=12','/assets/tnt-ui.css?v=34','/assets/tnt-core.js?v=40','/assets/tnt-module-theme.css?v=10','/assets/tnt-push.js?v=2','/organizacion/','/campamento/','/campamento/inscripcion/','/glosario/','/asistencia/','/lista-sabados/','/efe/','/buffet/','/chat/','/admin/','/perfiles/'];
+const CACHE='tnt-v47-profile-review';
+const CORE=['/','/index.html','/manifest.webmanifest','/icons/icon.svg','/icons/notification-badge.svg','/supabase-lite.js?v=12','/assets/tnt-ui.css?v=34','/assets/tnt-core.js?v=47','/assets/tnt-module-theme.css?v=10','/assets/tnt-push.js?v=2','/organizacion/','/campamento/','/campamento/inscripcion/','/glosario/','/asistencia/','/lista-sabados/','/efe/','/buffet/','/chat/','/admin/','/perfiles/'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).catch(()=>{}).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{
