@@ -45,3 +45,10 @@ Authenticated Google login is preserved. Browser UI review uses a separate synth
 - Los campos comunes están visibles y son obligatorios por defecto. Administración puede cambiar etiquetas, opciones, visibilidad y obligatoriedad, y agregar preguntas. Cambiar un campo a obligatorio vuelve a pedirlo a quienes todavía no lo completaron.
 - La agenda de comunidad muestra solo eventos confirmados o en curso que Organización haya marcado como visibles para la comunidad. Administración publica las novedades. No se comparten detalles operativos de los eventos.
 - El navegador Chromium local no pudo iniciarse por restricciones del entorno. La verificación en navegador remoto no incluye un inicio real por Google ni una prueba en un teléfono físico.
+
+## Corrección de Perfiles del 4 de octubre de 2026
+
+- 102 pruebas de interfaz y caché pasan. Perfiles usa `tnt-theme`, responde a cambios del tema compartido y habilita las acciones según los permisos cargados por el runtime.
+- Eliminar mueve el perfil a Papelera; Archivar sigue siendo una acción independiente. Se comprueban la revisión de registros coincidentes, cancelación con Atrás, errores conservando la ficha y reintentos sin duplicar operaciones.
+- `tests/profile-deletion.sql` pasó en una transacción revertida con cuentas sintéticas. Comprueba permisos de lectura y eliminación, bloqueo para perfiles incompletos, protección de la cuenta propia, conservación de identidad Google, asistencias y pagos, restauración de membresías y conservación del estado archivado anterior.
+- El recuento posterior confirmó cero cuentas y campamentos temporales. Las dos nuevas funciones requieren autenticación y permiso de eliminación; cuentas vinculadas a Google requieren administración. No se agregaron funciones accesibles al público sin iniciar sesión.

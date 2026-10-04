@@ -21,7 +21,7 @@
   --shadow-soft:0 8px 26px rgba(0,0,0,.16);
 }
 
-html[data-theme="light"] #baseTnt{
+html[data-tnt-theme="light"] #baseTnt{
   --bg:#f2f4fa;
   --surface:#ffffff;
   --surface-2:#f8f9fc;
@@ -43,7 +43,7 @@ html[data-theme="light"] #baseTnt{
 }
 
 html{background:#090b10}
-html[data-theme="light"]{background:#f2f4fa}
+html[data-tnt-theme="light"]{background:#f2f4fa}
 body.perfiles-admin{
   margin:0!important;
   min-height:100vh!important;
@@ -82,8 +82,8 @@ body.perfiles-admin #baseTnt .ambient{
   filter:blur(100px);
   opacity:.12
 }
-body.perfiles-admin #baseTnt .ambient-a{width:330px;height:330px;left:-160px;top:-100px;background:#7c3aed}
-body.perfiles-admin #baseTnt .ambient-b{width:300px;height:300px;right:-160px;top:42%;background:#0284c7}
+body.perfiles-admin #baseTnt .ambient-a{width:330px;height:330px;left:-160px;top:-100px;background:var(--tnt-accent)}
+body.perfiles-admin #baseTnt .ambient-b{width:300px;height:300px;right:-160px;top:42%;background:var(--tnt-lime)}
 
 body.perfiles-admin #baseTnt .app-shell{
   width:min(1320px,100%);
@@ -1148,7 +1148,7 @@ body.perfiles-admin #baseTnt .delete-actions button{
   justify-content:center!important;
   gap:8px!important;
   border-radius:14px!important;
-  font-size:12px!important;
+  font-size:15px!important;
   font-weight:800!important;
   cursor:pointer!important
 }
@@ -1183,3 +1183,31 @@ body.perfiles-admin #baseTnt #confirmDeleteBtn{
   body.perfiles-admin #baseTnt .edit-grid{grid-template-columns:1fr}
   body.perfiles-admin #baseTnt .management-actions{grid-template-columns:1fr 1fr}
 }
+
+/* Perfiles shares TNT's palette and has no separate theme preference. */
+html:has(body.perfiles-admin){background:var(--tnt-bg)}
+body.perfiles-admin #baseTnt{
+ --bg:var(--tnt-bg);--surface:var(--tnt-panel);--surface-2:var(--tnt-panel2);--surface-3:var(--tnt-panel2);
+ --text:var(--tnt-text);--text-2:var(--tnt-text);--muted:var(--tnt-muted);--muted-2:var(--tnt-muted);
+ --line:var(--tnt-line);--line-2:var(--tnt-line);--accent:var(--tnt-accent);--accent-2:var(--tnt-accent2);
+ --accent-soft:color-mix(in srgb,var(--tnt-accent) 15%,transparent);--shadow:var(--tnt-shadow);background:var(--bg);
+}
+body.perfiles-admin #baseTnt .detail-data{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:12px}
+body.perfiles-admin #baseTnt .detail-item{padding:16px;border-radius:18px}
+body.perfiles-admin #baseTnt .detail-item small{font-size:12px;line-height:1.5;margin-bottom:6px}
+body.perfiles-admin #baseTnt .detail-item strong{font-size:17px;line-height:1.5;white-space:pre-wrap}
+body.perfiles-admin #baseTnt .detail-item-wide{grid-column:1/-1}
+body.perfiles-admin #baseTnt .profile-detail-extra{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start;min-width:0;margin-top:12px}
+body.perfiles-admin #baseTnt .profile-detail-extra>h3{grid-column:1/-1;font-size:23px;color:var(--text);margin:8px 0}
+body.perfiles-admin #baseTnt .profile-detail-extra>.tnt-button{grid-column:1/-1;min-height:54px;font-size:16px;font-weight:750;white-space:normal}
+body.perfiles-admin #baseTnt .management-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+body.perfiles-admin #baseTnt #removeProfileBtn{grid-column:1/-1;color:var(--danger)!important;border:1px solid color-mix(in srgb,var(--danger) 50%,var(--line))!important;background:transparent!important}
+body.perfiles-admin #baseTnt .profile-duplicate-actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+body.perfiles-admin #baseTnt .profile-duplicate-actions button{min-height:44px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--text);padding:10px 12px;font:inherit;font-size:14px;cursor:pointer}
+@media(max-width:380px){body.perfiles-admin #baseTnt .detail-data,body.perfiles-admin #baseTnt .profile-detail-extra{grid-template-columns:1fr}}
+
+body.perfiles-admin #baseTnt .manage-btn{font-size:15px!important;min-height:52px!important;padding:10px 14px!important;line-height:1.4!important;white-space:normal!important;text-align:center!important}
+body.perfiles-admin #baseTnt .profile-delete-status:not(:empty){margin:14px 0 0;padding:12px;color:var(--danger);border:1px solid var(--line);border-radius:12px}
+body.perfiles-admin #baseTnt [hidden]{display:none!important}
+body.perfiles-admin #baseTnt .manage-btn.edit-btn{color:var(--tnt-on-color)!important;background:var(--accent)!important}
+body.perfiles-admin #baseTnt .manage-btn.delete-btn{color:var(--text)!important;background:var(--surface-3)!important;border-color:var(--line)!important}

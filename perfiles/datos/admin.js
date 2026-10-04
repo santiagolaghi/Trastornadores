@@ -34,6 +34,8 @@
   let toastTimer = null;
   let currentDetailId = "";
   let profileState = "active";
+  let deleteMode = "archive", deleting = false;
+  const deletedProfiles = new Set();
   const canEdit = () => window.TNT.canAction('perfiles', 'edit');
   const canArchive = () => window.TNT.canAction('perfiles', 'delete');
 
@@ -150,27 +152,22 @@
     }, 2300);
   }
 
-  function applyTheme(theme) {
-    const finalTheme = theme === "light" ? "light" : "dark";
-    document.documentElement.dataset.theme = finalTheme;
-    $("themeIcon").textContent = finalTheme === "dark" ? "☀" : "☾";
-    $("themeToggle").title = finalTheme === "dark" ? "Usar tema claro" : "Usar tema oscuro";
-    document.querySelector('meta[name="theme-color"]')
-      ?.setAttribute("content", finalTheme === "dark" ? "#0b0d12" : "#f2f4fa");
-    try {
-      localStorage.setItem("tnt_base_theme", finalTheme);
-    } catch (_) {}
+  function syncTheme() {
+    const theme = document.documentElement.dataset.tntTheme === 'light' ? 'light' : 'dark';
+    const label = theme === 'dark' ? 'Usar tema claro' : 'Usar tema oscuro';
+    $('themeIcon').innerHTML = window.TNTUI.icon(theme === 'dark' ? 'sun' : 'moon');
+    $('themeToggle').title = label;
+    $('themeToggle').setAttribute('aria-label', label);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#131412' : '#f5f3ec');
   }
 
   function initTheme() {
-    let saved = "";
-    try {
-      saved = localStorage.getItem("tnt_base_theme") || "";
-    } catch (_) {}
-    if (!saved && window.matchMedia?.("(prefers-color-scheme: light)").matches) {
-      saved = "light";
-    }
-    applyTheme(saved || "dark");
+    syncTheme();
+    document.addEventListener('tnt:theme', syncTheme);
+    window.addEventListener('storage', event => {
+      if (event.key !== 'tnt-theme') return;
+      window.TNT.setTheme(event.newValue || 'dark');
+    });
   }
 
   function savePanelSession(token) {
@@ -415,7 +412,7 @@
     visibleCount.textContent = filtered.length === 1 ? "1 persona" : filtered.length + " personas";
     listSubtext.textContent = (searchInput.value.trim() || activeFilters.hidden === false)
       ? "Resultados de tu búsqueda y filtros"
-      : profileState === 'archived' ? "Perfiles archivados · historial conservado" : "Todos los perfiles activos";
+      : profileState === 'trash' ? "Papelera · perfiles eliminados de la base" : profileState === 'archived' ? "Perfiles archivados · historial conservado" : "Todos los perfiles activos";
 
     emptyState.hidden = filtered.length !== 0;
     clearSearchBtn.hidden = !searchInput.value.trim();
@@ -432,7 +429,7 @@
     const duplicates = [...grouped.values()].filter(group => group.length > 1);
     const panel = $('profileDuplicates');
     panel.hidden = profileState !== 'active' || !duplicates.length;
-    panel.innerHTML = duplicates.map(group => `<p><strong>${escapeHtml(group[0].nombre)} ${escapeHtml(group[0].apellido)}</strong> · ${group.length} registros coincidentes. Se conservan separados hasta verificar su identidad.</p>`).join('');
+    panel.innerHTML = duplicates.map(group => `<div><p><strong>${escapeHtml(group[0].nombre)} ${escapeHtml(group[0].apellido)}</strong> · ${group.length} registros coincidentes. Revisá las fichas para elegir cuál conservar.</p><div class="profile-duplicate-actions">${group.map((record,index) => `<button type="button" data-view-id="${escapeHtml(record.id)}">Revisar registro ${index+1} · ${escapeHtml(formatDate(record.creado_en,true))}</button>`).join('')}</div></div>`).join('');
   }
 
   function syncChoiceButtons() {
@@ -463,20 +460,21 @@
     const id = record.id;
     try {
       const result = await window.TNT.sb.rpc('tnt_profile_detail', { p_person: id });
-      if (result.error || String(currentDetailId) !== String(id)) return;
+      if (result.error || String(currentDetailId) !== String(id) || !detailSheet.classList.contains('open')) return;
       const ctx = result.data;
       if (!ctx?.values) return;
       const old = $("detailData").querySelector('[data-profile-interests]');
       old?.remove();
       const extra = document.createElement('div');
       extra.dataset.profileInterests = '';
-      extra.innerHTML = Object.entries(ctx.fields).filter(([k,f]) => !window.TNTProfiles.baseKeys.includes(k) && f.visible !== false).map(([k,f]) => {
+      extra.className = 'profile-detail-extra';
+      extra.innerHTML = '<h3>Intereses y proyectos</h3>' + Object.entries(ctx.fields).filter(([k,f]) => !window.TNTProfiles.baseKeys.includes(k) && f.visible !== false).map(([k,f]) => {
         let value = ctx.values[k];
         if (k === 'efe_group') value = value === 'none' ? 'Todavía no va a un EFE' : ctx.groups.find(g => g.code === value)?.name;
         if (Array.isArray(value)) value = value.join(', ');
-        return detailItem(f.label, value || 'Sin completar');
+        return detailItem(f.label, value || 'Sin completar', ['dreams','studies','interests'].includes(k) || f.type === 'textarea' || String(value || '').length > 60);
       }).join('');
-      if (window.TNT.isAdmin && ctx.values.dni) extra.innerHTML += detailItem('DNI',ctx.values.dni);
+      if (window.TNT.isAdmin && ctx.fields.dni?.visible !== false && ctx.values.dni) extra.innerHTML += detailItem('DNI',ctx.values.dni);
       if (canEdit() && profileState === 'active') {
         const button = document.createElement('button');
         button.className = 'tnt-button primary';button.textContent = 'Editar intereses, sueños y EFE';
@@ -514,9 +512,9 @@
     renderList();
   }
 
-  function detailItem(label, value) {
+  function detailItem(label, value, wide = false) {
     return `
-      <div class="detail-item">
+      <div class="detail-item ${wide ? 'detail-item-wide' : ''}">
         <small>${escapeHtml(label)}</small>
         <strong>${escapeHtml(value || "—")}</strong>
       </div>
@@ -546,7 +544,7 @@
       detailItem("Género", record.genero || "—"),
       detailItem("Teléfono", phone || "—"),
       detailItem("Instagram", instagram || "—"),
-      detailItem("Registrado", formatDate(record.creado_en, true)),
+      detailItem("Registrado", formatDate(record.creado_en, true), true),
     ].join("");
 
     $("detailActions").innerHTML = `
@@ -555,9 +553,10 @@
       <button class="detail-action copy-detail ${phone ? "" : "disabled"}" type="button" data-copy-phone="${escapeHtml(phone)}">${icons.copy}<span>Copiar teléfono</span></button>
     `;
 
-    $("editProfileBtn").hidden = !canEdit() || profileState === 'archived';
+    $("editProfileBtn").hidden = !canEdit() || profileState !== 'active';
     $("deleteProfileBtn").hidden = !canArchive();
-    $("deleteProfileBtn").textContent = profileState === 'archived' ? 'Restaurar perfil' : 'Archivar perfil';
+    $("deleteProfileBtn").textContent = profileState === 'trash' ? 'Restaurar desde Papelera' : profileState === 'archived' ? 'Restaurar perfil' : 'Archivar perfil';
+    $('removeProfileBtn').hidden = !canArchive() || profileState === 'trash' || String(record.id) === String(window.TNT.person?.id);
     detailBackdrop.hidden = false;
     detailSheet.classList.add("open");
     detailSheet.setAttribute("aria-hidden", "false");
@@ -572,7 +571,7 @@
   }
 
   function closeDetail() {
-    window.TNTUI.closeModal(detailSheet);
+    return window.TNTUI.closeModal(detailSheet);
   }
 
   function currentRecord() {
@@ -585,7 +584,7 @@
 
   function openEdit() {
     const record = currentRecord();
-    if (!record || !canEdit() || profileState === 'archived') return;
+    if (!record || !canEdit() || profileState !== 'active') return;
 
 
     $("editNombre").value = record.nombre || "";
@@ -618,41 +617,61 @@
   }
 
   function closeDelete() {
-    window.TNTUI.closeModal($("deleteSheet"));
+    if (deleting) return;
+    return window.TNTUI.closeModal($("deleteSheet"));
   }
 
-  function openDelete() {
+  async function restoreProfile(record) {
+    const button = $('deleteProfileBtn');
+    button.disabled = true;
+    try {
+      const action = profileState === 'trash' ? 'tnt_restore_deleted_profile' : 'tnt_set_profile_active';
+      const args = profileState === 'trash' ? {p_person:record.id} : {p_person:record.id,p_active:true};
+      const result = await window.TNT.sb.rpc(action,args);
+      if (result.error) throw result.error;
+      deletedProfiles.delete(String(record.id));
+      await loadData('central', {silent:true});
+      await closeDetail();
+      currentDetailId = '';
+      showToast('Perfil restaurado. Su historial se conserva.');
+    } catch(error) { showToast(error.message || 'No se pudo restaurar.'); }
+    finally { button.disabled = false; }
+  }
+
+  function openDelete(mode = 'archive') {
     const record = currentRecord();
-    if (!record || !canArchive()) return;
-    if (profileState === 'archived') {
-      const button = $("deleteProfileBtn");
-      button.disabled = true;
-      window.TNT.sb.rpc('tnt_set_profile_active', { p_person: record.id, p_active: true }).then(async result => {
-        if (result.error) throw result.error;
-        await loadData('central', { silent: true });
-        closeDetail();
-        showToast('Perfil restaurado. Su historial se conserva.');
-      }).catch(error => showToast(error.message || 'No se pudo restaurar.')).finally(() => button.disabled = false);
+    if (!record || !canArchive() || deleting) return;
+    if (mode === 'archive' && profileState !== 'active') {
+      restoreProfile(record);
       return;
     }
-
-    $("deleteProfileName").textContent = [record.nombre, record.apellido].filter(Boolean).join(" ");
-    $("deleteBackdrop").hidden = false;
-    $("deleteSheet").classList.add("open");
-    $("deleteSheet").setAttribute("aria-hidden", "false");
-    window.TNTUI.trackOverlay($("deleteSheet"), () => {
-      $("deleteSheet").classList.remove("open");
-      $("deleteSheet").setAttribute("aria-hidden", "true");
-      $("deleteBackdrop").hidden = true;
+    if (mode === 'delete' && profileState === 'trash') return;
+    deleteMode = mode;
+    $('deleteTitle').textContent = mode === 'delete' ? '¿Eliminar este perfil?' : '¿Archivar perfil?';
+    $('deleteActionVerb').textContent = mode === 'delete' ? 'Vas a eliminar de la base a' : 'Vas a archivar a';
+    $('deleteActionDescription').textContent = mode === 'delete'
+      ? 'El perfil irá a la Papelera. Sus asistencias, pagos y responsabilidades se conservan. Podés restaurarlo desde allí.'
+      : 'Su historial de EFE y sábados se conserva. Podés restaurarlo desde Archivados.';
+    $('deleteStatus').textContent = '';
+    $('deleteProfileName').textContent = [record.nombre,record.apellido].filter(Boolean).join(' ');
+    setDeleteLoading(false);
+    $('deleteBackdrop').hidden = false;
+    $('deleteSheet').classList.add('open');
+    $('deleteSheet').setAttribute('aria-hidden','false');
+    window.TNTUI.trackOverlay($('deleteSheet'), () => {
+      $('deleteSheet').classList.remove('open');
+      $('deleteSheet').setAttribute('aria-hidden','true');
+      $('deleteBackdrop').hidden = true;
       document.body.style.overflow = document.querySelector('.bottom-sheet.open') ? 'hidden' : '';
     });
-    document.body.style.overflow = "hidden";
+    document.body.style.overflow = 'hidden';
   }
 
   function setDeleteLoading(active) {
-    $("confirmDeleteBtn").disabled = active;
-    $("confirmDeleteText").textContent = active ? "Archivando…" : "Sí, archivar";
-    $("deleteSpinner").hidden = !active;
+    $('confirmDeleteBtn').disabled = active;
+    $('cancelDeleteBtn').disabled = active;
+    $('confirmDeleteText').textContent = active ? (deleteMode === 'delete' ? 'Eliminando…' : 'Archivando…') : (deleteMode === 'delete' ? 'Eliminar perfil' : 'Sí, archivar');
+    $('deleteSpinner').hidden = !active;
   }
 
   async function copyPhone(phone) {
@@ -734,7 +753,7 @@
       const { data, error } = await sb.from("tnt_profiles_central").select("*").eq("active", profileState === 'active').order("actualizado_en", { ascending: false });
       if (error) throw error;
 
-      records = Array.isArray(data) ? data.filter(p => !p.data_notes?.linked_to) : [];
+      records = Array.isArray(data) ? data.filter(p => !p.data_notes?.linked_to && (profileState === 'trash' ? Boolean(p.data_notes?.deleted_at) : !p.data_notes?.deleted_at && !deletedProfiles.has(String(p.id)))) : [];
       renderStats();
       renderList();
 
@@ -767,12 +786,12 @@
   });
 
   $("themeToggle").addEventListener("click", () => {
-    applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+    window.TNT.toggleTheme();
   });
 
   searchInput.addEventListener("input", renderList);
   document.querySelectorAll('[data-profile-state]').forEach(button => button.addEventListener('click', async () => {
-    if (!accessToken || button.dataset.profileState === profileState) return;
+    if (!accessToken || button.dataset.profileState === profileState || button.dataset.profileState !== 'active' && !canArchive()) return;
     const previous = profileState;
     const controls = [...document.querySelectorAll('[data-profile-state]')];
     controls.forEach(b => b.disabled = true);
@@ -783,7 +802,7 @@
     } catch (error) {
       profileState = previous;
       showToast('No se pudieron cargar los perfiles. Reintentá.');
-    } finally { controls.forEach(b => b.disabled = false); }
+    } finally { controls.forEach(b => b.disabled = b.dataset.profileState !== 'active' && !canArchive()); }
   }));
   clearSearchBtn.addEventListener("click", () => {
     searchInput.value = "";
@@ -851,7 +870,8 @@
   detailBackdrop.addEventListener("click", closeDetail);
 
   $("editProfileBtn").addEventListener("click", openEdit);
-  $("deleteProfileBtn").addEventListener("click", openDelete);
+  $('deleteProfileBtn').addEventListener('click', () => openDelete('archive'));
+  $('removeProfileBtn').addEventListener('click', () => openDelete('delete'));
 
   $("closeEditBtn").addEventListener("click", closeEdit);
   $("cancelEditBtn").addEventListener("click", closeEdit);
@@ -925,34 +945,36 @@
   $("cancelDeleteBtn").addEventListener("click", closeDelete);
   $("deleteBackdrop").addEventListener("click", closeDelete);
 
-  $("confirmDeleteBtn").addEventListener("click", async () => {
-    const record = currentRecord();
-    if (!record || !accessToken) return;
-
+  $('confirmDeleteBtn').addEventListener('click', async () => {
+    const record = currentRecord(), mode = deleteMode;
+    if (!record || !accessToken || !canArchive() || deleting) return;
+    deleting = true;
     setDeleteLoading(true);
+    $('deleteStatus').textContent = '';
     try {
       const sb = window.TNT?.sb;
-      if (!sb) throw new Error("No se pudo conectar con la base.");
-
-      const { error } = await sb.rpc("tnt_set_profile_active", { p_person: record.id, p_active: false });
-      if (error) throw error;
-
-      const deletedName = [record.nombre, record.apellido].filter(Boolean).join(" ");
-      records = records.filter((item) => String(item.id) !== String(record.id));
-      currentDetailId = "";
-      renderStats();
-      renderList();
-      closeDelete();
-      $("detailName").textContent = "Perfil archivado";
-      $("detailData").innerHTML = "";
-      $("detailActions").innerHTML = "";
-      $("editProfileBtn").hidden = true;
-      $("deleteProfileBtn").hidden = true;
-      showToast(deletedName + " fue archivado sin perder su historial.");
-    } catch (error) {
-      console.error(error);
-      showToast(error.message || "No se pudo archivar el perfil.");
+      if (!sb) throw new Error('No se pudo conectar con la base.');
+      const result = mode === 'delete'
+        ? await sb.rpc('tnt_delete_profile', {p_person:record.id})
+        : await sb.rpc('tnt_set_profile_active', {p_person:record.id,p_active:false});
+      if (result.error) throw result.error;
+      const name = [record.nombre,record.apellido].filter(Boolean).join(' ');
+      if (mode === 'delete') deletedProfiles.add(String(record.id));
+      records = records.filter(item => String(item.id) !== String(record.id));
+      renderStats();renderList();
+      deleting = false;
+      await closeDelete();
+      if (String(currentDetailId) === String(record.id)) {
+        await closeDetail();
+        currentDetailId = '';
+        $('detailData').innerHTML = '';
+      }
+      showToast(name + (mode === 'delete' ? ' se eliminó de la base y está en la Papelera.' : ' fue archivado sin perder su historial.'));
+    } catch(error) {
+      $('deleteStatus').textContent = error.message || 'No se pudo guardar el cambio. Reintentá.';
+      showToast(error.message || 'No se pudo guardar el cambio.');
     } finally {
+      deleting = false;
       setDeleteLoading(false);
     }
   });
@@ -999,10 +1021,12 @@
       dashboardView.hidden=false;
       $("newProfileBtn").hidden = !canEdit();
       $("mobileNewProfileBtn").hidden = !canEdit();
+      document.querySelectorAll('[data-profile-state]').forEach(b => b.disabled = b.dataset.profileState !== 'active' && !canArchive());
     } catch (error) { console.error("No se pudieron cargar los perfiles",error); loginMessage.textContent="No se pudo cargar la base. Reintentá."; loginView.hidden=false; }
   }
 
   initTheme();
+  document.querySelectorAll('[data-profile-state]').forEach(b => b.disabled = b.dataset.profileState !== 'active' && !canArchive());
   syncChoiceButtons();
   $("editFechaNacimiento").max = new Date().toISOString().slice(0, 10);
   restorePanelSession();

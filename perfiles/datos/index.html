@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es" data-theme="dark">
+<html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/tnt-ui.css?v=36"><link rel="stylesheet" href="/perfiles/datos/admin.css?v=48">
+  <link rel="stylesheet" href="/assets/tnt-ui.css?v=36"><link rel="stylesheet" href="/perfiles/datos/admin.css?v=49">
 <link rel="stylesheet" href="/assets/tnt-identity.css?v=1"></head>
 <body data-tnt-module="perfiles" class="perfiles-admin">
   <div id="baseTnt">
@@ -124,6 +124,7 @@
           <div class="quick-chips" aria-label="Estado de los perfiles">
             <button class="quick-chip active" type="button" data-profile-state="active">Activos</button>
             <button class="quick-chip" type="button" data-profile-state="archived">Archivados</button>
+            <button class="quick-chip" type="button" data-profile-state="trash">Papelera</button>
           </div>
           <div class="quick-chips" aria-label="Filtros rápidos">
             <button class="quick-chip active" type="button" data-quick="all">Todos</button>
@@ -261,6 +262,7 @@
       <div class="management-actions">
         <button class="manage-btn edit-btn" id="editProfileBtn" type="button">✎ Editar perfil</button>
         <button class="manage-btn delete-btn" id="deleteProfileBtn" type="button">Archivar perfil</button>
+        <button class="manage-btn" id="removeProfileBtn" type="button">Eliminar perfil</button>
       </div>
     </section>
 
@@ -333,7 +335,8 @@
       <div class="sheet-handle"></div>
       <div class="danger-icon">!</div>
       <h2 id="deleteTitle">¿Archivar perfil?</h2>
-      <p>Vas a archivar a <strong id="deleteProfileName">esta persona</strong>. Su historial de EFE y sábados se conserva.</p>
+      <p><span id="deleteActionVerb">Vas a archivar a</span> <strong id="deleteProfileName">esta persona</strong>. <span id="deleteActionDescription">Su historial de EFE y sábados se conserva.</span></p>
+      <p id="deleteStatus" class="profile-delete-status" role="status" aria-live="polite"></p>
       <div class="delete-actions">
         <button id="cancelDeleteBtn" type="button">Cancelar</button>
         <button id="confirmDeleteBtn" type="button">
@@ -348,6 +351,6 @@
 
   <script src="/supabase-lite.js?v=12"></script>
   <script src="/assets/tnt-components.js?v=38"></script><script src="/assets/tnt-profiles.js?v=1"></script><script src="/assets/tnt-core.js?v=49" data-module="perfiles" data-label="Perfiles" data-shell="off"></script>
-  <script src="/perfiles/datos/admin.js?v=48"></script>
+  <script src="/perfiles/datos/admin.js?v=49"></script>
 </body>
 </html>

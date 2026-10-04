@@ -507,3 +507,63 @@ test('Eliminar una fila independiente del cronograma conserva las demás activid
  const a=await app('organization','?view=schedule',w=>{w.__fixtureDB.tnt_schedule_items.push({id:'manual-row',day_id:w.__fixtureDB.tnt_schedule_days[0].id,task_id:null,title:'Fila independiente',starts_at:'20:00',sort_order:5});});
  try{a.d.querySelector('[data-item-open=manual-row]').click();await until(()=>a.d.querySelector('#deleteItem'));a.d.querySelector('#deleteItem').click();await until(()=>a.d.querySelector('.tnt-question [type=submit]'));a.w.__fixtureFailures.tnt_schedule_items='Sin conexión';a.d.querySelector('.tnt-question [type=submit]').click();await until(()=>a.d.querySelector('#toast').textContent.includes('Sin conexión'));assert(a.d.querySelector('#deleteItem'));delete a.w.__fixtureFailures.tnt_schedule_items;a.d.querySelector('#deleteItem').click();await until(()=>a.d.querySelector('.tnt-question [type=submit]'));a.d.querySelector('.tnt-question [type=submit]').click();await until(()=>!a.d.querySelector('#modal dialog'));assert.equal(a.d.querySelectorAll('.timeline .agenda-card').length,4);assert.equal(a.d.querySelector('[data-item-open=manual-row]'),null);assert.equal(a.w.__fixtureDB.tnt_tasks.length,4);assert.deepEqual(a.errors,[]);}finally{a.close();}
 });
+
+function profileDeletionFixture(w){
+ const base={nombre:'Prueba',apellido:'Perfil',fecha_nacimiento:'2000-02-10',genero:'Varón',active:true,creado_en:'2026-10-01T12:00:00Z'};
+ w.__fixtureDB.tnt_profiles_central=[{...base,id:'keep-profile'},{...base,id:'duplicate-profile',creado_en:'2026-10-04T12:00:00Z'}];
+ const rpc=w.TNT.sb.rpc;
+ w.TNT.sb.rpc=async(name,args)=>{
+  if(!['tnt_delete_profile','tnt_restore_deleted_profile','tnt_set_profile_active'].includes(name))return rpc(name,args);
+  w.__fixtureCalls.push({rpc:name,args});
+  if(w.__fixtureFailures['rpc:'+name])return{error:{message:w.__fixtureFailures['rpc:'+name]}};
+  const profile=w.__fixtureDB.tnt_profiles_central.find(p=>p.id===args.p_person);
+  if(name==='tnt_delete_profile'){profile.data_notes={deleted_at:'2026-10-04T12:00:00Z',deleted_previous_active:profile.active};profile.active=false;}
+  else if(name==='tnt_restore_deleted_profile'){profile.active=profile.data_notes.deleted_previous_active;profile.data_notes={};}
+  else profile.active=args.p_active;
+  return{data:null,error:null};
+ };
+}
+test('Perfiles comparte el tema de TNT, ignora su preferencia antigua y conserva la selección al cambiarlo',async()=>{
+ const a=await inlinePage('perfiles/datos/index.html',w=>{w.localStorage.setItem('tnt-theme','light');w.localStorage.setItem('tnt_base_theme','dark');w.__fixtureDB.tnt_profiles_central=[{id:'theme-profile',nombre:'Tema',apellido:'Prueba',active:true}];},true);
+ try{
+  a.w.eval(fs.readFileSync(path.join(root,'perfiles/datos/admin.js'),'utf8'));await until(()=>a.d.querySelector('[data-view-id]'));assert.equal(a.d.querySelector('[data-profile-state=trash]').disabled,false);
+  assert.equal(a.d.documentElement.dataset.tntTheme,'light');assert(a.d.querySelector('#themeToggle').getAttribute('aria-label').includes('oscuro'));
+  a.d.querySelector('[data-view-id]').click();a.d.querySelector('#themeToggle').click();assert.equal(a.d.documentElement.dataset.tntTheme,'dark');assert.equal(a.w.localStorage.getItem('tnt-theme'),'dark');assert(a.d.querySelector('#detailSheet').classList.contains('open'));
+  a.w.TNT.setTheme('light');assert(a.d.querySelector('#themeToggle').getAttribute('aria-label').includes('oscuro'));assert.equal(a.d.querySelector('meta[name=theme-color]').content,'#f5f3ec');
+  a.w.dispatchEvent(new a.w.StorageEvent('storage',{key:'tnt-theme',newValue:'dark'}));assert.equal(a.d.documentElement.dataset.tntTheme,'dark');assert(a.d.querySelector('#themeToggle').getAttribute('aria-label').includes('claro'));assert.deepEqual(a.errors,[]);
+ }finally{a.w.dispatchEvent(new a.w.Event('pagehide'));a.close();}
+});
+test('Eliminar un duplicado conserva el otro perfil, lo separa de Archivados y permite restaurarlo desde Papelera',async()=>{
+ const a=await inlinePage('perfiles/datos/index.html',profileDeletionFixture);
+ try{
+  a.w.eval(fs.readFileSync(path.join(root,'perfiles/datos/admin.js'),'utf8'));await until(()=>a.d.querySelector('.profile-duplicate-actions [data-view-id="duplicate-profile"]'));
+  a.d.querySelector('.profile-duplicate-actions [data-view-id="duplicate-profile"]').click();a.d.querySelector('#removeProfileBtn').click();assert(a.d.querySelector('#deleteActionDescription').textContent.includes('Papelera'));assert.equal(a.d.querySelector('#deleteProfileName').textContent,'Prueba Perfil');a.d.querySelector('#confirmDeleteBtn').click();
+  await until(()=>!a.d.querySelector('#detailSheet').classList.contains('open'));assert.equal(a.d.querySelector('[data-view-id="duplicate-profile"]'),null);assert(a.d.querySelector('[data-view-id="keep-profile"]'));assert(a.d.querySelector('#profileDuplicates').hidden);
+  const call=a.w.__fixtureCalls.find(c=>c.rpc==='tnt_delete_profile');assert.equal(call.args.p_person,'duplicate-profile');assert.equal(a.w.__fixtureDB.tnt_profiles_central.find(p=>p.id==='keep-profile').active,true);
+  a.d.querySelector('[data-profile-state=archived]').click();await until(()=>a.d.querySelector('[data-profile-state=archived]').classList.contains('active'));assert.equal(a.d.querySelector('[data-view-id]'),null);
+  a.d.querySelector('[data-profile-state=trash]').click();await until(()=>a.d.querySelector('[data-view-id="duplicate-profile"]'));a.d.querySelector('[data-view-id="duplicate-profile"]').click();assert(a.d.querySelector('#removeProfileBtn').hidden);assert(a.d.querySelector('#editProfileBtn').hidden);assert.equal(a.d.querySelector('#deleteProfileBtn').textContent,'Restaurar desde Papelera');a.d.querySelector('#deleteProfileBtn').click();
+  await until(()=>!a.d.querySelector('#detailSheet').classList.contains('open'));assert.equal(a.d.querySelector('[data-view-id]'),null);a.d.querySelector('[data-profile-state=active]').click();await until(()=>a.d.querySelector('[data-view-id="duplicate-profile"]'));assert(a.w.__fixtureCalls.some(c=>c.rpc==='tnt_restore_deleted_profile'));assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+test('Un error al eliminar conserva la ficha y el duplicado; el reintento no duplica la operación',async()=>{
+ let finish;const a=await inlinePage('perfiles/datos/index.html',w=>{profileDeletionFixture(w);const rpc=w.TNT.sb.rpc;w.TNT.sb.rpc=(name,args)=>name==='tnt_delete_profile'?new Promise(resolve=>{w.__deleteAttempts=(w.__deleteAttempts||0)+1;finish=resolve;}):rpc(name,args);});
+ try{
+  a.w.eval(fs.readFileSync(path.join(root,'perfiles/datos/admin.js'),'utf8'));await until(()=>a.d.querySelector('[data-view-id="duplicate-profile"]'));a.d.querySelector('[data-view-id="duplicate-profile"]').click();a.d.querySelector('#removeProfileBtn').click();a.d.querySelector('#confirmDeleteBtn').click();assert(a.d.querySelector('#cancelDeleteBtn').disabled);a.d.querySelector('#confirmDeleteBtn').click();assert.equal(a.w.__deleteAttempts,1);
+  finish({error:{message:'Sin conexión'}});await until(()=>a.d.querySelector('#deleteStatus').textContent.includes('Sin conexión'));assert(a.d.querySelector('#detailSheet').classList.contains('open'));assert(a.d.querySelector('#deleteSheet').classList.contains('open'));assert(a.d.querySelector('[data-view-id="duplicate-profile"]'));
+  a.d.querySelector('#confirmDeleteBtn').click();finish({error:null});await until(()=>!a.d.querySelector('#detailSheet').classList.contains('open'));assert.equal(a.d.querySelector('[data-view-id="duplicate-profile"]'),null);
+  a.d.querySelector('#refreshBtn').click();await until(()=>!a.d.querySelector('#refreshBtn').disabled);assert.equal(a.d.querySelector('[data-view-id="duplicate-profile"]'),null);assert.equal(a.w.__deleteAttempts,2);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+test('Archivar sigue separado de Eliminar y Atrás cancela la eliminación sin cerrar la ficha',async()=>{
+ const a=await inlinePage('perfiles/datos/index.html',profileDeletionFixture);
+ try{
+  a.w.eval(fs.readFileSync(path.join(root,'perfiles/datos/admin.js'),'utf8'));await until(()=>a.d.querySelector('[data-view-id="duplicate-profile"]'));a.d.querySelector('[data-view-id="duplicate-profile"]').click();a.d.querySelector('#removeProfileBtn').click();a.w.history.back();await until(()=>!a.d.querySelector('#deleteSheet').classList.contains('open'));assert(a.d.querySelector('#detailSheet').classList.contains('open'));assert(!a.w.__fixtureCalls.some(c=>c.rpc==='tnt_delete_profile'));
+  a.d.querySelector('#deleteProfileBtn').click();assert.equal(a.d.querySelector('#deleteTitle').textContent,'¿Archivar perfil?');a.d.querySelector('#confirmDeleteBtn').click();await until(()=>!a.d.querySelector('#detailSheet').classList.contains('open'));assert(a.w.__fixtureCalls.some(c=>c.rpc==='tnt_set_profile_active'&&c.args.p_active===false));assert(!a.w.__fixtureCalls.some(c=>c.rpc==='tnt_delete_profile'));assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+test('Perfiles de lectura no ofrece eliminar, archivar ni acceder a la Papelera',async()=>{
+ const a=await inlinePage('perfiles/datos/index.html',w=>{profileDeletionFixture(w);w.TNT.isAdmin=false;w.TNT.grants=[{module:'perfiles',scope:'*',enabled:true,access_level:'view'}];});
+ try{
+  a.w.eval(fs.readFileSync(path.join(root,'perfiles/datos/admin.js'),'utf8'));await until(()=>a.d.querySelector('[data-view-id="duplicate-profile"]'));a.d.querySelector('[data-view-id="duplicate-profile"]').click();assert(a.d.querySelector('#removeProfileBtn').hidden);assert(a.d.querySelector('#deleteProfileBtn').hidden);assert(a.d.querySelector('#editProfileBtn').hidden);assert(a.d.querySelector('[data-profile-state=trash]').disabled);a.d.querySelector('#removeProfileBtn').click();assert(!a.d.querySelector('#deleteSheet').classList.contains('open'));assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
