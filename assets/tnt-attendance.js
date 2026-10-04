@@ -198,7 +198,7 @@ function paintContent(){
 function attendanceRow(p){
  const st=status(p.id),a=age(p),m=membership(p.id);
  return `<article class="person-row status-${st}">
-  <div class="person-avatar">${initials(p.full_name)}</div>
+  <div class="person-avatar">${U.avatar(p,S.accounts.find(a=>a.person_id===p.id)||{})}</div>
   <div class="person-copy"><b>${E(p.full_name)}</b><small>${a===null?'Edad sin cargar':a+' años'}${S.mode==='efe'?' · '+E(m?.leader_name?'Resp. '+m.leader_name:'Sin responsable'):''}</small></div>
   <div class="status-actions">
    <button data-status="absent" data-person="${p.id}" class="no" aria-pressed="${st==='absent'}" ${!can('attendance')?'disabled':''}>Faltó</button>
@@ -244,9 +244,9 @@ async function answerDeck(p,value,host){
  S.deck.history.push({id:p.id,prev});S.deck.index++;host.remove();renderDeck();
 }
 function bindSwipe(card,p,host){
- let sx=0,x=0,drag=false;card.onpointerdown=e=>{drag=true;sx=e.clientX;card.setPointerCapture(e.pointerId)};
- card.onpointermove=e=>{if(!drag)return;x=e.clientX-sx;card.style.transform=`translate3d(${x}px,0,0) rotate(${x/28}deg)`;card.dataset.dir=x>0?'yes':'no'};
- const end=()=>{if(!drag)return;drag=false;if(Math.abs(x)>72)answerDeck(p,x>0?'present':'absent',host);else{card.style.transform='';delete card.dataset.dir}x=0};
+ let sx=0,x=0,drag=false,raf=0;card.style.touchAction='pan-y';card.onpointerdown=e=>{if(e.pointerType==='mouse'&&e.button!==0)return;drag=true;sx=e.clientX;card.setPointerCapture(e.pointerId)};
+ card.onpointermove=e=>{if(!drag)return;x=e.clientX-sx;cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>{card.style.transform=`translate3d(${x}px,0,0) rotate(${x/38}deg)`;card.dataset.dir=x>0?'yes':'no'});};
+ const end=()=>{if(!drag)return;drag=false;cancelAnimationFrame(raf);if(Math.abs(x)>38)answerDeck(p,x>0?'present':'absent',host);else{card.style.transform='';delete card.dataset.dir}x=0};
  card.onpointerup=end;card.onpointercancel=end;
 }
 async function copyAttendance(kind){

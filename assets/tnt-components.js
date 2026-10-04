@@ -36,7 +36,8 @@
   const initials = name => String(name || 'TNT').trim().split(/\s+/).slice(0,2).map(p=>p[0]).join('').toUpperCase();
   function avatar(person={}, account={}, cls='') {
     const name=account.nickname || person.full_name || person.display_name || 'Persona TNT';
-    const url=safeUrl(account.avatar_url || person.avatar_url || '');
+    let url=safeUrl(account.avatar_url || person.avatar_url || '');
+    if(url && /googleusercontent\.com/i.test(url)) url=/=s\d+(?:-c)?$/.test(url)?url.replace(/=s\d+(?:-c)?$/,'=s512-c'):url+'=s512-c';
     return `<span class="tnt-person-avatar ${esc(cls)}" title="${esc(name)}"><span aria-hidden="true">${esc(initials(name))}</span>${url?`<img src="${esc(url)}" alt="${esc(name)}" loading="lazy" referrerpolicy="no-referrer">`:''}</span>`;
   }
   function avatarStack(ids, people, accounts, myId, max=5) {
