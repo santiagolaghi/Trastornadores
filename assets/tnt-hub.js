@@ -3,9 +3,9 @@
 const U=TNTUI, app=document.getElementById('app');
 const state={events:[],tasks:[],assignees:[],people:[],accounts:[],members:[],notes:[],files:[],errors:[],news:[]};
 const modules=[
-{id:'organizacion',name:'Organización',icon:'calendar',desc:'Actividades, calendario y equipo.',color:'var(--tnt-lilac)'},
-{id:'chat',name:'Chat TNT',icon:'chat',desc:'Coordiná con tu equipo.',color:'var(--tnt-lime)'},
-{id:'campamento',name:'Campamento',icon:'camp',desc:'Inscripciones, pagos y logística.',color:'var(--tnt-blue)'},
+{id:'organizacion',name:'Organización',icon:'calendar',desc:'Actividades, calendario y equipo.',color:'var(--tnt-lilac)',cover:'/assets/covers/equipo.jpg'},
+{id:'chat',name:'Chat TNT',icon:'chat',desc:'Coordiná con tu equipo.',color:'var(--tnt-lime)',cover:'/assets/covers/comunidad.jpg'},
+{id:'campamento',name:'Campamento',icon:'camp',desc:'Inscripciones, pagos y logística.',color:'var(--tnt-blue)',cover:'/assets/covers/campamento.jpg'},
 {id:'asistencia',name:'Asistencia',href:'/asistencia/',icon:'check',desc:'EFE y sábados · lista y seguimiento.',color:'var(--tnt-peach)'},
 {id:'glosario',name:'Prédicas y glosario',icon:'book',desc:'Tus mensajes y recursos bíblicos.',color:'var(--tnt-lilac)'},
 {id:'buffet',name:'Buffet',icon:'food',desc:'Ventas, caja y mercadería.',color:'var(--tnt-peach)'},

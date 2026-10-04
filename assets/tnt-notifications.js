@@ -26,7 +26,7 @@
   async function refresh(){const sub=await TNTPush.current();let enabled=false;if(sub){const r=await TNT.sb.from('tnt_push_subscriptions').select('endpoint').eq('person_id',TNT.person.id).eq('endpoint',sub.endpoint).maybeSingle();if(r.error)throw r.error;enabled=!!r.data;}o.querySelector('[data-phone-status]').textContent=enabled?'Avisos activados':permission==='denied'?'Permiso bloqueado':'Todavía sin activar';disable.hidden=!enabled;enable.hidden=enabled;}
   enable.onclick=async()=>{enable.disabled=true;try{await TNTPush.enableTNT();await refresh();status.textContent='Listo. Los próximos avisos llegarán a este teléfono.';}catch(e){status.textContent=e.message;}finally{enable.disabled=false;}};
   disable.onclick=async()=>{disable.disabled=true;try{const sub=await TNTPush.current();if(sub){const r=await TNT.sb.rpc('tnt_push_unsubscribe',{p_endpoint:sub.endpoint});if(r.error)throw r.error;}await refresh();status.textContent='Desactivados en este teléfono.';}catch(e){status.textContent=e.message;}finally{disable.disabled=false;}};
-  try{await refresh();}catch(e){console.error('TNT phone status',e);status.textContent='No pudimos comprobar este teléfono. Cerrá y volvé a abrir esta ventana.';}
+  try{await refresh();}catch(e){status.textContent=e.message;}
  };
  document.addEventListener('tnt:ready',()=>{if(!window.TNT?.profileComplete)return;TNT.showNotifications=N.open;N.load().catch(e=>console.warn('TNT notifications',e));});
  document.addEventListener('tnt:notifications',()=>document.dispatchEvent(new CustomEvent('tnt:data',{detail:{tables:['tnt_notifications']}})));
