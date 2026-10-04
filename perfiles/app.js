@@ -2,6 +2,9 @@
 'use strict';
 const U=TNTUI,P=TNTProfiles,container=document.getElementById('profile-form-content'),submit=document.getElementById('submitBtn'),status=document.getElementById('message');
 let ctx;
+document.querySelector('[aria-label="Volver al inicio"]').innerHTML=U.icon('back');
+const themeButton=document.getElementById('theme'),updateThemeIcon=()=>themeButton.innerHTML=U.icon(document.documentElement.dataset.tntTheme==='dark'?'sun':'moon');
+updateThemeIcon();document.addEventListener('tnt:theme',updateThemeIcon);
 async function load(){
  submit.disabled=true;container.innerHTML='<div class="tnt-skeleton"><div><div class="tnt-loader"></div>Preparando tu perfil…</div></div>';
  try{const r=await TNT.sb.rpc('tnt_public_profile_form');if(r.error)throw r.error;ctx=r.data;container.innerHTML=P.render(ctx.fields,{},ctx.groups);P.bind(document.getElementById('profileForm'),ctx.fields,{},ctx.groups);submit.disabled=false;status.textContent='';}
