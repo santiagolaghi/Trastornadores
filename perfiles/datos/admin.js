@@ -459,6 +459,41 @@
     document.body.style.overflow = "hidden";
   }
 
+  async function loadProfileInterests(record) {
+    const id = record.id;
+    try {
+      const result = await window.TNT.sb.rpc('tnt_profile_detail', { p_person: id });
+      if (result.error || String(currentDetailId) !== String(id)) return;
+      const ctx = result.data;
+      if (!ctx?.values) return;
+      const old = $("detailData").querySelector('[data-profile-interests]');
+      old?.remove();
+      const extra = document.createElement('div');
+      extra.dataset.profileInterests = '';
+      extra.innerHTML = Object.entries(ctx.fields).filter(([k,f]) => !window.TNTProfiles.baseKeys.includes(k) && f.visible !== false).map(([k,f]) => {
+        let value = ctx.values[k];
+        if (k === 'efe_group') value = value === 'none' ? 'Todavía no va a un EFE' : ctx.groups.find(g => g.code === value)?.name;
+        if (Array.isArray(value)) value = value.join(', ');
+        return detailItem(f.label, value || 'Sin completar');
+      }).join('');
+      if (window.TNT.isAdmin && ctx.values.dni) extra.innerHTML += detailItem('DNI',ctx.values.dni);
+      if (canEdit() && profileState === 'active') {
+        const button = document.createElement('button');
+        button.className = 'tnt-button primary';button.textContent = 'Editar intereses, sueños y EFE';
+        button.onclick = () => editProfileInterests(record,ctx);
+        extra.append(button);
+      }
+      $("detailData").append(extra);
+    } catch(error) { console.warn('Datos ampliados del perfil',error); }
+  }
+
+  function editProfileInterests(record,ctx) {
+    const U=window.TNTUI,P=window.TNTProfiles;
+    const o=U.modal('Lo que hace única a esta persona',`<form class="tnt-form">${P.render(ctx.fields,ctx.values,ctx.groups,{mode:'extra'})}<button class="tnt-button primary" type="submit">Guardar perfil</button><p role="status"></p></form>`,false,{stack:true});
+    const form=o.querySelector('form');P.bind(form,ctx.fields,ctx.values,ctx.groups);
+    form.onsubmit=async e=>{e.preventDefault();if(!P.validate(form,ctx.fields))return;const button=form.querySelector('[type=submit]');button.disabled=true;try{const r=await window.TNT.sb.rpc('tnt_save_central_profile',{p_person:record.id,p_values:P.collect(form,ctx.fields)});if(r.error)throw r.error;await U.closeModal(o);await loadProfileInterests(record);showToast('Perfil actualizado.');}catch(err){form.querySelector('[role=status]').textContent=err.message;}finally{button.disabled=false;}};
+  }
+
   function closeFilters() {
     window.TNTUI.closeModal(filterSheet);
   }
@@ -533,6 +568,7 @@
       document.body.style.overflow = document.querySelector('.bottom-sheet.open') ? 'hidden' : '';
     });
     document.body.style.overflow = "hidden";
+    loadProfileInterests(record);
   }
 
   function closeDetail() {

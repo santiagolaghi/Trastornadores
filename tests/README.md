@@ -37,3 +37,11 @@ Authenticated Google login is preserved. Browser UI review uses a separate synth
 - Sábados ya usa los registros originales recuperados. El resto del historial de la aplicación anterior de EFE sigue protegido por contraseña o patrón; se necesita una sesión de su grupo para importarlo.
 - Perfiles retira su antiguo worker: elimina solo su caché y no almacena respuestas privadas de Supabase. El worker compartido conserva cachés ajenas.
 - La revisión visual de los módulos privados y la grabación en un teléfono real requieren iniciar sesión. Estas pruebas automáticas no sustituyen esa comprobación.
+
+## Verificación del 4 de octubre de 2026
+
+- 86 pruebas de interfaz y caché: perfil obligatorio para cuentas nuevas y existentes, conservación de respuestas ante errores, intereses múltiples, sugerencia de EFE por cumpleaños y selección manual, portada de comunidad y configuración de todas las preguntas desde Administración.
+- `tests/community-profiles.sql` se ejecuta dentro de una transacción revertida. Verifica el bloqueo de permisos y lecturas antes de completar el perfil, validación del servidor, configuración de obligatoriedad, EFE sin conceder permisos de staff, protección de datos ya registrados y revisión de vinculaciones sin perder respuestas ni historial.
+- Los campos comunes están visibles y son obligatorios por defecto. Administración puede cambiar etiquetas, opciones, visibilidad y obligatoriedad, y agregar preguntas. Cambiar un campo a obligatorio vuelve a pedirlo a quienes todavía no lo completaron.
+- La agenda de comunidad muestra solo eventos confirmados o en curso que Organización haya marcado como visibles para la comunidad. Administración publica las novedades. No se comparten detalles operativos de los eventos.
+- El navegador Chromium local no pudo iniciarse por restricciones del entorno. La verificación en navegador remoto no incluye un inicio real por Google ni una prueba en un teléfono físico.
