@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const PUBLIC_KEY='BF3EVnNKTFBmSHImqA-PpYPylaHMG9L-A-gomiSB20084j_mNWWAT_Gm282-ovE5fXBN6fkPT_QyuXSx4H8r1hI';
-const ICON='/icons/icon.svg',BADGE='/icons/notification-badge.svg';
+const ICON='/icons/icon-192.png',BADGE='/icons/notification-badge.png';
 function keyBytes(base64){const pad='='.repeat((4-base64.length%4)%4),raw=atob((base64+pad).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)))}
 async function registration(){if(!('serviceWorker'in navigator))throw new Error('Este navegador no admite notificaciones en segundo plano.');await navigator.serviceWorker.register('/sw.js',{scope:'/'});return navigator.serviceWorker.ready}
 async function subscription(){

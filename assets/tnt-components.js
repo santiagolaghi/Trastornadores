@@ -26,7 +26,10 @@
     edit:'m16 3 5 5-12 12-6 1 1-6L16 3Zm-2 2 5 5',
     alert:'m12 3 10 18H2L12 3Zm0 6v5m0 3v.01',
     logout:'M9 4H3v16h6m6-13 5 5-5 5M8 12h12',
-    lock:'M5 10h14v11H5V10Zm3 0V6a4 4 0 0 1 8 0v4m-4 5v2'
+    lock:'M5 10h14v11H5V10Zm3 0V6a4 4 0 0 1 8 0v4m-4 5v2',
+    help:'M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4m0 3v.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
+    undo:'m8 4-5 5 5 5M3 9h11a6 6 0 0 1 0 12h-3',
+    doublecheck:'m1 12 4 4L15 6m-5 10 4 4L24 10'
   };
   function icon(name, cls='') { return `<svg class="tnt-icon ${esc(cls)}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name] || paths.calendar}"/></svg>`; }
   function safeUrl(value) { if(!String(value || '').trim())return '';try { const u = new URL(value, root.location?.origin || 'https://tnt.invalid'); return ['http:','https:'].includes(u.protocol) ? u.href : ''; } catch { return ''; } }

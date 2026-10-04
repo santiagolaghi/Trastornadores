@@ -1,7 +1,7 @@
 // Bump this whenever the shell or a module changes. Older caches are removed
 // during activate so a phone cannot keep rendering a previous TNT build.
-const CACHE='tnt-v52-modules-audit';
-const CORE=['/','/index.html','/manifest.webmanifest','/icons/icon.svg','/icons/notification-badge.svg','/supabase-lite.js?v=12','/assets/tnt-ui.css?v=35','/assets/tnt-components.js?v=37','/assets/tnt-core.js?v=48','/assets/tnt-module-theme.css?v=10','/assets/tnt-push.js?v=2','/organizacion/','/campamento/','/campamento/inscripcion/','/glosario/','/asistencia/','/lista-sabados/','/efe/','/buffet/','/chat/','/admin/','/perfiles/'];
+const CACHE='tnt-v53-team-experience';
+const CORE=['/','/index.html','/manifest.webmanifest','/icons/icon-192.png','/icons/notification-badge.png','/icons/icon-512.png','/icons/icon-maskable-512.png','/icons/dynamite.svg','/assets/tnt-experience.js?v=1','/assets/tnt-experience.css?v=1','/assets/tnt-notifications.js?v=1','/supabase-lite.js?v=12','/assets/tnt-ui.css?v=36','/assets/tnt-components.js?v=39','/assets/tnt-core.js?v=50','/assets/tnt-module-theme.css?v=10','/assets/tnt-push.js?v=2','/organizacion/','/campamento/','/campamento/inscripcion/','/glosario/','/asistencia/','/lista-sabados/','/efe/','/buffet/','/chat/','/admin/','/perfiles/'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).catch(()=>{}).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE&&/^(tnt-|perfiles-)/.test(k)).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{
@@ -24,8 +24,8 @@ self.addEventListener('push',e=>{
   const url=d.url||'/';
   const opts={
     body:d.body||'Tenés una novedad en TNT.',
-    icon:d.icon||'/icons/icon.svg',
-    badge:d.badge||'/icons/notification-badge.svg',
+    icon:d.icon||'/icons/icon-192.png',
+    badge:d.badge||'/icons/notification-badge.png',
     tag:d.tag||('tnt-'+Date.now()),
     data:{url},
     vibrate:[90,45,90],

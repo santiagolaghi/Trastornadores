@@ -2,7 +2,7 @@
 'use strict';
 const U=TNTUI,sb=TNT.sb,E=U.esc,app=document.getElementById('attendance-app');
 const qs=new URLSearchParams(location.search);
-const S={mode:qs.get('mode')||'',people:[],groups:[],members:[],saturdayMembers:[],events:[],meetings:[],attendance:[],followups:[],audit:[],group:null,date:'',tab:'attendance',query:'',filter:'all',loading:false,busy:new Set(),deck:null};
+const S={mode:qs.get('mode')||'',people:[],accounts:[],groups:[],members:[],saturdayMembers:[],events:[],meetings:[],attendance:[],followups:[],audit:[],group:null,date:'',tab:'attendance',query:'',filter:'all',loading:false,busy:new Set(),deck:null};
 const labels={present:'Presente',absent:'Ausente',pending:'Sin registrar'};
 const followLabels={pending:'Pendiente',contacted:'Le hablé',waiting:'Esperando respuesta',talking:'Conversando',no_response:'No respondió',resolved:'Cerrado'};
 const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
@@ -57,14 +57,15 @@ function modeAllowed(mode){
 async function loadBase(){
  await TNT.ready;
  if(!TNT.identity){location.replace('/?login=1&next='+encodeURIComponent('/asistencia/'+location.search));return}
- const [people,groups,members,saturdayMembers,events]=await Promise.all([
+ const [people,groups,members,saturdayMembers,events,accounts]=await Promise.all([
    checked(sb.from('tnt_people').select('*').order('full_name')),
    checked(sb.from('tnt_efe_groups').select('*').order('name')),
    checked(sb.from('tnt_efe_memberships').select('*')),
    checked(sb.from('tnt_saturday_members').select('*')),
    checked(sb.from('tnt_events').select('*').eq('kind','saturday').order('start_date'))
- ]);
- S.people=people;S.groups=groups;S.members=members;S.saturdayMembers=saturdayMembers;S.events=events;
+ ,
+  checked(sb.from('tnt_accounts').select('person_id,avatar_url,nickname'))]);
+ S.accounts=accounts;S.people=people;S.groups=groups;S.members=members;S.saturdayMembers=saturdayMembers;S.events=events;
  if(!S.mode||!['efe','sabados'].includes(S.mode)||!modeAllowed(S.mode))S.mode=modeAllowed('efe')?'efe':modeAllowed('sabados')?'sabados':'';
  if(!S.mode){renderNoAccess();return}
  if(S.mode==='efe'){
@@ -231,7 +232,7 @@ function renderDeck(){
  if(!p){const host=document.createElement('div');host.className='deck-screen';host.innerHTML='<div class="deck-finish"><div>✓</div><h2>Lista terminada</h2><p>Los cambios quedaron guardados en TNT.</p><button id="deckDone">Ver resumen</button></div>';document.body.append(host);host.querySelector('#deckDone').onclick=()=>{host.remove();S.deck=null;render()};return}
  const old=document.querySelector('.deck-screen');old?.remove();
  const host=document.createElement('div');host.className='deck-screen '+S.mode;const st=status(p.id),pct=Math.round(d.index/d.queue.length*100);
- host.innerHTML=`<header class="deck-head"><button id="deckClose">×</button><div><b>${S.mode==='efe'?E(group()?.name):'Sábado TNT'}</b><small>${d.index+1} de ${d.queue.length}</small></div><button id="deckUndo" ${!d.history.length?'disabled':''}>↶</button></header><div class="deck-bar"><i style="width:${pct}%"></i></div><main class="deck-stage"><article class="swipe-card" id="swipeCard"><div><div class="big-avatar">${initials(p.full_name)}</div><h2>${E(p.full_name)}</h2><div class="person-tags"><span>${age(p)??'—'} años</span>${S.mode==='efe'?'<span>'+E(membership(p.id)?.leader_name||'Sin responsable')+'</span>':''}${st!=='pending'?'<span>Antes: '+E(labels[st])+'</span>':''}</div></div><footer><span>← faltó</span><b>${E(p.phone||'Sin teléfono')}</b><span>vino →</span></footer></article></main><div class="deck-buttons"><button class="deck-no" data-deck-answer="absent">← Faltó</button><button class="deck-yes" data-deck-answer="present">Vino →</button></div>`;
+ host.innerHTML=`<header class="deck-head"><button id="deckClose" aria-label="Salir del modo swipe">${U.icon('close')}</button><div><b>${S.mode==='efe'?E(group()?.name):'Sábado TNT'}</b><small>${d.index+1} de ${d.queue.length}</small></div><button aria-label="Deshacer última asistencia" id="deckUndo" ${!d.history.length?'disabled':''}>${U.icon('undo')}</button></header><div class="deck-bar"><i style="width:${pct}%"></i></div><main class="deck-stage"><article class="swipe-card" id="swipeCard"><div><div class="big-avatar">${U.avatar(p,S.accounts.find(a=>a.person_id===p.id)||{})}</div><span class="deck-person-kicker">CADA PERSONA CUENTA</span><h2>${E(p.full_name)}</h2><div class="person-tags"><span>${age(p)??'—'} años</span>${S.mode==='efe'?'<span>'+E(membership(p.id)?.leader_name||'Sin responsable')+'</span>':''}${st!=='pending'?'<span>Antes: '+E(labels[st])+'</span>':''}</div></div><footer><span>← faltó</span><b>${E(p.phone||'Sin teléfono')}</b><span>vino →</span></footer></article></main><div class="deck-buttons"><button class="deck-no" data-deck-answer="absent">← Faltó</button><button class="deck-yes" data-deck-answer="present">Vino →</button></div>`;
  document.body.append(host);
  host.querySelector('#deckClose').onclick=()=>{host.remove();S.deck=null;render()};
  host.querySelector('#deckUndo').onclick=async()=>{const h=d.history.at(-1);if(!h)return;const ok=await mark(h.id,h.prev);if(!ok)return;d.history.pop();d.index=Math.max(0,d.index-1);host.remove();renderDeck()};
@@ -350,4 +351,5 @@ function paintBirthdays(host){
  const rows=filteredRows(),month=new Date().getMonth()+1;host.innerHTML=`<div class="section-title"><div><span class="att-kicker">CUMPLEAÑOS</span><h3>Fechas de tu gente</h3></div></div><div class="people-list">${rows.map(p=>`<article class="person-row ${Number(p.birthday?.slice(5,7))===month?'birthday-now':''}"><div class="person-avatar">🎂</div><div class="person-copy"><b>${E(p.full_name)}</b><small>${U.date(p.birthday+'T12:00:00-03:00',{day:'numeric',month:'long'})}</small></div></article>`).join('')||'<div class="att-empty">No hay cumpleaños cargados.</div>'}</div>`;
 }
 loadBase().catch(e=>{console.error(e);app.innerHTML='<div class="tnt-error"><b>No pudimos cargar Asistencia TNT.</b><p>'+E(e.message)+'</p><button class="tnt-button" onclick="location.reload()">Reintentar</button></div>'});
+let attendanceLiveTimer;document.addEventListener('tnt:data',e=>{if(!(e.detail?.tables||[]).some(t=>t.startsWith('tnt_efe_')||t.startsWith('tnt_saturday_')||['tnt_people','tnt_accounts','tnt_events'].includes(t)))return;clearTimeout(attendanceLiveTimer);attendanceLiveTimer=setTimeout(async()=>{if(TNT.blocked||S.loading||S.busy.size)return;try{if(S.deck){S.accounts=await checked(sb.from('tnt_accounts').select('person_id,avatar_url,nickname'));await loadDate();}else if(!document.querySelector('dialog[open]')){const date=S.date,group=S.group;await loadBase();S.date=date;S.group=group;await loadDate();render();}}catch(e){console.warn('Attendance live update',e);}},150);});
 })();

@@ -46,11 +46,11 @@ button,input,textarea,select{font:inherit}.orb{position:fixed;border-radius:50%;
 @media(min-width:600px){.stats{grid-template-columns:repeat(4,1fr)}.book-grid{grid-template-columns:repeat(3,1fr)}.topics{grid-template-columns:repeat(3,1fr)}.groups{grid-template-columns:repeat(4,1fr)}.styles{grid-template-columns:repeat(4,1fr)}.library-filters{grid-template-columns:repeat(5,1fr)}.deep-grid{grid-template-columns:1fr 1fr}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
-<link rel="stylesheet" href="/assets/tnt-ui.css?v=36"><link rel="stylesheet" href="/assets/tnt-module-theme.css?v=15"><link rel="stylesheet" href="/assets/tnt-identity.css?v=1"></head>
+<link rel="stylesheet" href="/assets/tnt-ui.css?v=36"><link rel="stylesheet" href="/assets/tnt-module-theme.css?v=15"><link rel="stylesheet" href="/assets/tnt-identity.css?v=1"><link rel="stylesheet" href="/assets/tnt-experience.css?v=1"><link rel="apple-touch-icon" href="/icons/icon-192.png"></head>
 <body data-tnt-module="glosario" data-tnt-label="Prédicas & Glosario" data-build="v4-deep-20260906">
 <div class="orb orb-a"></div><div class="orb orb-b"></div>
 <div id="app" role="main"><div class="tnt-skeleton"><div><div class="tnt-loader"></div>Cargando prédicas y glosario…</div></div></div>
-<script src="/supabase-lite.js?v=12"></script><script src="/assets/tnt-components.js?v=38"></script><script src="/assets/tnt-profiles.js?v=1"></script><script src="/assets/tnt-editor.js?v=15"></script><script src="/assets/tnt-core.js?v=49" data-module="glosario" data-label="Prédicas & Glosario"></script>
+<script src="/supabase-lite.js?v=12"></script><script src="/assets/tnt-components.js?v=39"></script><script src="/assets/tnt-profiles.js?v=1"></script><script src="/assets/tnt-editor.js?v=15"></script><script src="/assets/tnt-experience.js?v=1"></script><script src="/assets/tnt-notifications.js?v=1"></script><script src="/assets/tnt-push.js?v=2"></script><script src="/assets/tnt-core.js?v=50" data-module="glosario" data-label="Prédicas & Glosario"></script>
 
 <script>
 
@@ -88,7 +88,7 @@ async function fetchAll(table,select,order){
   }
   return out;
 }
-async function load(){
+async function load({live=false}={}){
   try{
     let uid=S.session.user.id;
     let[p,t,st,l,bk,se]=await TNT.withTimeout(Promise.all([
@@ -102,7 +102,7 @@ async function load(){
     if(se.error)throw se.error;S.profile=p.data;S.topics=t.filter(x=>x.active!==false);S.stories=st;S.links=l;S.books=bk;S.sermons=se.data||[];
     render();
   }catch(e){
-    console.error('Glosario: error de carga',e);
+    console.error('Glosario: error de carga',e);if(live){TNTUI.toast('No se pudo actualizar la biblioteca: '+e.message,true);return;}
     $('#app').innerHTML=`<main class="page"><section class="card" role="alert"><h1>No pudimos cargar Prédicas y Glosario</h1><p>${esc(e.message||'Revisá la conexión e intentá nuevamente.')}</p><button class="btn primary" id="glosario-retry">Reintentar</button><a class="btn" href="/">Volver a TNT</a></section></main>`;
     $('#glosario-retry').onclick=load;
   }
@@ -314,6 +314,17 @@ function buildHtml(e){
 }
 function download(html,name){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));a.download=(name||'predica-tnt').replace(/[^a-z0-9áéíóúñ _-]/gi,'').trim().replace(/\s+/g,'-')+'.html';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),700)}
 
+let glossaryLiveTimer;
+document.addEventListener('tnt:data',event=>{
+ if(!(event.detail?.tables||[]).some(t=>['sermons','topics','sermon_files'].includes(t)))return;
+ clearTimeout(glossaryLiveTimer);glossaryLiveTimer=setTimeout(async()=>{
+  if(TNT.blocked||!S.session)return;
+  // El borrador sigue en pantalla mientras la biblioteca se actualiza.
+  const editing=S.tab==='create',draft=S.edit;
+  if(editing){try{const r=await db.from('sermons').select('*').order('updated_at',{ascending:false});if(!r.error)S.sermons=r.data||[];}catch{}S.edit=draft;}
+  else await load({live:true});
+ },180);
+});
 init();
 </script>
 </body></html>
