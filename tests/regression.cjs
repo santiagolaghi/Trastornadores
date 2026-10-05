@@ -1,5 +1,19 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');const {JSDOM,VirtualConsole}=require('jsdom');const root=path.resolve(__dirname,'..');
 
+test('Cambiar de módulo reutiliza los assets de esta versión; HTML y API siguen consultando la red',async()=>{
+ const listeners={},stores=new Map(),network=[];
+ const cache=name=>{if(!stores.has(name))stores.set(name,new Map());const rows=stores.get(name);return{match:async r=>rows.get(r.url)?.clone(),put:async(r,x)=>rows.set(r.url,x.clone())};};
+ const context=vm.createContext({URL,Date,JSON,location:{origin:'https://tnt.test'},self:{addEventListener:(name,fn)=>listeners[name]=fn},caches:{open:async name=>cache(name),match:async r=>{for(const rows of stores.values())if(rows.has(r.url))return rows.get(r.url).clone();}},fetch:async r=>{network.push(r.url);return new Response('desde la red');}});
+ vm.runInContext(fs.readFileSync(path.join(root,'sw.js'),'utf8'),context);
+ const current=vm.runInContext('CACHE',context),url='https://tnt.test/assets/tnt-design.css?v=1';
+ await cache('tnt-previous').put({url},new Response('versión vieja'));await cache(current).put({url},new Response('versión actual'));
+ const request=async(url,mode='cors')=>{let response;listeners.fetch({request:{url,method:'GET',mode},respondWith:p=>response=p});return response?await response:null;};
+ assert.equal(await (await request(url)).text(),'versión actual');assert.equal(network.length,0);
+ const newer='https://tnt.test/assets/tnt-design.css?v=2';assert.equal(await (await request(newer)).text(),'desde la red');await request(newer);assert.equal(network.filter(x=>x===newer).length,1);
+ await request('https://tnt.test/organizacion/','navigate');await request('https://tnt.test/organizacion/','navigate');assert.equal(network.filter(x=>x.endsWith('/organizacion/')).length,2);
+ assert.equal(await request('https://tnt.test/api/private'),null);assert.equal(await request('https://database.test/rest/v1/people'),null);
+});
+
 test('La foto Google se pide con resolución adecuada y recupera las iniciales si falla',async()=>{
  const a=await app('hub');try{
   const U=a.w.TNTUI,url='https://lh3.googleusercontent.com/a/photo=s96-c';

@@ -1,7 +1,7 @@
 // Bump this whenever the shell or a module changes. Older caches are removed
 // during activate so a phone cannot keep rendering a previous TNT build.
-const CACHE='tnt-v53-team-experience';
-const CORE=['/','/index.html','/manifest.webmanifest','/icons/icon-192.png','/icons/notification-badge.png','/icons/icon-512.png','/icons/icon-maskable-512.png','/icons/dynamite.svg','/assets/tnt-experience.js?v=1','/assets/tnt-experience.css?v=1','/assets/tnt-notifications.js?v=1','/supabase-lite.js?v=12','/assets/tnt-ui.css?v=36','/assets/tnt-components.js?v=39','/assets/tnt-core.js?v=50','/assets/tnt-module-theme.css?v=10','/assets/tnt-push.js?v=2','/organizacion/','/campamento/','/campamento/inscripcion/','/glosario/','/asistencia/','/lista-sabados/','/efe/','/buffet/','/chat/','/admin/','/perfiles/'];
+const CACHE='tnt-v54-neobrutal';
+const CORE=['/','/index.html','/manifest.webmanifest','/icons/icon.svg?v=2','/icons/icon-192.png?v=2','/icons/notification-badge.png','/icons/icon-512.png?v=2','/icons/icon-maskable-512.png?v=2','/icons/dynamite.svg','/assets/tnt-experience.js?v=2','/assets/tnt-experience.css?v=1','/assets/tnt-notifications.js?v=2','/supabase-lite.js?v=12','/supabase-lite.js?v=15','/assets/tnt-ui.css?v=37','/assets/tnt-design.css?v=1','/assets/fonts/inter.woff2','/assets/fonts/archivo-black.woff2','/assets/tnt-identity.css?v=1','/assets/tnt-components.js?v=40','/assets/tnt-core.js?v=51','/assets/tnt-module-theme.css?v=10','/assets/tnt-push.js?v=2','/organizacion/','/campamento/','/campamento/inscripcion/','/glosario/','/asistencia/','/lista-sabados/','/efe/','/buffet/','/chat/','/admin/','/perfiles/'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).catch(()=>{}).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE&&/^(tnt-|perfiles-)/.test(k)).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{
@@ -12,7 +12,16 @@ self.addEventListener('fetch',e=>{
     e.respondWith(fetch(r).then(x=>{const c=x.clone();caches.open(CACHE).then(k=>k.put(r,c));return x}).catch(()=>caches.match(r).then(x=>x||caches.match('/index.html'))));
     return;
   }
-  if(/\.(?:js|css|html)$/.test(u.pathname)||r.url.includes('?v=')){
+  // Versioned assets belong to this build. Reuse them immediately on every
+  // module; HTML remains network-first and introduces the next asset versions.
+  if(u.searchParams.has('v')&&(/^\/(?:assets|icons)\//.test(u.pathname)||u.pathname==='/supabase-lite.js')){
+    e.respondWith(caches.open(CACHE).then(async cache=>{
+      const hit=await cache.match(r);if(hit)return hit;
+      const fresh=await fetch(r);if(fresh.ok)await cache.put(r,fresh.clone());return fresh;
+    }));
+    return;
+  }
+  if(/\.(?:js|css|html)$/.test(u.pathname)){
     e.respondWith(fetch(r).then(x=>{const y=x.clone();caches.open(CACHE).then(k=>k.put(r,y));return x}).catch(()=>caches.match(r)));
     return;
   }

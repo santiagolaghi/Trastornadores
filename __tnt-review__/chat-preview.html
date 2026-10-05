@@ -29,6 +29,7 @@ document.body.classList.add('tnt-access-ready');TNT.setTheme('dark');window.TNT.
 if(!location.pathname.includes('/hub')){document.body.classList.add('tnt-shell-active');document.body.insertAdjacentHTML('beforeend',`<header id="tnt-shell"><a class="tnt-shell-home" href="/__preview__/hub">${U.icon('home')}</a><div class="tnt-shell-brand"><b>TNT</b><small>Demostración · datos de prueba</small></div><button class="tnt-shell-icon" onclick="TNT.toggleTheme()" aria-label="Cambiar tema">${U.icon('sun')}</button><span class="tnt-shell-user">${U.avatar(people[0],accounts[0])}Nora</span></header>`);}
 })();
 </script><script>
+(()=>{
 window.TNT.module=document.body.dataset.tntModule||'';window.TNT.blocked=false;
 window.supabase={createClient:()=>TNT.sb};TNT.sheet=TNTUI.modal;TNT.sb.removeChannel=()=>{};
 const db=window.__fixtureDB,pid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0'),date=TNTUI.dateKey();
@@ -46,6 +47,7 @@ db.tnt_camp_settings=[{camp_id:pid(300),form_open:true}];
 db.tnt_products=[{id:pid(400),name:'Agua mineral',emoji:'💧',active:true},{id:pid(401),name:'Alfajor',emoji:'🍫',active:true},{id:pid(402),name:'Sandwich',emoji:'🥪',active:true}];
 db.tnt_shifts=[{id:pid(410),shift_date:date,status:'open'}];db.tnt_menu_items=db.tnt_products.map((p,i)=>({id:pid(420+i),shift_id:pid(410),product_id:p.id,price:1000+i*1000,remaining_qty:20-i*4,active:true,tnt_products:p}));
 db.tnt_home_news=[{id:pid(430),title:'Tus ideas tienen lugar.',body:'Este sábado nos encontramos para compartir, crear y servir juntos. Traé tus ganas de ser parte.',active:true,published:true,audience:'all',created_at:date+'T12:00:00Z'}];
+db.tnt_settings=[{key:'community_news',value:db.tnt_home_news}];
 db.tnt_experience=[{id:true,revision:0,config:{}}];
 const rpc=TNT.sb.rpc;TNT.sb.rpc=async(n,args)=>n==='tnt_community_home'?{data:{efe:{code:'mujeres18',name:'EFE Mujeres +18',leader_name:'Equipo TNT'},events:db.tnt_events,news:db.tnt_home_news,notes:[]},error:null}:n==='tnt_mark_attendance'?{data:null,error:null}:rpc(n,args);
 if(document.body.dataset.tntShell==='off'){document.getElementById('tnt-shell')?.remove();document.body.classList.remove('tnt-shell-active');}
@@ -53,4 +55,5 @@ else {const shell=document.getElementById('tnt-shell');if(shell){shell.innerHTML
 localStorage.setItem('tnt_role','cashier');localStorage.setItem('tnt_name','Nora');TNT.setTheme('light');
 for(const id of ['home','organizacion','chat','asistencia','perfiles','campamento','glosario','buffet','admin'])localStorage.setItem('tnt-tutorial:'+TNT.person.id+':'+id+':2',JSON.stringify({done:true}));
 setTimeout(()=>document.dispatchEvent(new CustomEvent('tnt:ready')),200);
+})();
 </script><script src="/assets/tnt-editor.js?v=21"></script><script src="/assets/tnt-experience.js?v=2"></script><script src="/assets/tnt-notifications.js?v=2"></script><script src="/assets/tnt-push.js?v=2"></script><script src="/chat/app.js?v=39"></script><button onclick="TNTExperience.startTutorial(TNT.module||'home')" style="position:fixed;top:2px;right:2px;z-index:99999;font:10px system-ui;background:#fff;color:#111;border:1px solid #111;padding:4px">Probar tutorial · datos de demostración</button></body></html>
