@@ -33,6 +33,7 @@ if(!location.pathname.includes('/hub')){document.body.classList.add('tnt-shell-a
 (()=>{
 window.TNT.module=document.body.dataset.tntModule||'';window.TNT.blocked=false;
 window.supabase={createClient:()=>TNT.sb};TNT.sheet=TNTUI.modal;TNT.sb.removeChannel=()=>{};
+TNT.profileContext={settings:TNTProfiles.config(),values:{interests:['Música','Dibujar','Bailar'],dreams:'Crear, compartir y acompañar a otras personas.'},groups:[]};
 const db=window.__fixtureDB,pid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0'),date=TNTUI.dateKey();
 const portraits=['https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=512&auto=format&fit=crop&q=85','https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=512&auto=format&fit=crop&q=85'];
 db.tnt_accounts.forEach((a,i)=>a.avatar_url=i===4?'':portraits[i%2]);
