@@ -3,6 +3,7 @@ const {test}=require('node:test');const assert=require('node:assert/strict');con
 test('La foto Google se pide con resolución adecuada y recupera las iniciales si falla',async()=>{
  const a=await app('hub');try{
   const U=a.w.TNTUI,url='https://lh3.googleusercontent.com/a/photo=s96-c';
+  assert.equal(a.w.TNTExperience.image(''),'');assert.equal(a.w.TNTExperience.image('   '),'');assert.equal(a.d.querySelector('.tnt-space-cover'),null);assert.equal(a.d.querySelector('.tnt-cover-hero'),null);
   const portrait=U.avatar({id:'photo',full_name:'Persona registrada'},{avatar_url:url},'portrait');
   const el=a.d.createElement('div');el.innerHTML=portrait;a.d.body.append(el);
   assert.equal(el.querySelector('img').getAttribute('src'),'https://lh3.googleusercontent.com/a/photo=s512-c');
@@ -55,6 +56,19 @@ test('Perfiles une las fotos de las cuentas con los registros y abre el resultad
 function swipeFixture(w){
  w.__fixtureDB.tnt_saturday_members=w.__fixtureDB.tnt_people.map(p=>({person_id:p.id,active:true}));w.__fixtureDB.tnt_saturday_attendance=[];
 }
+test('Agregar desde Perfiles a un EFE muestra la foto de una cuenta que ya se registró',async()=>{
+ const a=await inlinePage('asistencia/index.html',w=>{
+  w.TNT.grants=[{module:'efe',scope:'varones',access_level:'manage',enabled:true}];
+  w.TNT.account.avatar_url='https://lh3.googleusercontent.com/a/nora=s96-c';
+  w.__fixtureDB.tnt_efe_groups=[{id:'photo-group',code:'varones',name:'EFE Varones',active:true}];
+  w.__fixtureDB.tnt_efe_memberships=[{person_id:w.__fixtureDB.tnt_people[1].id,group_id:'photo-group',active:true}];
+  w.__fixtureDB.tnt_efe_meetings=[{id:'photo-meeting',group_id:'photo-group',meeting_date:w.TNTUI.dateKey(),active:true,title:'Miércoles EFE'}];
+ });try{
+  a.w.eval(fs.readFileSync(path.join(root,'assets/tnt-attendance.js'),'utf8'));await until(()=>a.d.querySelector('[data-tab=people]'));
+  a.d.querySelector('[data-tab=people]').click();a.d.querySelector('#addRosterPerson').click();
+  const photo=a.d.querySelector('[data-profile-pick="'+a.w.TNT.person.id+'"] img');assert(photo);assert.equal(photo.getAttribute('src'),'https://lh3.googleusercontent.com/a/nora=s128-c');assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
 test('El swipe avanza mientras guarda y Deshacer conserva el orden de las operaciones',async()=>{
  let finishFirst,finishUndo;const calls=[];
  const a=await inlinePage('asistencia/index.html',w=>{

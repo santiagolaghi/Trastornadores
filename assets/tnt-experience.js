@@ -15,7 +15,7 @@
  E.module=id=>({enabled:true,...(config().modules?.[canonical(id)]||{})});
  E.enabled=id=>E.module(id).enabled!==false;
  E.text=(id,fallback)=>config().copy?.[id]??fallback;
- E.image=url=>{try{const u=new URL(url,location.origin);return ['https:','http:'].includes(u.protocol)&&(u.protocol==='https:'||u.origin===location.origin)?u.href:'';}catch{return '';}};
+ E.image=url=>{if(!String(url||'').trim())return '';try{const u=new URL(String(url).trim(),location.origin);return ['https:','http:'].includes(u.protocol)&&(u.protocol==='https:'||u.origin===location.origin)?u.href:'';}catch{return '';}};
  E.logo=(animated=false)=>`<span class="tnt-dynamite ${animated?'is-burning':''}" aria-hidden="true"><img src="/icons/dynamite.svg" alt=""><i class="tnt-fuse-spark"></i></span>`;
  E.loader=(label='Encendiendo TNT…')=>`<div class="tnt-ignition" role="status">${E.logo(true)}<span>${esc(label)}</span></div>`;
  E.load=async sb=>{const r=await sb.from('tnt_experience').select('config,revision').eq('id',true).maybeSingle();if(r.error)throw r.error;E.config=r.data?.config||{};E.revision=Number(r.data?.revision||0);E.paint();return E.config;};

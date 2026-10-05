@@ -43,6 +43,9 @@ body .tnt-shell-home{width:46px;min-width:46px;min-height:46px;background:var(--
 #tnt-account-menu{border:1.5px solid var(--tnt-line);border-radius:18px;box-shadow:5px 5px 0 var(--tnt-edge);background:var(--tnt-panel);width:min(420px,calc(100vw - 24px))}
 .tnt-menu-actions{gap:10px}.tnt-menu-actions button{border:1.5px solid var(--tnt-line);border-radius:12px;font-size:15px;min-height:48px;background:var(--tnt-panel2);color:var(--tnt-text)}
 /* Home: an expressive cover and a tactile deck of spaces. */
+body .hub-greeting:not(.tnt-cover-hero)::before,body .community-hero:not(.tnt-cover-hero)::before{display:none!important}
+body .tnt-cover-hero{background-image:var(--home-cover)!important;background-size:cover!important;background-position:center!important}
+body .tnt-cover-hero :is(h1,h1 em,h1 small,p){color:#fff!important}
 body .hub{max-width:1280px;padding:24px 28px 120px!important;animation:none}
 body .hub-top{margin-bottom:28px;gap:10px;align-items:center;min-height:50px}
 body .hub-brand{display:flex;gap:10px;align-items:center;text-decoration:none;color:var(--tnt-text);font:400 clamp(16px,2.2vw,23px)/1.1 var(--tnt-display);letter-spacing:-.05em;min-width:0;flex:none}

@@ -94,7 +94,7 @@ function decorateHome(staff){
  const next=staff?upcoming()[0]:state.community?.events?.[0],title=next?.name||'Un lugar para tus ideas.';
  const art='<div class="tnt-hero-art" aria-hidden="true"><div class="tnt-orbit-grid"></div><span class="tnt-star">✦</span><div class="tnt-hero-sticker"><span>TNT EN MOVIMIENTO</span><b>'+U.esc(title)+'</b><small>'+(next?U.esc(U.date(next.start_date,{day:'numeric',month:'long'})):'FE · COMUNIDAD · PROPÓSITO')+'</small></div><span class="tnt-hero-spark">✳</span></div>';
  hero.querySelector('.community-brand-art')?.remove();hero.insertAdjacentHTML('beforeend',art);
- const cover=E.image(cfg.cover||'');if(cover){hero.classList.add('tnt-cover-hero');hero.style.backgroundImage='url('+JSON.stringify(cover)+')';}
+ const cover=E.image(cfg.cover||'');if(cover){hero.classList.add('tnt-cover-hero');hero.style.setProperty('--home-cover','url('+JSON.stringify(cover)+')');}
  hero.insertAdjacentHTML('afterend',featuredNews(staff));
  }
  app.querySelector('.community-grid>.community-news')?.remove();
