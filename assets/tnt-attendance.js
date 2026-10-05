@@ -2,7 +2,7 @@
 'use strict';
 const U=TNTUI,sb=TNT.sb,E=U.esc,app=document.getElementById('attendance-app');
 const qs=new URLSearchParams(location.search);
-const S={mode:qs.get('mode')||'',people:[],accounts:[],groups:[],members:[],saturdayMembers:[],events:[],meetings:[],attendance:[],followups:[],audit:[],group:null,date:'',tab:'attendance',query:'',filter:'all',loading:false,busy:new Set(),deck:null};
+const S={mode:qs.get('mode')||'',people:[],accounts:[],groups:[],members:[],saturdayMembers:[],events:[],meetings:[],attendance:[],followups:[],audit:[],group:null,date:'',tab:'attendance',query:'',filter:'all',loading:false,busy:new Set(),writes:new Map(),failed:new Map(),deck:null};
 const labels={present:'Presente',absent:'Ausente',pending:'Sin registrar'};
 const followLabels={pending:'Pendiente',contacted:'Le hablé',waiting:'Esperando respuesta',talking:'Conversando',no_response:'No respondió',resolved:'Cerrado'};
 const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
@@ -107,7 +107,7 @@ function topShell(inner){
  <header class="attendance-top">
    <a href="/" class="att-back" aria-label="Volver">←</a>
    <div><span class="att-kicker">ASISTENCIA TNT</span><h1>Seguimiento de personas</h1></div>
-   <a href="/perfiles/datos/" class="att-profile-link" ${canProfiles()?'':'hidden'}>Perfiles</a>
+   <div class="attendance-top-actions"><button type="button" class="tnt-icon-button" id="att-tutorial" aria-label="Tutorial de Asistencia">${U.icon('help')}</button><button type="button" class="att-account" id="att-account" aria-label="Mi perfil">${U.avatar(TNT.person,TNT.account)}</button><a href="/perfiles/datos/" class="att-profile-link" ${canProfiles()?'':'hidden'}>Perfiles</a></div>
  </header>
  <nav class="mode-switch" aria-label="Submódulo">
    <button class="mode-card efe ${S.mode==='efe'?'on':''}" data-mode="efe" ${modeAllowed('efe')?'':'disabled'}><span>MIÉRCOLES</span><b>EFE</b><small>Grupos + seguimiento</small></button>
@@ -125,7 +125,7 @@ function render(){
    <div class="hero-copy"><span class="context-pill">${S.mode==='efe'?'Encuentro EFE':'Encuentro general'}</span><h2>${E(context)}</h2><p>${S.mode==='efe'?'Acompañamiento, asistencia y contacto.':'Solo quienes forman parte de la lista de Sábados.'}</p></div>
    <div class="hero-progress" style="--p:${pct}"><b>${pct}%</b><small>registrado</small></div>
  </section>
- <section class="date-panel">
+ ${saveStatusHtml()}<section class="date-panel">
    ${S.mode==='efe'?groupChooser():''}
    <label><span>${S.mode==='efe'?'Encuentro':'Sábado'}</span>${S.mode==='efe'?`<select id="att-efe-meeting">${efeMeetingOptions()}</select>`:dateOptions.length?`<select id="att-event">${dateOptions.map(e=>`<option value="${e.start_date}" ${e.start_date===S.date?'selected':''}>${E(e.name)} · ${U.date(e.start_date+'T12:00:00-03:00',{day:'numeric',month:'short'})}</option>`).join('')}</select>`:`<input id="att-date" type="date" value="${S.date}">`}</label>
  </section>
@@ -145,7 +145,7 @@ function render(){
  <nav class="attendance-tabs">${tabs().map(([id,label])=>`<button data-tab="${id}" class="${S.tab===id?'on':''}">${label}</button>`).join('')}</nav>
  <div class="attendance-toolbar"><input id="att-search" type="search" placeholder="Buscar persona..." value="${E(S.query)}"><label class="sr-only" for="att-filter">Estado de asistencia</label><select id="att-filter" aria-label="Estado de asistencia"><option value="all">Todos</option>${Object.entries(labels).map(([k,v])=>`<option value="${k}" ${S.filter===k?'selected':''}>${v}</option>`).join('')}</select></div>
  <section id="attendanceContent"></section>`);
- bindBase();paintContent();
+ bindBase();paintContent();app.querySelector('[data-save-retry]')?.addEventListener('click',retryMarks);
 }
 function groupChooser(){
  const allowed=S.groups.filter(g=>has('efe',g.code));
@@ -158,6 +158,8 @@ function tabs(){
  out.push(['birthdays','Cumpleaños']);return out;
 }
 function bindBase(){
+ app.querySelector('#att-tutorial')?.addEventListener('click',()=>TNTExperience.startTutorial('asistencia'));
+ app.querySelector('#att-account')?.addEventListener('click',()=>TNT.editProfile());
  app.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
  app.querySelector('#att-group')?.addEventListener('change',async e=>{S.group=e.target.value;S.tab='attendance';S.date=latestWednesday();const url=new URL(location.href);url.searchParams.set('group',group()?.code||'');url.searchParams.delete('date');history.replaceState(null,'',url);await loadMeetings();await loadDate();render()});
  app.querySelector('#att-efe-meeting')?.addEventListener('change',async e=>{S.date=e.target.value;const url=new URL(location.href);url.searchParams.set('date',S.date);history.replaceState(null,'',url);await loadDate();render()});
@@ -198,7 +200,7 @@ function paintContent(){
 function attendanceRow(p){
  const st=status(p.id),a=age(p),m=membership(p.id);
  return `<article class="person-row status-${st}">
-  <div class="person-avatar">${initials(p.full_name)}</div>
+  <div class="person-avatar">${U.avatar(p,S.accounts.find(a=>a.person_id===p.id)||{})}</div>
   <div class="person-copy"><b>${E(p.full_name)}</b><small>${a===null?'Edad sin cargar':a+' años'}${S.mode==='efe'?' · '+E(m?.leader_name?'Resp. '+m.leader_name:'Sin responsable'):''}</small></div>
   <div class="status-actions">
    <button data-status="absent" data-person="${p.id}" class="no" aria-pressed="${st==='absent'}" ${!can('attendance')?'disabled':''}>Faltó</button>
@@ -206,49 +208,70 @@ function attendanceRow(p){
   </div>
  </article>`;
 }
-async function mark(id,value){
- if(!can('attendance')||S.busy.has(id))return false;S.busy.add(id);
- const old=status(id);const idx=S.attendance.findIndex(a=>a.person_id===id);
- if(idx>=0)S.attendance[idx]={...S.attendance[idx],status:value};else S.attendance.push({person_id:id,status:value});
- paintContent();
- const r=await sb.rpc('tnt_mark_attendance',{p_mode:S.mode,p_person:id,p_date:S.date,p_status:value,p_group:S.mode==='efe'?S.group:null});
- if(r.error){
-   if(idx>=0)S.attendance[idx].status=old;else S.attendance=S.attendance.filter(a=>a.person_id!==id);
-   U.toast(r.error.message,true);S.busy.delete(id);paintContent();return false;
- }
- if(can('history'))await loadAuditOnly();
- S.busy.delete(id);paintContent();return true;
+
+function markContext(){return {mode:S.mode,date:S.date,group:S.mode==='efe'?S.group:null};}
+const sameContext=c=>c.mode===S.mode&&c.date===S.date&&c.group===(S.mode==='efe'?S.group:null);
+function localMark(id,value){const index=S.attendance.findIndex(a=>a.person_id===id);if(index>=0)S.attendance[index]={...S.attendance[index],status:value};else S.attendance.push({person_id:id,status:value});}
+let auditTimer;
+function saveStatusHtml(){const failed=[...S.failed.values()];return failed.length?'<div class="attendance-save-status" role="alert"><span>'+failed.length+' '+(failed.length===1?'marca pendiente de guardar':'marcas pendientes de guardar')+'. Revisá la conexión.</span><button class="tnt-button" data-save-retry>Reintentar guardado</button></div>':'';}
+function retryMarks(){for(const record of [...S.failed.values()])queueMark(record.id,record.desired,record.context);}
+function paintDeckSync(){const pending=S.busy.size,failed=S.failed.size;document.querySelectorAll('[data-deck-sync]').forEach(el=>{el.innerHTML=failed?'<span>'+failed+' '+(failed===1?'marca no se pudo guardar':'marcas no se pudieron guardar')+'.</span> <button data-save-retry>Reintentar</button>':pending?'Guardando '+pending+' '+(pending===1?'marca…':'marcas…'):'Todo guardado';el.classList.toggle('has-error',!!failed);el.querySelector('[data-save-retry]')?.addEventListener('click',retryMarks);});const end=document.querySelector('.deck-finish h2');if(end)end.textContent=failed?'Revisá el guardado':pending?'Terminaste de pasar lista':'Lista terminada';}
+function queueMark(id,value,context=markContext()){
+ const key=[context.mode,context.group||'',context.date,id].join(':');
+ let record=S.writes.get(key);if(!record){record={key,id,context,version:0,confirmed:sameContext(context)?status(id):'pending',tail:Promise.resolve()};S.writes.set(key,record);}
+ const version=++record.version;record.desired=value;S.failed.delete(key);S.busy.add(key);
+ if(sameContext(context))localMark(id,value);
+ if(!S.deck)paintContent();paintDeckSync();
+ const saving=record.tail.then(async()=>{
+  try{const r=await sb.rpc('tnt_mark_attendance',{p_mode:context.mode,p_person:id,p_date:context.date,p_status:value,p_group:context.group});if(r.error)throw r.error;record.confirmed=value;if(version===record.version)S.failed.delete(key);return true;}
+  catch(error){if(version===record.version){S.failed.set(key,record);if(sameContext(context))localMark(id,record.confirmed);U.toast('No se guardó la asistencia de '+person(id).full_name+'. Podés reintentar.',true);}console.warn('TNT attendance save',error);return false;}
+  finally{if(version===record.version){S.busy.delete(key);if(!S.deck){render();}paintDeckSync();if(!S.busy.size&&can('history')){clearTimeout(auditTimer);auditTimer=setTimeout(()=>loadAuditOnly().catch(e=>console.warn('TNT attendance history',e)),250);}}}
+ });
+ record.tail=saving;return saving;
 }
+async function mark(id,value){
+ if(!can('attendance'))return false;
+ const context=markContext(),key=[context.mode,context.group||'',context.date,id].join(':');if(S.busy.has(key))return false;
+ return queueMark(id,value,context);
+}
+
 async function loadAuditOnly(){
  let q=sb.from('tnt_attendance_audit').select('*').eq('mode',S.mode).eq('attendance_date',S.date).order('created_at',{ascending:false}).limit(120);
  if(S.mode==='efe')q=q.eq('group_id',S.group);const r=await q;if(!r.error)S.audit=r.data||[];
 }
 function startDeck(){
  const rows=eligiblePeople(),pending=rows.filter(p=>status(p.id)==='pending'),marked=rows.filter(p=>status(p.id)!=='pending');
- S.deck={queue:[...pending,...marked],index:0,history:[],original:new Map(rows.map(p=>[p.id,status(p.id)]))};renderDeck();
+ S.deck={id:crypto.randomUUID(),preloaded:new Set(),queue:[...pending,...marked],index:0,history:[],original:new Map(rows.map(p=>[p.id,status(p.id)]))};renderDeck();
 }
 function renderDeck(){
  const d=S.deck,p=d?.queue[d.index];if(!d)return render();
- if(!p){const host=document.createElement('div');host.className='deck-screen';host.innerHTML='<div class="deck-finish"><div>✓</div><h2>Lista terminada</h2><p>Los cambios quedaron guardados en TNT.</p><button id="deckDone">Ver resumen</button></div>';document.body.append(host);host.querySelector('#deckDone').onclick=()=>{host.remove();S.deck=null;render()};return}
+ document.querySelector('.deck-screen')?.remove();
+ if(!p){const host=document.createElement('div');host.className='deck-screen';host.innerHTML='<div class="deck-finish"><div>✓</div><h2>Lista terminada</h2><p>Revisá el estado de guardado antes de salir.</p><div data-deck-sync role="status" aria-live="polite"></div><button id="deckDone">Ver resumen</button></div>';document.body.append(host);host.querySelector('#deckDone').onclick=()=>{host.remove();S.deck=null;render()};paintDeckSync();return}
  const old=document.querySelector('.deck-screen');old?.remove();
  const host=document.createElement('div');host.className='deck-screen '+S.mode;const st=status(p.id),pct=Math.round(d.index/d.queue.length*100);
- host.innerHTML=`<header class="deck-head"><button id="deckClose" aria-label="Salir del modo swipe">${U.icon('close')}</button><div><b>${S.mode==='efe'?E(group()?.name):'Sábado TNT'}</b><small>${d.index+1} de ${d.queue.length}</small></div><button aria-label="Deshacer última asistencia" id="deckUndo" ${!d.history.length?'disabled':''}>${U.icon('undo')}</button></header><div class="deck-bar"><i style="width:${pct}%"></i></div><main class="deck-stage"><article class="swipe-card" id="swipeCard"><div><div class="big-avatar">${U.avatar(p,S.accounts.find(a=>a.person_id===p.id)||{})}</div><span class="deck-person-kicker">CADA PERSONA CUENTA</span><h2>${E(p.full_name)}</h2><div class="person-tags"><span>${age(p)??'—'} años</span>${S.mode==='efe'?'<span>'+E(membership(p.id)?.leader_name||'Sin responsable')+'</span>':''}${st!=='pending'?'<span>Antes: '+E(labels[st])+'</span>':''}</div></div><footer><span>← faltó</span><b>${E(p.phone||'Sin teléfono')}</b><span>vino →</span></footer></article></main><div class="deck-buttons"><button class="deck-no" data-deck-answer="absent">← Faltó</button><button class="deck-yes" data-deck-answer="present">Vino →</button></div>`;
- document.body.append(host);
+ host.innerHTML=`<header class="deck-head"><button id="deckClose" aria-label="Salir del modo swipe">${U.icon('close')}</button><div><b>${S.mode==='efe'?E(group()?.name):'Sábado TNT'}</b><small>${d.index+1} de ${d.queue.length}</small></div><button aria-label="Deshacer última asistencia" id="deckUndo" ${!d.history.length?'disabled':''}>${U.icon('undo')}</button></header><div class="deck-bar"><i style="width:${pct}%"></i></div><main class="deck-stage"><article class="swipe-card" id="swipeCard"><div><div class="big-avatar">${U.avatar(p,S.accounts.find(a=>a.person_id===p.id)||{},'portrait')}</div><span class="deck-person-kicker">CADA PERSONA CUENTA</span><h2>${E(p.full_name)}</h2><div class="person-tags"><span>${age(p)??'—'} años</span>${S.mode==='efe'?'<span>'+E(membership(p.id)?.leader_name||'Sin responsable')+'</span>':''}${st!=='pending'?'<span>Antes: '+E(labels[st])+'</span>':''}</div></div><footer><span>← faltó</span><b>${E(p.phone||'Sin teléfono')}</b><span>vino →</span></footer></article></main><div class="deck-sync" data-deck-sync role="status" aria-live="polite"></div><div class="deck-buttons"><button class="deck-no" data-deck-answer="absent">← Faltó</button><button class="deck-yes" data-deck-answer="present">Vino →</button></div>`;
+ host.dataset.deckId=d.id;
+ document.body.append(host);paintDeckSync();
+ for(const next of d.queue.slice(d.index,d.index+3)){const a=S.accounts.find(a=>a.person_id===next.id)||{};const url=U.photoUrl(a.avatar_url||next.avatar_url,512);if(url&&!d.preloaded.has(url)){d.preloaded.add(url);const img=new Image();img.referrerPolicy='no-referrer';img.src=url;}}
  host.querySelector('#deckClose').onclick=()=>{host.remove();S.deck=null;render()};
- host.querySelector('#deckUndo').onclick=async()=>{const h=d.history.at(-1);if(!h)return;const ok=await mark(h.id,h.prev);if(!ok)return;d.history.pop();d.index=Math.max(0,d.index-1);host.remove();renderDeck()};
+ host.querySelector('#deckUndo').onclick=()=>{if(!host.isConnected)return;const h=d.history.pop();if(!h)return;queueMark(h.id,h.prev);d.index=Math.max(0,d.index-1);host.remove();renderDeck()};
  host.querySelectorAll('[data-deck-answer]').forEach(b=>b.onclick=()=>answerDeck(p,b.dataset.deckAnswer,host));
  bindSwipe(host.querySelector('#swipeCard'),p,host);
 }
-async function answerDeck(p,value,host){
- const prev=status(p.id),ok=await mark(p.id,value);if(!ok)return;
- S.deck.history.push({id:p.id,prev});S.deck.index++;host.remove();renderDeck();
+
+function answerDeck(p,value,host){
+ const d=S.deck;if(!d||!host.isConnected||host.dataset.answered||d.queue[d.index]?.id!==p.id||!can('attendance'))return;
+ host.dataset.answered='true';const prev=status(p.id);queueMark(p.id,value);d.history.push({id:p.id,prev});d.index++;host.remove();renderDeck();
 }
 function bindSwipe(card,p,host){
- let sx=0,x=0,drag=false;card.onpointerdown=e=>{drag=true;sx=e.clientX;card.setPointerCapture(e.pointerId)};
- card.onpointermove=e=>{if(!drag)return;x=e.clientX-sx;card.style.transform=`translate3d(${x}px,0,0) rotate(${x/28}deg)`;card.dataset.dir=x>0?'yes':'no'};
- const end=()=>{if(!drag)return;drag=false;if(Math.abs(x)>72)answerDeck(p,x>0?'present':'absent',host);else{card.style.transform='';delete card.dataset.dir}x=0};
- card.onpointerup=end;card.onpointercancel=end;
+ let sx=0,sy=0,x=0,drag=false,raf=0;card.style.touchAction='pan-y';
+ card.onpointerdown=e=>{if(e.pointerType==='mouse'&&e.button!==0)return;drag=true;x=0;sx=e.clientX;sy=e.clientY;card.setPointerCapture?.(e.pointerId);};
+ card.onpointermove=e=>{if(!drag)return;x=e.clientX-sx;if(Math.abs(e.clientY-sy)>Math.abs(x)+12){cancel();return;}cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>{card.style.transform='translate3d('+x+'px,0,0) rotate('+x/38+'deg)';card.dataset.dir=x>0?'yes':'no';});};
+ function cancel(){drag=false;cancelAnimationFrame(raf);card.style.transform='';delete card.dataset.dir;x=0;}
+ card.onpointerup=()=>{if(!drag)return;const direction=x;cancel();if(Math.abs(direction)>38)answerDeck(p,direction>0?'present':'absent',host);};
+ card.onpointercancel=cancel;
 }
+
 async function copyAttendance(kind){
  const rows=eligiblePeople().filter(p=>kind==='all'||status(p.id)===kind);
  const title=S.mode==='efe'?(group()?.name||'EFE'):'Sábado TNT';
@@ -263,7 +286,7 @@ function paintPeople(host){
  const rows=filteredRows(),isEfe=S.mode==='efe',canEdit=can('edit_people');
  const add=canEdit?`<button class="section-action" id="addRosterPerson">+ Agregar desde Perfiles</button>`:'';
  const context=isEfe?(group()?.name||'este EFE'):'Sábados';
- host.innerHTML=`<div class="section-title"><div><span class="att-kicker">INTEGRANTES</span><h3>${rows.length} personas</h3><p class="section-note">Solo aparecen quienes pertenecen a ${E(context)}. Perfiles sigue siendo la base central: quitar a alguien de acá no borra su perfil ni su historial.</p></div>${add}</div><div class="people-list">${rows.map(p=>`<article class="person-row"><div class="person-avatar">${initials(p.full_name)}</div><div class="person-copy"><b>${E(p.full_name)}</b><small>${E(p.phone||'Sin teléfono')} · ${E(p.instagram||'Sin Instagram')}${isEfe?' · '+E(membership(p.id)?.leader_name||'Sin responsable'):''}</small></div>${canEdit?`<div class="member-actions">${isEfe?`<button class="mini-action" data-member-edit="${p.id}">Responsable</button>`:''}<button class="mini-action danger" data-member-remove="${p.id}">Quitar</button></div>`:canProfiles()?`<a class="mini-action" href="/perfiles/datos/">Perfil</a>`:''}</article>`).join('')||'<div class="att-empty">Todavía no hay integrantes cargados acá.</div>'}</div>`;
+ host.innerHTML=`<div class="section-title"><div><span class="att-kicker">INTEGRANTES</span><h3>${rows.length} personas</h3><p class="section-note">Solo aparecen quienes pertenecen a ${E(context)}. Perfiles sigue siendo la base central: quitar a alguien de acá no borra su perfil ni su historial.</p></div>${add}</div><div class="people-list">${rows.map(p=>`<article class="person-row"><div class="person-avatar">${U.avatar(p,S.accounts.find(a=>a.person_id===p.id)||{})}</div><div class="person-copy"><b>${E(p.full_name)}</b><small>${E(p.phone||'Sin teléfono')} · ${E(p.instagram||'Sin Instagram')}${isEfe?' · '+E(membership(p.id)?.leader_name||'Sin responsable'):''}</small></div>${canEdit?`<div class="member-actions">${isEfe?`<button class="mini-action" data-member-edit="${p.id}">Responsable</button>`:''}<button class="mini-action danger" data-member-remove="${p.id}">Quitar</button></div>`:canProfiles()?`<a class="mini-action" href="/perfiles/datos/">Perfil</a>`:''}</article>`).join('')||'<div class="att-empty">Todavía no hay integrantes cargados acá.</div>'}</div>`;
  host.querySelector('#addRosterPerson')?.addEventListener('click',addRosterPersonModal);
  host.querySelectorAll('[data-member-edit]').forEach(b=>b.onclick=()=>editMembershipModal(b.dataset.memberEdit));
  host.querySelectorAll('[data-member-remove]').forEach(b=>b.onclick=()=>isEfe?removeEfeMember(b.dataset.memberRemove):removeSaturdayMember(b.dataset.memberRemove));
@@ -275,7 +298,7 @@ function addRosterPersonModal(){
  const paint=()=>{const q=norm(o.querySelector('#profilePickSearch').value),rows=available.filter(p=>!q||norm(p.full_name+' '+(p.phone||'')+' '+(p.instagram||'')).includes(q));o.querySelector('#profilePicker').innerHTML=rows.map(p=>profilePickRow(p)).join('')||'<div class="att-empty">No hay más perfiles para agregar.</div>';o.querySelectorAll('[data-profile-pick]').forEach(b=>b.onclick=()=>isEfe?saveMembership(b.dataset.profilePick,true,'',o):saveSaturdayMembership(b.dataset.profilePick,true,o))};
  o.querySelector('#profilePickSearch').oninput=paint;paint();
 }
-function profilePickRow(p){return `<button class="profile-pick" data-profile-pick="${p.id}"><span class="person-avatar">${initials(p.full_name)}</span><span><b>${E(p.full_name)}</b><small>${E(p.phone||'Sin teléfono')}</small></span><i>＋</i></button>`}
+function profilePickRow(p){return `<button class="profile-pick" data-profile-pick="${p.id}"><span class="person-avatar">${U.avatar(p,S.accounts.find(a=>a.person_id===p.id)||{})}</span><span><b>${E(p.full_name)}</b><small>${E(p.phone||'Sin teléfono')}</small></span><i>＋</i></button>`}
 function editMembershipModal(id){
  const p=person(id),m=membership(id),o=U.modal('Integrante EFE',`<form class="tnt-form"><p><b>${E(p.full_name)}</b><br><small>Los datos personales se editan en Perfiles.</small></p><label>Responsable de acompañamiento<input name="leader" value="${E(m?.leader_name||'')}"></label><div class="tnt-actions"><button class="tnt-button primary" type="submit">Guardar</button><button class="tnt-button danger" type="button" id="removeMember">Quitar de este EFE</button></div><p role="alert"></p></form>`);
  o.querySelector('form').onsubmit=async e=>{e.preventDefault();await saveMembership(id,true,e.target.elements.leader.value,o)};
@@ -335,7 +358,7 @@ async function resetEfeList(){
  await loadDate();render();U.toast('Lista reseteada');
 }
 function paintFollowups(host){
- const rows=filteredRows();host.innerHTML=`<div class="section-title"><div><span class="att-kicker">AUSENTES</span><h3>Seguimiento del miércoles</h3></div></div><div class="people-list">${rows.map(p=>{const f=S.followups.find(x=>x.person_id===p.id),wa=phoneUrl(p);return`<article class="follow-row"><div class="person-avatar">${initials(p.full_name)}</div><div><b>${E(p.full_name)}</b><small>${E(followLabels[f?.status]||'Pendiente')} · ${E(f?.note||'Sin nota')}</small></div><div class="follow-actions">${wa?`<button data-wa="${wa}">WhatsApp</button>`:''}<button data-follow="${p.id}">Seguimiento</button></div></article>`}).join('')||'<div class="att-empty">No hay ausentes para seguir.</div>'}</div>`;
+ const rows=filteredRows();host.innerHTML=`<div class="section-title"><div><span class="att-kicker">AUSENTES</span><h3>Seguimiento del miércoles</h3></div></div><div class="people-list">${rows.map(p=>{const f=S.followups.find(x=>x.person_id===p.id),wa=phoneUrl(p);return`<article class="follow-row"><div class="person-avatar">${U.avatar(p,S.accounts.find(a=>a.person_id===p.id)||{})}</div><div><b>${E(p.full_name)}</b><small>${E(followLabels[f?.status]||'Pendiente')} · ${E(f?.note||'Sin nota')}</small></div><div class="follow-actions">${wa?`<button data-wa="${wa}">WhatsApp</button>`:''}<button data-follow="${p.id}">Seguimiento</button></div></article>`}).join('')||'<div class="att-empty">No hay ausentes para seguir.</div>'}</div>`;
  host.querySelectorAll('[data-wa]').forEach(b=>b.onclick=()=>window.open(b.dataset.wa,'_blank','noopener'));
  host.querySelectorAll('[data-follow]').forEach(b=>b.onclick=()=>followModal(b.dataset.follow));
 }
@@ -350,6 +373,7 @@ function paintHistory(host){
 function paintBirthdays(host){
  const rows=filteredRows(),month=new Date().getMonth()+1;host.innerHTML=`<div class="section-title"><div><span class="att-kicker">CUMPLEAÑOS</span><h3>Fechas de tu gente</h3></div></div><div class="people-list">${rows.map(p=>`<article class="person-row ${Number(p.birthday?.slice(5,7))===month?'birthday-now':''}"><div class="person-avatar">🎂</div><div class="person-copy"><b>${E(p.full_name)}</b><small>${U.date(p.birthday+'T12:00:00-03:00',{day:'numeric',month:'long'})}</small></div></article>`).join('')||'<div class="att-empty">No hay cumpleaños cargados.</div>'}</div>`;
 }
+window.addEventListener('beforeunload',e=>{if(S.busy.size||S.failed.size){e.preventDefault();e.returnValue='';}});
 loadBase().catch(e=>{console.error(e);app.innerHTML='<div class="tnt-error"><b>No pudimos cargar Asistencia TNT.</b><p>'+E(e.message)+'</p><button class="tnt-button" onclick="location.reload()">Reintentar</button></div>'});
-let attendanceLiveTimer;document.addEventListener('tnt:data',e=>{if(!(e.detail?.tables||[]).some(t=>t.startsWith('tnt_efe_')||t.startsWith('tnt_saturday_')||['tnt_people','tnt_accounts','tnt_events'].includes(t)))return;clearTimeout(attendanceLiveTimer);attendanceLiveTimer=setTimeout(async()=>{if(TNT.blocked||S.loading||S.busy.size)return;try{if(S.deck){S.accounts=await checked(sb.from('tnt_accounts').select('person_id,avatar_url,nickname'));await loadDate();}else if(!document.querySelector('dialog[open]')){const date=S.date,group=S.group;await loadBase();S.date=date;S.group=group;await loadDate();render();}}catch(e){console.warn('Attendance live update',e);}},150);});
+let attendanceLiveTimer;document.addEventListener('tnt:data',e=>{if(!(e.detail?.tables||[]).some(t=>t.startsWith('tnt_efe_')||t.startsWith('tnt_saturday_')||['tnt_people','tnt_accounts','tnt_events'].includes(t)))return;clearTimeout(attendanceLiveTimer);attendanceLiveTimer=setTimeout(async()=>{if(TNT.blocked||S.loading||S.busy.size)return;try{if(S.deck){S.accounts=await checked(sb.from('tnt_accounts').select('person_id,avatar_url,nickname'));}else if(!document.querySelector('dialog[open]')){const date=S.date,group=S.group;await loadBase();S.date=date;S.group=group;await loadDate();render();}}catch(e){console.warn('Attendance live update',e);}},150);});
 })();

@@ -1,7 +1,7 @@
 /* Shared TNT configuration, visual editing, tutorials and live updates. */
 (() => {
  'use strict';
- const E=window.TNTExperience={revision:0,config:{},draft:null,editing:false}, moduleId=()=>canonical(window.TNT?.module||'home');
+ const E=window.TNTExperience={revision:0,config:{},draft:null,editing:false}, moduleId=()=>canonical(window.TNT?.module||document.body.dataset.tntSurface||'home');
  const canonical=id=>['efe','lista-sabados'].includes(id)?'asistencia':id;
  const esc=s=>window.TNTUI.esc(s), clone=x=>JSON.parse(JSON.stringify(x)), emit=(name,detail)=>document.dispatchEvent(new CustomEvent(name,{detail}));
  const MODULES=E.modules=[
@@ -15,14 +15,14 @@
  E.module=id=>({enabled:true,...(config().modules?.[canonical(id)]||{})});
  E.enabled=id=>E.module(id).enabled!==false;
  E.text=(id,fallback)=>config().copy?.[id]??fallback;
- E.image=url=>{try{const u=new URL(url,location.origin);return ['https:','http:'].includes(u.protocol)&&(u.protocol==='https:'||u.origin===location.origin)?u.href:'';}catch{return '';}};
+ E.image=url=>{if(!String(url||'').trim())return '';try{const u=new URL(String(url).trim(),location.origin);return ['https:','http:'].includes(u.protocol)&&(u.protocol==='https:'||u.origin===location.origin)?u.href:'';}catch{return '';}};
  E.logo=(animated=false)=>`<span class="tnt-dynamite ${animated?'is-burning':''}" aria-hidden="true"><img src="/icons/dynamite.svg" alt=""><i class="tnt-fuse-spark"></i></span>`;
  E.loader=(label='Encendiendo TNT…')=>`<div class="tnt-ignition" role="status">${E.logo(true)}<span>${esc(label)}</span></div>`;
  E.load=async sb=>{const r=await sb.from('tnt_experience').select('config,revision').eq('id',true).maybeSingle();if(r.error)throw r.error;E.config=r.data?.config||{};E.revision=Number(r.data?.revision||0);E.paint();return E.config;};
  E.paint=()=>{
   const c=config(),m=E.module(moduleId()),accent=m.accent||c.brand?.accent||'#ff7948';
   if(/^#[\da-f]{6}$/i.test(accent)){document.documentElement.style.setProperty('--tnt-accent',accent);document.documentElement.style.setProperty('--tnt-focus',accent);}
-  const shell=document.querySelector('.tnt-shell-brand b');if(shell&&m.title)shell.textContent=m.title;applyCopy();paintCover(); document.body.dataset.tntEditing=String(E.editing);
+  const shell=document.querySelector('.tnt-shell-brand b');if(shell&&m.title)shell.textContent=m.title;applyCopy(true);paintCover(); document.body.dataset.tntEditing=String(E.editing);
  };
  function paintCover(){
   const id=moduleId(),m=E.module(id),url=E.image(m.cover||''),existing=document.getElementById('tnt-module-cover');
@@ -70,7 +70,7 @@
  function eligible(el){if(el?.hasAttribute('data-tnt-copy')&&!el.closest('[data-tnt-record],#tnt-studio-toolbar,#tnt-copy-editor,#tnt-module-config'))return true;return el&&!el.closest(exclude)&&!el.closest('#tnt-module-config')&&el.matches('h1,h2,h3,label,button,a.tnt-button,a.btn,summary,legend,.tnt-empty,.empty,.tnt-error,.tiny,.meta,p,[data-tnt-copy]');}
  function usable(text){const s=text.trim();return s.length>=2&&s.length<=1500&&!/https?:|@|\d{5,}|^[\d\W]+$/.test(s)&&(!window.TNT?.identity||![TNT.displayName(),TNT.identity.email].some(x=>x&&s.includes(x)));}
  function textNodes(el){const result=[],walk=document.createTreeWalker(el,4);let node;while(node=walk.nextNode())if(!node.parentElement.closest('svg,script,style,input,textarea,[data-tnt-record]'))result.push(node);return result;}
- function applyCopy(){if(applying)return;applying=true;try{
+ function applyCopy(force=false){if(applying||(!force&&!E.editing&&!Object.keys(config().copy||{}).length))return;applying=true;try{
   const roots=document.querySelectorAll('h1,h2,h3,label,button,a.tnt-button,a.btn,summary,legend,.tnt-empty,.empty,.tnt-error,p,[data-tnt-copy]');
   for(const el of roots){if(!eligible(el))continue;for(const node of textNodes(el)){const before=originals.get(node)||node.nodeValue;if(!usable(before))continue;originals.set(node,before);const name=el.dataset.tntCopy||copyKey(before.trim()),value=config().copy?.[name];const next=value===undefined?before:before.match(/^\s*/)[0]+value+before.match(/\s*$/)[0];if(node.nodeValue!==next)node.nodeValue=next;}}
   document.querySelectorAll('input[placeholder],textarea[placeholder]').forEach(el=>{if(el.closest('#tnt-module-config,#tnt-copy-editor'))return;const before=attributes.get(el)||el.placeholder;attributes.set(el,before);const next=config().copy?.[copyKey('placeholder:'+before)]??before;if(el.placeholder!==next)el.placeholder=next;});
@@ -95,31 +95,376 @@
   o.querySelector('form').onsubmit=async event=>{event.preventDefault();E.draft.copy||={};E.draft.copy[id]=o.querySelector('textarea').value.trim();E.paint();await TNTUI.closeModal(o);};
  },true);
  const TUTORIALS=E.tutorials={
-  admin:[['Tu equipo','Administración reúne personas, roles, accesos, solicitudes y la historia de los cambios.','.hero'],['Personas y permisos','Elegí una persona para ver sus accesos heredados y sus excepciones. Un permiso para Organización se aplica a los encuentros que coordina.','[data-tab=users]'],['Solicitudes','Revisá las solicitudes de staff y los cambios de perfil. La vinculación de Google requiere verificar la identidad antes de unir historiales.','[data-tab=requests]'],['Configuración por módulo','Desde Configuración abrís Estudio TNT. Podés pausar espacios, elegir portadas y colores, y cambiar los textos y tutoriales.','[data-tab=settings]'],['Borradores y publicación','Modo desarrollo guarda los cambios como borrador. Vista previa te deja recorrer la app; Publicar los aplica para el equipo. Podés recuperar una versión anterior.','[data-tab=settings]'],['Auditoría','Los cambios de accesos y configuración conservan quién los realizó y cuándo.','[data-tab=audit]']],
-  home:[['Tu comunidad','Esta es la portada de TNT. Las novedades importantes aparecen primero, seguidas por lo que viene y tus responsabilidades.','.hub-greeting,.community-hero'],['Novedades','Los anuncios publicados por el equipo se ven acá. Abrilos para conocer el detalle y la acción propuesta.','.tnt-home-news'],['Tu próximo encuentro','Acá encontrás fecha, lugar y personas responsables. Si sos parte del staff podés ir al cronograma.','.hub-upnext,.community-calendar'],['Tus espacios','Los módulos que ves dependen de tus permisos y de lo que TNT tenga habilitado.','.module-grid,.community-shortcuts'],['Tu cuenta','Desde tu foto podés cambiar tus datos, ver tu EFE y configurar las notificaciones en el teléfono.','#account']],
-  organizacion:[['Organización','Este espacio reúne los encuentros, el cronograma y las responsabilidades de cada persona.','.hero,.org-hero,.page'],['Elegí un sábado','Tocá un sábado para entrar directamente en su cronograma. Dentro de la agenda podés pasar al anterior o al siguiente.','[data-event-open],[data-view="saturdays"]'],['Cronograma visual','Cronograma rápido muestra los horarios, los detalles y quién se encarga de cada actividad. No crea actividades automáticamente.','[data-build-schedule],[data-action="schedule"]'],['Actividades','Usá Nueva actividad para cargar una actividad desde cero. Guardar y agregar otra permite seguir sin salir del formulario.','[data-action="new-task"],[data-action="add-task"]'],['Deslizá para actuar','Deslizá una actividad hacia la izquierda para ver Editar y Eliminar. También podés usar su botón de opciones.','.agenda-card,.task-card'],['Tu responsabilidad','Confirmá una asignación, pedí un cambio o actualizá el avance de tus propias actividades. Un permiso de edición solo permite gestionar encuentros que coordinás.','[data-view="my"],.nav'],['Trabajá en equipo','El chat del encuentro reúne al equipo. Si ya existe, el botón abre esa conversación.','[data-action="event-chat"],.page']],
-  chat:[['Conversaciones','La lista muestra los chats de los encuentros y de los grupos a los que pertenecés.','#chat-threads'],['Abrí un chat','Tocá una conversación para ver mensajes. El contador indica los mensajes que todavía no leíste.','.chat-thread,#chat-search'],['El equipo','La cabecera muestra quién participa. La foto de cada persona viene de su perfil de TNT.','#chat-team,#chat-room-head'],['Escribí y respondé','Podés escribir, adjuntar archivos o grabar un audio. Usá Responder para mantener el contexto.','#chat-composer,#chat-send'],['A quién llega','Un mensaje puede ir al grupo o a las personas elegidas cuando la conversación lo permite. Revisá el destino antes de enviarlo.','#chat-audience,#chat-room-head'],['Administrar conversaciones','Los controles de crear y gestionar dependen de tus permisos. Un chat de sábado se crea una sola vez; después se abre el existente.','#new-chat'],['Avisos en tu teléfono','Activá las notificaciones desde tu cuenta. Solo recibís mensajes de las conversaciones a las que pertenecés.','.chat-list,.chat-sidebar']],
-  asistencia:[['Cada persona cuenta','Elegí el espacio de asistencia: EFE o sábados. Los grupos disponibles dependen de tu acceso.','.page,.container,main'],['Elegí fecha y grupo','Seleccioná la reunión correcta antes de comenzar. Las personas se toman de Perfiles y de su EFE.','select,[type="date"]'],['Marcá asistencia','En el modo swipe, deslizá o usá Faltó y Vino. La tarjeta muestra la foto y el nombre de la persona.','[data-swipe],.swipe-card,main'],['Corregí un registro','Usá Deshacer para corregir la última marca. Revisá el resumen antes de terminar.','main'],['Seguimiento','Consultá el historial para acompañar a cada persona. No hace falta crear otro perfil si ya existe.','main']],
-  perfiles:[['Una persona, una historia','Esta es la base central de TNT. Buscá primero para evitar duplicados.','#search,.toolbar,main'],['Datos e intereses','El perfil reúne los datos personales, sus intereses, estudios, sueños y EFE. Los campos obligatorios se configuran en Administración.','main'],['Foto y cuenta','Cuando la persona ingresa con Google se conserva su foto y se vincula a su perfil confirmado.','main'],['Archivar','Archivar conserva la historia de una persona que ya no participa. Podés restaurarla después.','main'],['Duplicados','Eliminar un perfil lo lleva a Papelera. Revisá su identidad y su historia antes de borrar un duplicado.','main']],
-  campamento:[['Todo el campamento','Elegí una edición para trabajar con inscripciones, pagos y logística.','main'],['Inscripciones','Las personas completan el formulario de la edición. Revisá los datos pendientes y confirmá cada inscripción.','main'],['Pagos','Cada cobro queda registrado con fecha y responsable. Una anulación conserva el historial.','main'],['Logística','Organizá transporte, habitaciones y equipos usando los datos confirmados.','main'],['Comunicaciones','Elegí destinatarios y revisá la vista previa antes de enviar un aviso.','main'],['Accesos','Cada acción depende de tus permisos para esa edición. Las acciones que no tenés habilitadas permanecen protegidas.','main']],
-  glosario:[['Ideas que nos acompañan','Buscá prédicas y recursos por título, tema o palabra.','main'],['Abrí un recurso','Cada recurso conserva su contenido y archivos. Podés volver a consultarlo cuando lo necesites.','main'],['Crear y editar','Si tu permiso lo permite, agregá contenidos con un título claro y los archivos correspondientes.','main']],
-  buffet:[['Todo listo para servir','Este espacio organiza productos, existencias y ventas.','main'],['Registrar una venta','Seleccioná los productos y revisá cantidad e importe antes de guardar.','main'],['Existencias','Los movimientos de stock ayudan a saber qué falta. Gestionarlos requiere el permiso correspondiente.','main'],['Cierre y seguimiento','Revisá los movimientos y la caja antes de cerrar la jornada.','main']]
+ "admin": [
+  [
+   "Tu equipo",
+   "Acá gestionás personas, roles, accesos y solicitudes. Cada cambio queda registrado.",
+   ".hero h1"
+  ],
+  [
+   "Personas y permisos",
+   "Elegí una persona para revisar su rol, los permisos heredados y las excepciones. Editar un sábado también requiere coordinar ese encuentro.",
+   "[data-tab=users]",
+   "[data-tab=users]"
+  ],
+  [
+   "Solicitudes",
+   "Revisá los pedidos pendientes y verificá la identidad antes de vincular una cuenta de Google con un perfil existente.",
+   "[data-tab=requests]",
+   "[data-tab=requests]"
+  ],
+  [
+   "Configuración por módulo",
+   "Desde Configuración abrís Estudio TNT: módulos habilitados, portadas, colores, textos y tutoriales.",
+   "[data-tab=settings]",
+   "[data-tab=settings]"
+  ],
+  [
+   "Borradores y publicación",
+   "Editar en la pantalla abre el modo desarrollo. Guardar conserva el borrador; Publicar lo aplica al equipo. Podés recuperar versiones anteriores.",
+   "[data-tab=settings]"
+  ],
+  [
+   "Auditoría",
+   "Consultá quién cambió un permiso o una configuración y cuándo.",
+   "[data-tab=audit]",
+   "[data-tab=audit]"
+  ]
+ ],
+ "home": [
+  [
+   "Tu comunidad",
+   "Esta es la portada de TNT. Las novedades, los próximos encuentros y tus responsabilidades tienen su lugar.",
+   ".hub-greeting,.community-hero"
+  ],
+  [
+   "Novedades",
+   "Los anuncios publicados por el equipo aparecen acá. Abrilos para conocer los detalles.",
+   ".tnt-home-news"
+  ],
+  [
+   "Tu próximo encuentro",
+   "Encontrá la fecha, el lugar y el equipo responsable. El staff puede ir al cronograma.",
+   ".hub-upnext,.community-calendar"
+  ],
+  [
+   "Tus espacios",
+   "Deslizá las tarjetas o usá las flechas para recorrer los módulos que tenés habilitados.",
+   "[data-spaces-heading],.community-shortcuts"
+  ],
+  [
+   "Tu cuenta",
+   "Desde tu foto podés editar tus datos, ver tu participación, cambiar el tema y volver a iniciar estos tutoriales.",
+   "#account"
+  ]
+ ],
+ "organizacion": [
+  [
+   "Organización",
+   "Encuentros, actividades y responsabilidades, en un mismo espacio.",
+   ".org-heading"
+  ],
+  [
+   "Elegí un sábado",
+   "Tocá un sábado para abrir su cronograma. Podés pasar al anterior o al siguiente dentro de la agenda.",
+   ".saturday-card,.saturday-list",
+   "[data-view=saturdays]"
+  ],
+  [
+   "Cronograma visual",
+   "Cronograma rápido muestra horarios, detalles y responsables. Elegí un encuentro para ver su programa.",
+   "[data-quick-schedule]"
+  ],
+  [
+   "Actividades",
+   "Cada tarjeta abre un encuentro con sus actividades. Podés cargar una desde cero y guardar otra sin salir del formulario.",
+   ".encounter-card,.activity-tools",
+   "[data-view=activities]"
+  ],
+  [
+   "Deslizá para actuar",
+   "Dentro del cronograma, deslizá una actividad para editarla o eliminarla. También tenés un botón de opciones.",
+   ".encounter-card,.activity-tools"
+  ],
+  [
+   "Tu responsabilidad",
+   "Acá aparecen tus asignaciones. Confirmalas, pedí un cambio y actualizá el avance.",
+   ".my-summary",
+   "[data-view=my]"
+  ],
+  [
+   "Trabajá en equipo",
+   "Chat abre la conversación del encuentro. Los accesos siguen los permisos y la participación de cada persona.",
+   "[data-open-chat]"
+  ]
+ ],
+ "chat": [
+  [
+   "Conversaciones",
+   "Tus chats de encuentros y equipos aparecen en esta lista.",
+   "#chat-threads"
+  ],
+  [
+   "Abrí un chat",
+   "Tocá una conversación para leer los mensajes. El contador muestra los que todavía no leíste.",
+   ".chat-thread,#chat-search"
+  ],
+  [
+   "El equipo",
+   "Las fotos vienen de los perfiles de TNT. En la cabecera de un chat podés consultar sus participantes.",
+   "#chat-room-head,#chat-team"
+  ],
+  [
+   "Escribí y respondé",
+   "Escribí, adjuntá archivos o grabá un audio. Responder conserva el contexto del mensaje.",
+   "#chat-composer"
+  ],
+  [
+   "A quién llega",
+   "Revisá el destino antes de enviar. Algunas conversaciones permiten elegir personas dentro del equipo.",
+   "#chat-audience,#chat-room-head"
+  ],
+  [
+   "Administrar conversaciones",
+   "Crear y gestionar depende de tus permisos. Si el chat de un sábado ya existe, se abre esa conversación.",
+   "#new-chat"
+  ],
+  [
+   "Avisos en tu teléfono",
+   "Activá los avisos desde tu cuenta. También podés volver a estos tutoriales desde ahí.",
+   ".chat-title-row"
+  ]
+ ],
+ "asistencia": [
+  [
+   "Cada persona cuenta",
+   "Elegí EFE o sábados. Solo aparecen los espacios que tenés habilitados.",
+   ".mode-switch"
+  ],
+  [
+   "Elegí fecha y grupo",
+   "Revisá el grupo y la reunión antes de pasar lista. Las personas se toman de Perfiles.",
+   ".date-panel"
+  ],
+  [
+   "Marcá asistencia",
+   "Modo swipe muestra una persona por tarjeta, con su foto. Deslizá o tocá Faltó y Vino; el guardado se realiza mientras avanzás.",
+   ".take-attendance"
+  ],
+  [
+   "Corregí un registro",
+   "Usá la lista para corregir una marca. Dentro del swipe, Deshacer vuelve a la tarjeta anterior.",
+   ".person-row,.attendance-toolbar"
+  ],
+  [
+   "Seguimiento",
+   "Las pestañas permiten revisar integrantes, historial y seguimiento según tus permisos.",
+   ".attendance-tabs"
+  ]
+ ],
+ "perfiles": [
+  [
+   "Una persona, una historia",
+   "Buscá primero por nombre, apellido, teléfono o Instagram para evitar duplicados.",
+   "#searchInput"
+  ],
+  [
+   "Datos e intereses",
+   "Abrí una ficha para ver sus datos, intereses, estudios, sueños y EFE. Los campos obligatorios se configuran en Administración.",
+   ".person-card,.person-cell"
+  ],
+  [
+   "Foto y cuenta",
+   "Quienes ya tienen cuenta muestran su foto de perfil acá y en los selectores de otros módulos.",
+   ".person-card-head .tnt-person-avatar,.person-cell .tnt-person-avatar"
+  ],
+  [
+   "Archivar",
+   "Desde una ficha podés archivar a una persona y conservar su historia. Los filtros permiten encontrar los perfiles archivados.",
+   "#openFiltersBtn"
+  ],
+  [
+   "Duplicados",
+   "Revisá nombre y datos antes de eliminar un duplicado. Eliminar lo lleva a Papelera y permite restaurarlo.",
+   "#profileDuplicates,#openFiltersBtn"
+  ]
+ ],
+ "campamento": [
+  [
+   "Todo el campamento",
+   "Trabajá con una edición, sus inscripciones, pagos y logística.",
+   ".camp-head,.camp-empty-state"
+  ],
+  [
+   "Inscripciones",
+   "Revisá quiénes completaron el formulario y los datos pendientes de cada inscripción.",
+   ".camp-section-head",
+   "[data-main=registrations]"
+  ],
+  [
+   "Pagos",
+   "Cada cobro conserva la fecha y el responsable. Revisá el saldo antes de registrar un pago.",
+   ".camp-section-head",
+   "[data-main=payments]"
+  ],
+  [
+   "Logística",
+   "Organizá transporte, habitaciones y equipos con los datos confirmados.",
+   ".camp-section-head",
+   "[data-main=logistics]"
+  ],
+  [
+   "Comunicaciones y accesos",
+   "Más reúne otras herramientas. Cada acción depende de tus permisos para la edición.",
+   ".camp-section-head,[data-main=more]",
+   "[data-main=more]"
+  ]
+ ],
+ "glosario": [
+  [
+   "Ideas que nos acompañan",
+   "Buscá por tema, emoción, título o palabra para encontrar recursos.",
+   "#search"
+  ],
+  [
+   "Abrí un recurso",
+   "Las tarjetas abren el contenido, las referencias y los archivos del recurso.",
+   ".topic,.topic-card,.bookmap"
+  ],
+  [
+   "Tu biblioteca",
+   "Consultá las prédicas guardadas y publicadas desde Biblioteca.",
+   "[data-nav=library]",
+   "[data-nav=library]"
+  ],
+  [
+   "Crear y editar",
+   "Con el permiso correspondiente podés preparar una prédica, guardarla como borrador y publicarla cuando esté lista.",
+   "[data-nav=create]"
+  ]
+ ],
+ "buffet": [
+  [
+   "Todo listo para servir",
+   "Elegí la jornada antes de trabajar con productos, pedidos y caja.",
+   "#shift-history"
+  ],
+  [
+   "Registrar una venta",
+   "Tocá productos, revisá las cantidades y el importe, y recién después confirmá el cobro.",
+   ".product,.section-title,.hero",
+   "[data-tab=sale]"
+  ],
+  [
+   "Menú y existencias",
+   "En Menú configurás productos, precios y cantidades disponibles para esta jornada.",
+   "[data-tab=menu]",
+   "[data-tab=menu]"
+  ],
+  [
+   "Cierre y seguimiento",
+   "Caja reúne los movimientos del día. Revisalos antes de cerrar la jornada.",
+   ".stats,.hero,[data-tab=cash]",
+   "[data-tab=cash]"
+  ]
+ ]
+};
+ let tutorial,highlight,tourObserver,tourFrame=0,tourVersion=0,tourPadding='';
+ // Keep the callout separate from its target. Scrolling and resizing reuse the
+ // same placement calculation, including mobile safe areas and app navigation.
+ E.tourPlacement=(rect,panel,view)=>{
+  const gap=16,edge=12,top=view.top||12,bottom=view.height-(view.bottom||12),width=Math.min(panel.width,view.width-edge*2);
+  let x=Math.min(Math.max(edge,rect.left),view.width-width-edge),y;
+  if(view.width-rect.right>=width+gap+edge){x=rect.right+gap;y=Math.max(top,Math.min(rect.top,bottom-panel.height));}
+  else if(rect.bottom+gap+panel.height<=bottom)y=rect.bottom+gap;
+  else if(rect.top-gap-panel.height>=top)y=rect.top-gap-panel.height;
+  else y=bottom-panel.height;
+  return {x,y:Math.max(top,y),width,overlaps:y<rect.bottom&&y+panel.height>rect.top&&x<rect.right&&x+width>rect.left};
  };
- let tutorial,highlight;
- E.startTutorial=(id=moduleId(),first=false)=>{
-  if(!TNT.profileComplete||!TUTORIALS[id])return;finishTutorial(false);
-  let saved={};try{saved=JSON.parse(localStorage.getItem(key(id))||'{}');}catch{}
-  tutorial={id,step:saved.done?0:Math.min(saved.step||0,TUTORIALS[id].length-1),first};paintTutorial();
- };
- function finishTutorial(done){if(!tutorial)return;const t=tutorial;if(done)localStorage.setItem(key(t.id),JSON.stringify({done:true,step:t.step}));document.getElementById('tnt-tutorial')?.remove();highlight?.classList.remove('tnt-tutorial-highlight');highlight=null;tutorial=null;}
- function paintTutorial(){
-  highlight?.classList.remove('tnt-tutorial-highlight');const t=tutorial,steps=TUTORIALS[t.id],s=steps[t.step];
-  const selector=s[2];highlight=selector?document.querySelector(selector):null;highlight?.classList.add('tnt-tutorial-highlight');
-  const old=document.getElementById('tnt-tutorial');old?.remove();const d=document.createElement('aside');d.id='tnt-tutorial';d.setAttribute('role','dialog');d.setAttribute('aria-modal','false');d.setAttribute('aria-label','Tutorial de '+(MODULES.find(m=>m[0]===t.id)?.[1]||'TNT'));
-  d.innerHTML=`<header><span>CONOCÉ TNT · ${t.step+1} DE ${steps.length}</span><button data-skip aria-label="Omitir tutorial">${TNTUI.icon('close')}</button></header><progress value="${t.step+1}" max="${steps.length}"></progress><h2>${esc(E.text('tutorial.'+t.id+'.'+t.step+'.title',s[0]))}</h2><p>${esc(E.text('tutorial.'+t.id+'.'+t.step,s[1]))}</p><footer><button data-skip>Omitir</button><span></span>${t.step?'<button data-back>Anterior</button>':''}<button class="primary" data-next>${t.step===steps.length-1?'Listo':'Siguiente'} ${TNTUI.icon('arrow')}</button></footer>`;document.body.append(d);
-  localStorage.setItem(key(t.id),JSON.stringify({done:false,step:t.step}));d.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>finishTutorial(true));d.querySelector('[data-back]')?.addEventListener('click',()=>{t.step--;paintTutorial();});d.querySelector('[data-next]').onclick=()=>{if(t.step===steps.length-1)finishTutorial(true);else{t.step++;paintTutorial();}};
+ function tourSteps(id){
+  const steps=(TUTORIALS[id]||[]).map((x,i)=>Object.assign([...x],{copyIndex:i}));
+  if(id==='home'){
+   const modules=[...document.querySelectorAll('[data-space]')].map(el=>{
+    const id=el.dataset.space,def=MODULES.find(m=>m[0]===id);
+    return [el.querySelector('h3')?.textContent||def?.[1]||'Administración',def?.[2]||'Personas, accesos y configuración del equipo.', '[data-space="'+id+'"]'];
+   });
+   const idx=steps.findIndex(x=>x[0]==='Tus espacios');steps.splice(idx+1,0,...modules);
+  }
+  return steps;
  }
- function tools(){if(!TNT.identity||!TNT.profileComplete)return;document.getElementById('tnt-experience-tools')?.remove();const d=document.createElement('div');d.id='tnt-experience-tools';d.innerHTML=`<button data-tutorial aria-label="Tutorial de este espacio">${TNTUI.icon('help')}<span>Cómo se usa</span></button>${TNT.isAdmin?`<button data-studio aria-label="Configuración de este espacio">${TNTUI.icon('settings')}<span>Configurar</span></button>`:''}`;document.body.append(d);d.querySelector('[data-tutorial]').onclick=()=>E.startTutorial();d.querySelector('[data-studio]')?.addEventListener('click',()=>E.openSettings());}
+ function visibleTarget(selector){
+  const elements=selector?[...document.querySelectorAll(selector)]:[];
+  return elements.find(el=>{if(el.closest('[hidden]'))return false;for(let p=el;p;p=p.parentElement){const style=getComputedStyle(p);if(style.display==='none'||style.visibility==='hidden')return false;}return true;})||null;
+ }
+ E.startTutorial=(id=moduleId(),first=false)=>{
+  if(!TNT.profileComplete)return;id=canonical(id);if(!TUTORIALS[id])return;finishTutorial(false);
+  let saved={};try{saved=JSON.parse(localStorage.getItem(key(id))||'{}');}catch{}
+  const steps=tourSteps(id);tourPadding=document.body.style.paddingBottom;const base=parseFloat(getComputedStyle(document.body).paddingBottom)||0;document.body.style.paddingBottom=(base+innerHeight)+'px';tutorial={id,steps,step:saved.done?0:Math.min(saved.step||0,steps.length-1),first};paintTutorial();
+ };
+ function finishTutorial(done){
+  if(!tutorial)return;const t=tutorial;if(done)localStorage.setItem(key(t.id),JSON.stringify({done:true,step:t.step}));
+  tourVersion++;cancelAnimationFrame(tourFrame);tourObserver?.disconnect();tourObserver=null;
+  document.getElementById('tnt-tutorial')?.remove();document.getElementById('tnt-tour-focus')?.remove();
+  document.body.classList.remove('tnt-touring');document.body.style.paddingBottom=tourPadding;highlight?.classList.remove('tnt-tutorial-highlight');highlight=null;tutorial=null;
+ }
+ function positionTutorial(scroll=false){
+  if(!tutorial)return;const d=document.getElementById('tnt-tutorial'),focus=document.getElementById('tnt-tour-focus');if(!d||!focus)return;
+  const s=tutorial.steps[tutorial.step];let target=visibleTarget(s[2]);
+  d.style.width=Math.min(360,(window.visualViewport?.width||innerWidth)-24)+'px';
+  if(highlight!==target){highlight?.classList.remove('tnt-tutorial-highlight');highlight=target;highlight?.classList.add('tnt-tutorial-highlight');}
+  const vp=window.visualViewport,view={width:vp?.width||innerWidth,height:vp?.height||innerHeight,
+   top:(document.getElementById('tnt-shell')?.getBoundingClientRect().bottom||0)+12,
+   bottom:document.getElementById('tnt-home-bottom')?88:16};
+  if(!target){focus.hidden=true;d.style.left='12px';d.style.top=Math.max(view.top,view.height-d.offsetHeight-view.bottom)+'px';d.style.width=Math.min(360,view.width-24)+'px';return;}
+  if(scroll){
+   const track=target.closest('[data-space-track]');if(track)track.scrollTo?.({left:target.offsetLeft-(track.clientWidth-target.offsetWidth)/2,behavior:'instant'});
+   let rect=target.getBoundingClientRect(),reserve=d.offsetHeight+24,maxTarget=Math.max(80,view.height-view.top-view.bottom-reserve);
+   const desired=view.top+Math.max(0,(maxTarget-Math.min(rect.height,maxTarget))/2);
+   const amount=rect.top-desired;
+   // Scroll the nearest real scroll container as well as the page when needed.
+   let parent=target.parentElement;
+   while(parent&&parent!==document.body){const style=getComputedStyle(parent);
+    if(/auto|scroll/.test(style.overflowY)&&parent.scrollHeight>parent.clientHeight+2){parent.scrollTop+=amount;break;}parent=parent.parentElement;
+   }
+   const remaining=target.getBoundingClientRect().top-desired;
+   window.scrollTo?.({top:Math.max(0,scrollY+remaining),behavior:'instant'});
+  }
+  let rect=target.getBoundingClientRect();const panel={width:Math.min(360,view.width-24),height:d.offsetHeight};
+  let placement=E.tourPlacement(rect,panel,view);
+  if(placement.overlaps){
+   const anchor=[...target.querySelectorAll('h1,h2,h3,b,input,button')].find(el=>{const r=el.getBoundingClientRect();return r.height>0&&r.top>=view.top&&r.bottom<view.height-view.bottom-panel.height-16;});
+   if(anchor){rect=anchor.getBoundingClientRect();placement=E.tourPlacement(rect,panel,view);}
+  }
+  d.style.width=placement.width+'px';d.style.left=placement.x+'px';d.style.top=placement.y+'px';d.dataset.placement=placement.overlaps?'reserved':'adjacent';
+  const top=Math.max(view.top,rect.top),bottom=Math.min(view.height-view.bottom,rect.bottom),left=Math.max(8,rect.left),right=Math.min(view.width-8,rect.right);
+  focus.hidden=bottom<=top||right<=left;focus.style.cssText='left:'+left+'px;top:'+top+'px;width:'+Math.max(0,right-left)+'px;height:'+Math.max(0,bottom-top)+'px';
+  if(placement.overlaps){focus.style.height=Math.max(0,placement.y-gapForTour()-top)+'px';}
+ }
+ function gapForTour(){return 14;}
+ function queueTour(){cancelAnimationFrame(tourFrame);tourFrame=requestAnimationFrame(()=>positionTutorial());}
+ function paintTutorial(){
+  const t=tutorial;if(!t)return;const steps=t.steps,s=steps[t.step];tourVersion++;
+  // Only navigation controls are activated by a tutorial. No save, delete, send
+  // or attendance action ever runs automatically.
+  if(s[3]){const nav=document.querySelector(s[3]);if(nav&&!nav.disabled&&nav.getAttribute('aria-current')!=='page'&&!nav.classList.contains('on'))nav.click();}
+  const old=document.getElementById('tnt-tutorial');old?.remove();document.getElementById('tnt-tour-focus')?.remove();
+  const focus=document.createElement('div');focus.id='tnt-tour-focus';focus.setAttribute('aria-hidden','true');document.body.append(focus);
+  const d=document.createElement('aside');d.id='tnt-tutorial';d.setAttribute('role','dialog');d.setAttribute('aria-modal','false');d.setAttribute('aria-label','Tutorial de '+(MODULES.find(m=>m[0]===t.id)?.[1]||'TNT'));
+  d.innerHTML='<header><span>CONOCÉ TNT · '+(t.step+1)+' DE '+steps.length+'</span><button data-skip aria-label="Omitir tutorial">'+TNTUI.icon('close')+'</button></header><progress value="'+(t.step+1)+'" max="'+steps.length+'"></progress><h2>'+esc(s.copyIndex===undefined?s[0]:E.text('tutorial.'+t.id+'.'+s.copyIndex+'.title',s[0]))+'</h2><p>'+esc(s.copyIndex===undefined?s[1]:E.text('tutorial.'+t.id+'.'+s.copyIndex,s[1]))+'</p><footer><button data-skip>Omitir</button><span></span>'+(t.step?'<button data-back aria-label="Paso anterior">Atrás</button>':'')+'<button class="primary" data-next>'+(t.step===steps.length-1?'Listo':'Siguiente')+' '+TNTUI.icon('arrow')+'</button></footer>';
+  document.body.append(d);document.body.classList.add('tnt-touring');d.dataset.step=String(t.step);
+  localStorage.setItem(key(t.id),JSON.stringify({done:false,step:t.step}));
+  d.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>finishTutorial(true));
+  d.querySelector('[data-back]')?.addEventListener('click',()=>{t.step--;paintTutorial();});
+  d.querySelector('[data-next]').onclick=()=>{if(t.step===steps.length-1)finishTutorial(true);else{t.step++;paintTutorial();}};
+  positionTutorial(true);const version=tourVersion;
+  requestAnimationFrame(()=>{if(version===tourVersion){positionTutorial(true);d.querySelector('[data-next]')?.focus({preventScroll:true});}});
+  tourObserver?.disconnect();tourObserver=new MutationObserver(records=>{
+   if(records.some(r=>!r.target.closest?.('#tnt-tutorial,#tnt-tour-focus')))queueTour();
+  });tourObserver.observe(document.querySelector('#app,#camp-app,#attendance-app,#dashboardView')||document.body,{childList:true,subtree:true});
+ }
+ window.addEventListener('resize',queueTour);window.addEventListener('scroll',queueTour,true);
+ window.visualViewport?.addEventListener('resize',queueTour);
+ function tools(){document.getElementById('tnt-experience-tools')?.remove();document.querySelectorAll('.tnt-inline-tools').forEach(el=>el.remove());}
  let channel,queued=new Set(),liveTimer,identityBusy=false;
  E.subscribe=()=>{
   if(!TNT.sb.channel||!TNT.identity||channel)return;

@@ -34,10 +34,20 @@
   function icon(name, cls='') { return `<svg class="tnt-icon ${esc(cls)}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name] || paths.calendar}"/></svg>`; }
   function safeUrl(value) { if(!String(value || '').trim())return '';try { const u = new URL(value, root.location?.origin || 'https://tnt.invalid'); return ['http:','https:'].includes(u.protocol) ? u.href : ''; } catch { return ''; } }
   const initials = name => String(name || 'TNT').trim().split(/\s+/).slice(0,2).map(p=>p[0]).join('').toUpperCase();
+  function photoUrl(value,size=128) {
+    const safe=safeUrl(value);if(!safe)return '';
+    try{const url=new URL(safe);if(/(^|\.)googleusercontent\.com$/.test(url.hostname)){
+      const px=Math.min(1024,Math.max(64,Number(size)||128));
+      if(url.searchParams.has('sz'))url.searchParams.set('sz',String(px));
+      else url.pathname=url.pathname.replace(/=s\d+(?:-[\w-]+)?$/,'')+'=s'+px+'-c';
+      return url.href;
+    }}catch{}return safe;
+  }
   function avatar(person={}, account={}, cls='') {
+    person||={};account||={};const own=root.TNT?.person?.id===person.id?root.TNT.account||{}:{};
     const name=account.nickname || person.full_name || person.display_name || 'Persona TNT';
-    const url=safeUrl(account.avatar_url || person.avatar_url || '');
-    return `<span class="tnt-person-avatar ${esc(cls)}" title="${esc(name)}"><span aria-hidden="true">${esc(initials(name))}</span>${url?`<img src="${esc(url)}" alt="${esc(name)}" loading="lazy" referrerpolicy="no-referrer">`:''}</span>`;
+    const large=cls.includes('portrait'),url=photoUrl(account.avatar_url||person.avatar_url||own.avatar_url||'',large?512:128);
+    return `<span class="tnt-person-avatar ${esc(cls)} ${url?'has-photo':'without-photo'}" title="${esc(name)}"><span aria-hidden="true">${esc(initials(name))}</span>${url?`<img src="${esc(url)}" alt="${esc(name)}" loading="${large?'eager':'lazy'}" decoding="async" ${large?'fetchpriority="high"':''} referrerpolicy="no-referrer">`:''}</span>`;
   }
   function avatarStack(ids, people, accounts, myId, max=5) {
     const all=[...new Set(ids)].sort((a,b)=>(b===myId)-(a===myId));
@@ -166,9 +176,9 @@
       };
     }
   }
-  const api={esc,icon,safeUrl,initials,avatar,avatarStack,dateKey,addDays,date,time,completed,modal,closeModal,trackOverlay,confirm,prompt,toast,enhanceSelects,backOverlay,accessInfo};
+  const api={esc,icon,safeUrl,photoUrl,initials,avatar,avatarStack,dateKey,addDays,date,time,completed,modal,closeModal,trackOverlay,confirm,prompt,toast,enhanceSelects,backOverlay,accessInfo};
   root.TNTUI=api;
   if(root.document){const init=()=>{enhanceSelects();if(root.MutationObserver){new root.MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1)enhanceSelects(node);}).observe(root.document.body,{childList:true,subtree:true});}};if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init,{once:true});else init();}
-  root.document?.addEventListener('error',e=>{if(e.target?.matches?.('.tnt-person-avatar img'))e.target.remove();},true);
+  root.document?.addEventListener('error',e=>{if(e.target?.matches?.('.tnt-person-avatar img')){const avatar=e.target.parentElement;avatar.classList.remove('has-photo');avatar.classList.add('without-photo');e.target.remove();}},true);
   if(typeof module!=='undefined')module.exports=api;
 })(typeof window==='undefined'?globalThis:window);
