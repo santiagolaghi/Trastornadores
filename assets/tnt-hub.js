@@ -112,7 +112,9 @@ function setupSpaces(){
  track.after(controls);
  function update(){const center=track.scrollLeft+track.clientWidth/2;let nearest=0,distance=Infinity;
   cards.forEach((card,i)=>{const delta=(card.offsetLeft+card.offsetWidth/2-center)/Math.max(1,track.clientWidth);card.style.setProperty('--card-turn',String(Math.max(-1,Math.min(1,delta))));if(Math.abs(delta)<distance){distance=Math.abs(delta);nearest=i;}});
-  controls.querySelector('[data-space-position]').textContent=(nearest+1)+' / '+cards.length;controls.querySelector('[data-space-prev]').disabled=nearest===0;controls.querySelector('[data-space-next]').disabled=nearest===cards.length-1;return nearest;
+  const atStart=track.scrollLeft<=2,atEnd=track.scrollWidth-track.clientWidth-track.scrollLeft<=2;
+  if(atStart)nearest=0;else if(atEnd)nearest=cards.length-1;
+  controls.querySelector('[data-space-position]').textContent=(nearest+1)+' / '+cards.length;controls.querySelector('[data-space-prev]').disabled=atStart;controls.querySelector('[data-space-next]').disabled=atEnd;return nearest;
  }
  function move(dir){const current=update(),card=cards[Math.max(0,Math.min(cards.length-1,current+dir))];track.scrollTo?.({left:card.offsetLeft-(track.clientWidth-card.offsetWidth)/2,behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'instant':'smooth'});}
  controls.querySelector('[data-space-prev]').onclick=()=>move(-1);controls.querySelector('[data-space-next]').onclick=()=>move(1);
