@@ -48,7 +48,7 @@
       ]
     }
   ],
-  "buildCommand": "mkdir -p public && cp -r assets admin asistencia buffet campamento chat efe glosario icons organizacion lista-sabados perfiles manifest.webmanifest index.html sw.js public/",
+  "buildCommand": "mkdir -p public && cp -r assets admin asistencia buffet campamento chat efe glosario icons organizacion lista-sabados perfiles manifest.webmanifest index.html sw.js __tnt-review__ public/",
   "outputDirectory": "public",
   "installCommand": "echo skip-install"
 }

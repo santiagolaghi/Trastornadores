@@ -29,10 +29,12 @@
   const detailSheet = $("detailSheet");
   const detailBackdrop = $("detailBackdrop");
 
-  let records = [];
+  let records = [], profileAccounts = [];
+  const profilePhoto = record => window.TNTUI.avatar({id:record.id,full_name:[record.nombre,record.apellido].filter(Boolean).join(' '),avatar_url:record.avatar_url},profileAccounts.find(a=>a.person_id===record.id)||{});
   let accessToken = "";
   let toastTimer = null;
   let currentDetailId = "";
+  let linkedProfileOpened = false;
   let profileState = "active";
   let deleteMode = "archive", deleting = false;
   const deletedProfiles = new Set(), selectedProfiles=new Set();
@@ -373,6 +375,7 @@
       return `
         <tr>
           <td class="person-cell">
+            ${profilePhoto(record)}
             <strong>${escapeHtml(record.nombre)} ${escapeHtml(record.apellido)}</strong>
             <small>${escapeHtml(instagram || "Sin Instagram")}</small>
           </td>
@@ -396,6 +399,7 @@
         <article class="person-card">
           <div class="person-card-main">
             <div class="person-card-head">
+              ${profilePhoto(record)}
               <div>
                 <strong class="person-name">${escapeHtml(record.nombre)} ${escapeHtml(record.apellido)}</strong>
                 <p class="person-subtitle">${age === null ? 'Nacimiento sin completar' : age + ' años · ' + group} · ${escapeHtml(record.genero || "Sexo sin definir")}</p>
@@ -535,8 +539,7 @@
     const wa = whatsappUrl(phone);
     const ig = instagramUrl(instagram);
 
-    $("detailAvatar").textContent =
-      ((record.nombre || "P").charAt(0) + (record.apellido || "").charAt(0)).toUpperCase();
+    $("detailAvatar").innerHTML = profilePhoto(record);
     $("detailName").textContent = [record.nombre, record.apellido].filter(Boolean).join(" ");
     $("detailSummary").textContent = (age === null ? 'Nacimiento sin completar' : age + ' años · ' + group) + " · " + (record.genero || "Sexo sin definir");
     $("detailData").innerHTML = [
@@ -765,12 +768,22 @@
 
     if (!options.silent) setRefreshLoading(true);
     try {
-      const { data, error } = await sb.from("tnt_profiles_central").select("*").eq("active", profileState === 'active').order("actualizado_en", { ascending: false });
+      const [profiles,photos] = await Promise.all([
+        sb.from("tnt_profiles_central").select("*").eq("active", profileState === 'active').order("actualizado_en", { ascending: false }),
+        sb.from("tnt_accounts").select("person_id,nickname,avatar_url")
+      ]);
+      const {data,error}=profiles;profileAccounts=photos.error?[]:photos.data||[];
       if (error) throw error;
 
       records = Array.isArray(data) ? data.filter(p => !p.data_notes?.linked_to && (profileState === 'trash' ? Boolean(p.data_notes?.deleted_at) : !p.data_notes?.deleted_at && !deletedProfiles.has(String(p.id)))) : [];
       renderStats();
       renderList();
+
+      const linkedProfile = new URLSearchParams(location.search).get('person');
+      if (linkedProfile && !linkedProfileOpened && records.some(p => String(p.id) === linkedProfile)) {
+        linkedProfileOpened = true;
+        openDetail(linkedProfile);
+      }
 
       const time = new Intl.DateTimeFormat("es-AR", {
         hour: "2-digit",

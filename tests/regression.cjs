@@ -1,4 +1,85 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');const {JSDOM,VirtualConsole}=require('jsdom');const root=path.resolve(__dirname,'..');
+
+test('La foto Google se pide con resolución adecuada y recupera las iniciales si falla',async()=>{
+ const a=await app('hub');try{
+  const U=a.w.TNTUI,url='https://lh3.googleusercontent.com/a/photo=s96-c';
+  const portrait=U.avatar({id:'photo',full_name:'Persona registrada'},{avatar_url:url},'portrait');
+  const el=a.d.createElement('div');el.innerHTML=portrait;a.d.body.append(el);
+  assert.equal(el.querySelector('img').getAttribute('src'),'https://lh3.googleusercontent.com/a/photo=s512-c');
+  assert.equal(el.querySelector('img').getAttribute('loading'),'eager');
+  el.querySelector('img').dispatchEvent(new a.w.Event('error'));
+  assert(el.querySelector('.tnt-person-avatar').classList.contains('without-photo'));assert.equal(el.querySelector('img'),null);
+  assert.equal(U.photoUrl('https://example.invalid/custom.jpg',512),'https://example.invalid/custom.jpg');
+ }finally{a.close();}
+});
+
+test('Buscar Buffet o EFE encuentra el módulo y respeta los espacios deshabilitados',async()=>{
+ const a=await app('hub');try{
+  for(const [query,href] of [['Buffet','/buffet/'],['EFE','/asistencia/'],['organizacion','/organizacion/']]){
+   a.d.querySelector('#hub-query').value=query;a.d.querySelector('#hub-search').dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));
+   assert(a.d.querySelector('.tnt-overlay a[href="'+href+'"]'),query);await a.w.TNTUI.closeModal(a.d.querySelector('.tnt-overlay'));
+  }
+  a.w.TNTExperience.config={modules:{buffet:{enabled:false}}};a.d.querySelector('#hub-query').value='Buffet';a.d.querySelector('#hub-search').dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));
+  assert.equal(a.d.querySelector('.tnt-overlay a[href="/buffet/"]'),null);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
+test('El tutorial desplaza la pantalla al siguiente objetivo y deja la explicación fuera del objetivo',async()=>{
+ const a=await app('hub');try{
+  const w=a.w,E=w.TNTExperience;let pageY=0,calls=[];
+  Object.defineProperty(w,'innerWidth',{value:390});Object.defineProperty(w,'innerHeight',{value:844});
+  Object.defineProperty(w,'scrollY',{get:()=>pageY});w.scrollTo=options=>{pageY=options.top;calls.push(pageY);};
+  Object.defineProperty(w.HTMLElement.prototype,'offsetHeight',{get(){return this.id==='tnt-tutorial'?210:280;},configurable:true});
+  const rect=(top,h=280)=>({top:top-pageY,bottom:top-pageY+h,left:18,right:372,width:354,height:h});
+  a.d.querySelector('.hub-greeting').getBoundingClientRect=()=>rect(900);
+  a.d.querySelector('.tnt-home-news').getBoundingClientRect=()=>rect(2000,240);
+  E.startTutorial('home');let panel=a.d.querySelector('#tnt-tutorial'),target=a.d.querySelector('.hub-greeting').getBoundingClientRect();
+  assert(Number.parseFloat(panel.style.top)>=target.bottom+14);assert(target.top>=12);assert(Number.parseFloat(panel.style.top)+210<=756);
+  const firstY=pageY;panel.querySelector('[data-next]').click();panel=a.d.querySelector('#tnt-tutorial');target=a.d.querySelector('.tnt-home-news').getBoundingClientRect();
+  assert(pageY>firstY);assert(calls.length>=2);assert(Number.parseFloat(panel.style.top)>=target.bottom+14);assert(target.top>=12);
+  panel.querySelector('[data-skip]').click();assert.equal(a.d.querySelector('#tnt-tour-focus'),null);assert.equal(a.d.body.style.paddingBottom,'');assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
+test('Perfiles une las fotos de las cuentas con los registros y abre el resultado enlazado',async()=>{
+ const a=await inlinePage('perfiles/datos/index.html',w=>{
+  const id=w.TNT.person.id;w.__fixtureDB.tnt_profiles_central=[{id,active:true,nombre:'Nora',apellido:'Pérez',creado_en:'2026-10-01T12:00:00Z'}];
+  w.TNT.account.avatar_url='https://lh3.googleusercontent.com/a/nora=s96-c';w.history.replaceState({},'', '/perfiles/datos/?person='+id);
+ });try{
+  a.w.eval(fs.readFileSync(path.join(root,'perfiles/datos/admin.js'),'utf8'));await until(()=>a.d.querySelector('#cardsList .tnt-person-avatar img'));
+  assert.equal(a.d.querySelector('#cardsList img').getAttribute('src'),'https://lh3.googleusercontent.com/a/nora=s128-c');
+  assert(a.d.querySelector('#detailSheet').classList.contains('open'));assert(a.d.querySelector('#detailAvatar img'));assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
+function swipeFixture(w){
+ w.__fixtureDB.tnt_saturday_members=w.__fixtureDB.tnt_people.map(p=>({person_id:p.id,active:true}));w.__fixtureDB.tnt_saturday_attendance=[];
+}
+test('El swipe avanza mientras guarda y Deshacer conserva el orden de las operaciones',async()=>{
+ let finishFirst,finishUndo;const calls=[];
+ const a=await inlinePage('asistencia/index.html',w=>{
+  swipeFixture(w);const rpc=w.TNT.sb.rpc;w.TNT.sb.rpc=(name,args)=>{if(name!=='tnt_mark_attendance')return rpc(name,args);calls.push(args);return new Promise(resolve=>{if(calls.length===1)finishFirst=resolve;else finishUndo=resolve;});};
+ });try{
+  a.w.eval(fs.readFileSync(path.join(root,'assets/tnt-attendance.js'),'utf8'));await until(()=>a.d.querySelector('#startDeck'));a.d.querySelector('#startDeck').click();
+  const first=a.d.querySelector('#swipeCard h2').textContent;a.d.querySelector('[data-deck-answer=present]').click();
+  assert.notEqual(a.d.querySelector('#swipeCard h2').textContent,first);await until(()=>finishFirst);assert(a.d.querySelector('[data-deck-sync]').textContent.includes('Guardando'));
+  a.d.querySelector('#deckUndo').click();assert.equal(a.d.querySelector('#swipeCard h2').textContent,first);assert.equal(calls.length,1);
+  finishFirst({error:null});await until(()=>finishUndo);assert.equal(calls[1].p_status,'pending');assert.equal(calls[1].p_person,calls[0].p_person);
+  finishUndo({error:null});await until(()=>a.d.querySelector('[data-deck-sync]').textContent==='Todo guardado');assert.deepEqual(a.errors,[]);
+ }finally{finishFirst?.({error:null});finishUndo?.({error:null});a.close();}
+});
+
+test('Un guardado fallido en el swipe permite reintentar y un gesto cancelado no registra asistencia',async()=>{
+ const a=await inlinePage('asistencia/index.html',w=>{swipeFixture(w);w.__fixtureFailures['rpc:tnt_mark_attendance']='Sin conexión';});try{
+  a.w.eval(fs.readFileSync(path.join(root,'assets/tnt-attendance.js'),'utf8'));await until(()=>a.d.querySelector('#startDeck'));a.d.querySelector('#startDeck').click();
+  const card=a.d.querySelector('#swipeCard');card.onpointerdown({pointerType:'touch',clientX:50,clientY:50,pointerId:1});card.onpointermove({clientX:150,clientY:50});card.onpointercancel();
+  assert(!a.w.__fixtureCalls.some(c=>c.rpc==='tnt_mark_attendance'));
+  a.d.querySelector('[data-deck-answer=absent]').click();await until(()=>a.d.querySelector('[data-deck-sync] [data-save-retry]'));
+  delete a.w.__fixtureFailures['rpc:tnt_mark_attendance'];a.d.querySelector('[data-deck-sync] [data-save-retry]').click();await until(()=>a.d.querySelector('[data-deck-sync]').textContent==='Todo guardado');
+  assert.equal(a.w.__fixtureCalls.filter(c=>c.rpc==='tnt_mark_attendance').length,2);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
 function campFixture(w){
  Object.assign(w.__fixtureDB,{
   tnt_camp_editions:[{id:'camp-one',name:'Prueba',public_slug:'camp-one',start_date:'2026-12-01',end_date:'2026-12-03',capacity:120,fee:100}],
