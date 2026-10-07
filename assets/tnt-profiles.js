@@ -8,6 +8,8 @@ const defaults={
  phone:{label:'WhatsApp',type:'tel'},instagram:{label:'Instagram',type:'text'},dni:{label:'DNI',type:'text'},
  interests:{label:'¿Qué te gusta hacer?',type:'multiselect',options:['Música','Dibujar','Cantar','Bailar','Deportes','Leer','Tecnología','Crear contenido','Todavía estoy descubriéndolo']},
  studies:{label:'¿Qué estudiás o a qué te dedicás?',type:'text'},dreams:{label:'¿Cuáles son tus sueños?',type:'textarea'},
+ health:{label:'¿Tenés alguna enfermedad, alergia o condición de salud que debamos conocer?',type:'textarea'},
+ leadership_strengths:{label:'Fortalezas en el liderazgo (jóvenes y adolescentes)',type:'leadership',required:false,roles:['Líder']},
  efe_group:{label:'¿A qué EFE vas?',type:'efe'}
 };
 function config(fields){const order=Object.keys(defaults);return Object.fromEntries(Object.entries(fields||defaults).sort(([a],[b])=>(order.includes(a)?order.indexOf(a):100)-(order.includes(b)?order.indexOf(b):100)).map(([k,f])=>[k,{visible:true,required:true,...defaults[k],...f}]));}
@@ -21,6 +23,9 @@ function field(key,f,v='',groups=[],locked=false){
  if(f.type==='multiselect'){
   const selected=Array.isArray(v)?v:[],known=f.options||[],extra=selected.filter(x=>!known.includes(x));
   input=`<div class="profile-interests">${known.map(x=>`<label><input type="checkbox" name="${name}" value="${U.esc(x)}" ${selected.includes(x)?'checked':''}><span>${U.esc(x)}</span></label>`).join('')}</div><input name="${name}_other" value="${U.esc(extra.join(', '))}" maxlength="300" placeholder="Otros intereses, separados por coma" aria-label="Otros intereses"><small class="profile-field-error" data-error="${name}" role="alert"></small>`;
+ }else if(f.type==='leadership'){
+  const areas=['Acompañar jóvenes','Acompañar adolescentes','Enseñar','Escuchar','Organizar equipos','Comunicar'];const scores=v&&typeof v==='object'&&!Array.isArray(v)?v:{};
+  input=`<div class="profile-leadership">${areas.map(area=>`<label>${U.esc(area)}<input type="range" name="${name}" data-area="${U.esc(area)}" min="0" max="100" step="5" value="${Number(scores[area])||0}"><output>${Number(scores[area])||0}%</output></label>`).join('')}</div><small>Elegí varias fortalezas. Los porcentajes expresan cómo te sentís hoy; no son una evaluación.</small><small class="profile-field-error" data-error="${name}" role="alert"></small>`;
  }else if(f.type==='efe'||f.type==='select'){
   const options=f.type==='efe'?[...groups.map(g=>[g.code,g.name]),['none','Todavía no voy a un EFE']]:(f.options||[]).map(x=>[x,key==='sex'?({M:'Varón',F:'Mujer'}[x]||x):x]);
   input=`<select ${attrs.replace('readonly aria-readonly="true"','disabled')} aria-label="${label}"><option value="">Elegí una opción</option>${options.map(([value,text])=>`<option value="${U.esc(value)}" ${v===value?'selected':''}>${U.esc(text)}</option>`).join('')}</select>${lock?`<input type="hidden" name="${name}" value="${U.esc(v)}">`:''}${f.type==='efe'?'<small data-efe-hint>Tu grupo actual se conserva. Podés elegir otro si corresponde.</small>':''}`;
@@ -31,8 +36,8 @@ function field(key,f,v='',groups=[],locked=false){
  }
  return `<div class="profile-field ${f.type==='multiselect'||f.type==='textarea'?'profile-field-wide':''}"><label ${f.type==='multiselect'?'':`for="${id}"`}>${label}<span class="profile-requirement">${hint}</span></label>${input}${help?`<small>${help}</small>`:''}${lock?'<small>Dato guardado. Podés solicitar su corrección desde Mi perfil.</small>':''}</div>`;
 }
-function render(fields,values={},groups=[],{mode='all',locked=false}={}){
- const entries=Object.entries(config(fields)).filter(([k])=>mode==='all'||(mode==='base'?baseKeys.includes(k):!baseKeys.includes(k)));
+function render(fields,values={},groups=[],{mode='all',locked=false,role=''}={}){
+ const entries=Object.entries(config(fields)).filter(([k,f])=>(!f.roles?.length||f.roles.includes(role))&&(mode==='all'||(mode==='base'?baseKeys.includes(k):!baseKeys.includes(k))));
  const base=entries.filter(([k])=>baseKeys.includes(k)),extra=entries.filter(([k])=>!baseKeys.includes(k));
  return `${base.length?`<fieldset class="profile-section"><legend>01 · Tus datos</legend><div class="profile-grid">${base.map(([k,f])=>field(k,f,values[k]||'',groups,locked)).join('')}</div></fieldset>`:''}${extra.length?`<fieldset class="profile-section"><legend>${base.length?'02 · ':' '}Lo que te hace vos</legend><p>Queremos conocerte, acompañarte y hacer lugar a tus ideas.</p><div class="profile-grid">${extra.map(([k,f])=>field(k,f,values[k]||'',groups)).join('')}</div></fieldset>`:''}`;
 }
@@ -41,6 +46,7 @@ function collect(form,fields){
  for(const [k,f] of Object.entries(config(fields))){
   if(f.visible===false||!form.querySelector(`[name="${k}"]`))continue;
   if(f.type==='multiselect')out[k]=[...new Set([...fd.getAll(k),...String(fd.get(k+'_other')||'').split(',').map(x=>x.trim()).filter(Boolean)])];
+  else if(f.type==='leadership')out[k]=Object.fromEntries([...form.querySelectorAll(`[name="${k}"][data-area]`)].filter(el=>Number(el.value)>0).map(el=>[el.dataset.area,Number(el.value)]));
   else out[k]=String(fd.get(k)||'').trim();
  }
  return out;
@@ -49,10 +55,11 @@ function validate(form,fields){
  const v=collect(form,fields);
  for(const [k,f] of Object.entries(config(fields))){
   const el=form.querySelector(`[name="${k}"]`);if(!el||f.visible===false)continue;
-  if(f.type==='multiselect'){
+  if(f.type==='multiselect'||f.type==='leadership'){
    const error=form.querySelector(`[data-error="${k}"]`),missing=f.required&&!v[k]?.length;
-   if(error)error.textContent=missing?'Elegí al menos una opción o contanos otro interés.':'';
-   if(missing){el.focus();return false;}
+   const reallyMissing=f.type==='leadership'?f.required&&Object.keys(v[k]||{}).length===0:missing;
+   if(error)error.textContent=reallyMissing?'Elegí al menos una opción.':'';
+   if(reallyMissing){el.focus();return false;}
   }
  }
  return form.reportValidity();
@@ -63,6 +70,7 @@ function suggest(birthday,sex,today=U.dateKey()){
  return age>=18?'mujeres18':age>=15?'mujeres15_17':age>=12?'mujeres12_14':'';
 }
 function bind(form,fields,values={},groups=[]){
+ form.querySelectorAll('.profile-leadership input[type=range]').forEach(input=>input.oninput=()=>{input.nextElementSibling.textContent=input.value+'%';});
  const efe=form.querySelector('[name="efe_group"]');let manual=!!values.efe_group;
  const update=()=>{if(!efe||manual)return;const code=suggest(form.querySelector('[name="birthday"]')?.value||values.birthday,form.querySelector('[name="sex"]')?.value||values.sex);if(code&&groups.some(g=>g.code===code)){efe.value=code;const hint=form.querySelector('[data-efe-hint]');if(hint)hint.textContent='Sugerido por tu edad y sexo. Podés cambiarlo.';U.enhanceSelects(form);}};
  efe?.addEventListener('change',()=>manual=true);form.querySelector('[name="birthday"]')?.addEventListener('change',update);form.querySelector('[name="sex"]')?.addEventListener('change',update);update();U.enhanceSelects(form);

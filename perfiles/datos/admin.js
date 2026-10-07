@@ -35,7 +35,8 @@
   let toastTimer = null;
   let currentDetailId = "";
   let linkedProfileOpened = false;
-  let profileState = "active";
+  let profileState = ['archived','trash'].includes(new URLSearchParams(location.search).get('state'))
+    ? new URLSearchParams(location.search).get('state') : 'active';
   let deleteMode = "archive", deleting = false;
   const deletedProfiles = new Set(), selectedProfiles=new Set();
   let bulkBusy=false;
@@ -474,17 +475,25 @@
       const extra = document.createElement('div');
       extra.dataset.profileInterests = '';
       extra.className = 'profile-detail-extra';
-      extra.innerHTML = '<h3>Intereses y proyectos</h3>' + Object.entries(ctx.fields).filter(([k,f]) => !window.TNTProfiles.baseKeys.includes(k) && f.visible !== false).map(([k,f]) => {
+      extra.innerHTML = '<h3>Intereses y proyectos</h3>' + Object.entries(ctx.fields).filter(([k,f]) => !window.TNTProfiles.baseKeys.includes(k) && f.visible !== false && (k!=='health'||window.TNT.isAdmin||String(record.id)===String(window.TNT.person?.id))).map(([k,f]) => {
         let value = ctx.values[k];
         if (k === 'efe_group') value = value === 'none' ? 'Todavía no va a un EFE' : ctx.groups.find(g => g.code === value)?.name;
         if (Array.isArray(value)) value = value.join(', ');
+        if (k === 'leadership_strengths') {
+          if (!profileAccounts.find(a=>a.person_id===record.id&&a.ministry_role==='Líder')) return '';
+          value=value&&typeof value==='object'?Object.entries(value).map(([area,score])=>`${area}: ${score}%`).join(' · '):'';
+        }
         return detailItem(f.label, value || 'Sin completar', ['dreams','studies','interests'].includes(k) || f.type === 'textarea' || String(value || '').length > 60);
       }).join('');
       if (window.TNT.isAdmin && ctx.fields.dni?.visible !== false && ctx.values.dni) extra.innerHTML += detailItem('DNI',ctx.values.dni);
-      if (canEdit() && profileState === 'active') {
+      const account=profileAccounts.find(a=>a.person_id===record.id);
+      if(account?.skills?.length)extra.innerHTML+=detailItem('Habilidades',account.skills.join(', '),true);
+      if(account?.bio)extra.innerHTML+=detailItem('Sobre mí',account.bio,true);
+      if(account?.service_areas?.length)extra.innerHTML+=detailItem('Áreas donde participa',account.service_areas.join(', '),true);
+      if ((canEdit()||String(record.id)===String(window.TNT.person?.id)) && profileState === 'active') {
         const button = document.createElement('button');
-        button.className = 'tnt-button primary';button.textContent = 'Editar intereses, sueños y EFE';
-        button.onclick = () => editProfileInterests(record,ctx);
+        button.className = 'tnt-button primary';button.textContent = 'Editar perfil completo';
+        button.onclick = openEdit;
         extra.append(button);
       }
       $("detailData").append(extra);
@@ -493,7 +502,9 @@
 
   function editProfileInterests(record,ctx) {
     const U=window.TNTUI,P=window.TNTProfiles;
-    const o=U.modal('Lo que hace única a esta persona',`<form class="tnt-form">${P.render(ctx.fields,ctx.values,ctx.groups,{mode:'extra'})}<button class="tnt-button primary" type="submit">Guardar perfil</button><p role="status"></p></form>`,false,{stack:true});
+    const role=profileAccounts.find(a=>a.person_id===record.id)?.ministry_role;
+    const fields={...ctx.fields};if(!window.TNT.isAdmin&&String(record.id)!==String(window.TNT.person?.id)){delete fields.health;delete fields.dni;}
+    const o=U.modal('Editar perfil completo',`<form class="tnt-form">${P.render(fields,ctx.values,ctx.groups,{role})}<button class="tnt-button primary" type="submit">Guardar perfil</button><p role="status"></p></form>`,false,{stack:true});
     const form=o.querySelector('form');P.bind(form,ctx.fields,ctx.values,ctx.groups);
     form.onsubmit=async e=>{e.preventDefault();if(!P.validate(form,ctx.fields))return;const button=form.querySelector('[type=submit]');button.disabled=true;try{const r=await window.TNT.sb.rpc('tnt_save_central_profile',{p_person:record.id,p_values:P.collect(form,ctx.fields)});if(r.error)throw r.error;await U.closeModal(o);await loadProfileInterests(record);showToast('Perfil actualizado.');}catch(err){form.querySelector('[role=status]').textContent=err.message;}finally{button.disabled=false;}};
   }
@@ -558,7 +569,7 @@
       <button class="detail-action copy-detail ${phone ? "" : "disabled"}" type="button" data-copy-phone="${escapeHtml(phone)}">${icons.copy}<span>Copiar teléfono</span></button>
     `;
 
-    $("editProfileBtn").hidden = !canEdit() || profileState !== 'active';
+    $("editProfileBtn").hidden = (!canEdit()&&String(record.id)!==String(window.TNT.person?.id)) || profileState !== 'active';
     $("deleteProfileBtn").hidden = !canArchive();
     $("deleteProfileBtn").textContent = profileState === 'trash' ? 'Restaurar desde Papelera' : profileState === 'archived' ? 'Restaurar perfil' : 'Archivar perfil';
     $('removeProfileBtn').hidden = !canArchive() || profileState === 'trash' || String(record.id) === String(window.TNT.person?.id);
@@ -587,32 +598,15 @@
     window.TNTUI.closeModal($("editSheet"));
   }
 
-  function openEdit() {
+  async function openEdit() {
     const record = currentRecord();
-    if (!record || !canEdit() || profileState !== 'active') return;
-
-
-    $("editNombre").value = record.nombre || "";
-    $("editApellido").value = record.apellido || "";
-    $("editFechaNacimiento").value = record.fecha_nacimiento || "";
-    $("editInstagram").value = record.instagram || "";
-    $("editTelefono").value = record.telefono || "";
-    document.querySelectorAll('input[name="editGenero"]').forEach((input) => {
-      input.checked = input.value === record.genero;
-    });
-
-    $("editMessage").textContent = "";
-    $("editBackdrop").hidden = false;
-    $("editSheet").classList.add("open");
-    $("editSheet").setAttribute("aria-hidden", "false");
-    window.TNTUI.trackOverlay($("editSheet"), () => {
-      $("editSheet").classList.remove("open");
-      $("editSheet").setAttribute("aria-hidden", "true");
-      $("editBackdrop").hidden = true;
-      document.body.style.overflow = document.querySelector('.bottom-sheet.open') ? 'hidden' : '';
-    });
-    document.body.style.overflow = "hidden";
-    setTimeout(() => $("editNombre").focus(), 120);
+    if (!record || profileState !== 'active') return;
+    if(String(record.id)===String(window.TNT.person?.id)){await closeDetail();return window.TNT.editProfile();}
+    if(!canEdit())return;
+    const result=await window.TNT.sb.rpc('tnt_profile_detail',{p_person:record.id});
+    if(result.error)return showToast(result.error.message);
+    if(String(currentDetailId)!==String(record.id))return;
+    editProfileInterests(record,result.data);
   }
 
   function setEditLoading(active) {
@@ -770,7 +764,7 @@
     try {
       const [profiles,photos] = await Promise.all([
         sb.from("tnt_profiles_central").select("*").eq("active", profileState === 'active').order("actualizado_en", { ascending: false }),
-        sb.from("tnt_accounts").select("person_id,nickname,avatar_url")
+        sb.from("tnt_accounts").select("person_id,nickname,avatar_url,ministry_role,skills,bio,service_areas")
       ]);
       const {data,error}=profiles;profileAccounts=photos.error?[]:photos.data||[];
       if (error) throw error;
