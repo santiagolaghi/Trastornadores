@@ -1,0 +1,40 @@
+name: Buffet direct hotfix
+
+on:
+  push:
+    paths:
+      - '.github/workflows/buffet-direct-hotfix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch Buffet HTML
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('buffet/index.html')
+          s=p.read_text()
+          s=s.replace('/assets/tnt-experience.js?v=2','/assets/tnt-experience.js?v=65')
+          marker='<script src="/assets/tnt-core.js?v=52" data-module="buffet" data-label="Buffet"></script><script type="module">'
+          repl='<script src="/assets/tnt-core.js?v=52" data-module="buffet" data-label="Buffet"></script><script src="/assets/tnt-buffet-direct.js?v=1"></script><script type="module">'
+          if '/assets/tnt-buffet-direct.js?v=1' not in s:
+              if marker not in s:
+                  raise SystemExit('Buffet script marker not found')
+              s=s.replace(marker,repl,1)
+          p.write_text(s)
+          PY
+      - name: Commit hotfix
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "TNT Bot"
+          git config user.email "tnt-bot@users.noreply.github.com"
+          git add buffet/index.html
+          git commit -m "Load direct Buffet exact cash and photo fix"
+          git push origin main
