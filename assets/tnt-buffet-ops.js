@@ -21,6 +21,7 @@ body[data-tnt-module="buffet"] .prep-strip small{color:#365f49!important;font-we
 body[data-tnt-module="buffet"] .prep-dot{background:#15945b!important;box-shadow:0 0 0 5px #15945b22!important}
 body[data-tnt-module="buffet"] .paychips{grid-template-columns:repeat(2,minmax(0,1fr))!important}
 body[data-tnt-module="buffet"] #tnt-exact-pay.sel{background:#ffe083!important;color:#211a05!important;border-color:#6a5511!important;box-shadow:0 3px 0 #6a551125!important}
+body[data-tnt-module="buffet"] .paychips.tnt-exact-active [data-pay="cash"].sel{background:var(--tnt-panel)!important;color:var(--tnt-muted)!important;border-color:var(--tnt-line)!important;box-shadow:none!important}
 body[data-tnt-module="buffet"] .tnt-change-card{margin:-2px 0 14px;padding:14px 15px;border-radius:16px;border:1.5px solid var(--tnt-line);background:var(--tnt-panel);color:var(--tnt-text);display:grid;gap:3px}
 body[data-tnt-module="buffet"] .tnt-change-card small{font-size:12px;font-weight:850;color:var(--tnt-muted)}
 body[data-tnt-module="buffet"] .tnt-change-card strong{font-size:23px;line-height:1.05;font-weight:950;letter-spacing:-.03em}
@@ -129,8 +130,9 @@ body[data-tnt-module="buffet"] .pvisual img[data-tnt-product-photo],body[data-tn
       });
       chips.appendChild(exact);
     }
-    exact.classList.toggle('sel',exactMode&&selectedCash());
-    if(exactMode&&selectedCash())document.querySelector('.paychips [data-pay="cash"]')?.classList.remove('sel');
+    const active=exactMode&&selectedCash();
+    exact.classList.toggle('sel',active);
+    chips.classList.toggle('tnt-exact-active',active);
   }
 
   function ensureChangeCard(){
