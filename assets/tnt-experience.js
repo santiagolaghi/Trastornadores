@@ -1,6 +1,6 @@
 /* TNT experience loader. The base stays byte-identical; the guard replaces only the realtime subscription strategy. */
 (() => {
-  const base='/assets/tnt-experience-base.js?v=1',guard='/assets/tnt-live-guard.js?v=2',isBuffet=location.pathname.startsWith('/buffet'),buffetStock=isBuffet?'/assets/tnt-buffet-stock.js?v=1':'',buffetPermissions=isBuffet?'/assets/tnt-buffet-permissions.js?v=1':'',buffetPolish=isBuffet?'/assets/tnt-buffet-polish.js?v=1':'',buffetOps=isBuffet?'/assets/tnt-buffet-ops.js?v=1':'';
+  const base='/assets/tnt-experience-base.js?v=1',guard='/assets/tnt-live-guard.js?v=2',isBuffet=location.pathname.startsWith('/buffet'),buffetStock=isBuffet?'/assets/tnt-buffet-stock.js?v=1':'',buffetPermissions=isBuffet?'/assets/tnt-buffet-permissions.js?v=1':'',buffetPolish=isBuffet?'/assets/tnt-buffet-polish.js?v=1':'',buffetOps=isBuffet?'/assets/tnt-buffet-ops.js?v=2':'';
   if(document.readyState==='loading'){
     document.write('<script src="'+base+'"><\/script><script src="'+guard+'"><\/script>'+(buffetStock?'<script src="'+buffetStock+'"><\/script><script src="'+buffetPermissions+'"><\/script><script src="'+buffetPolish+'"><\/script><script src="'+buffetOps+'"><\/script>':''));
     return;
