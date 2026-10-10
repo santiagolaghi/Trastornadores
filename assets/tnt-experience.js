@@ -1,6 +1,6 @@
 /* TNT experience loader. The base stays byte-identical; the guard replaces only the realtime subscription strategy. */
 (() => {
-  const base='/assets/tnt-experience-base.js?v=1',guard='/assets/tnt-live-guard.js?v=1';
+  const base='/assets/tnt-experience-base.js?v=1',guard='/assets/tnt-live-guard.js?v=2';
   if(document.readyState==='loading'){
     document.write('<script src="'+base+'"><\/script><script src="'+guard+'"><\/script>');
     return;

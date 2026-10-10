@@ -1,10 +1,11 @@
 /* Scoped realtime guard for TNT. Keeps collaborative updates live without making every screen react to every table in the app. */
 (() => {
   'use strict';
-  const E=window.TNTExperience,T=window.TNT;
-  if(!E||!T)return;
+  const E=window.TNTExperience;
+  if(!E)return;
+  const getT=()=>window.TNT;
   const canonical=id=>['efe','lista-sabados'].includes(id)?'asistencia':(id||'home');
-  const page=()=>canonical(T.module||document.body.dataset.tntSurface||'home');
+  const page=()=>{const T=getT();return canonical(T?.module||document.body.dataset.tntSurface||'home');};
   const COMMON=['tnt_experience','tnt_settings','tnt_notifications','tnt_notification_state','tnt_people','tnt_accounts','tnt_access_grants','tnt_role_permission_presets','tnt_person_permission_overrides','tnt_profile_answers'];
   const PAGE_TABLES={
     home:['tnt_events','tnt_event_members','tnt_tasks','tnt_task_assignees','tnt_library_items','tnt_efe_groups','tnt_efe_memberships'],
@@ -23,6 +24,8 @@
   const queued=new Set();
   const rowOf=p=>p?.new&&Object.keys(p.new).length?p.new:(p?.old||{});
   function affectsMe(table,payload){
+    const T=getT();
+    if(!T)return false;
     if(table==='tnt_settings')return true;
     const row=rowOf(payload),pid=T.person?.id;
     if(!pid)return false;
@@ -32,11 +35,11 @@
     return false;
   }
   function relevant(table,payload){
-    const p=page(),row=rowOf(payload),pid=T.person?.id;
+    const T=getT(),p=page(),row=rowOf(payload),pid=T?.person?.id;
     if(table==='tnt_notifications')return !row.person_id||row.person_id===pid;
     if(table==='tnt_notification_state')return !row.person_id||row.person_id===pid;
     if(table==='tnt_access_grants'||table==='tnt_person_permission_overrides')return p==='admin'||!row.person_id||row.person_id===pid;
-    if(table==='tnt_role_permission_presets')return p==='admin'||!row.role||row.role===T.account?.ministry_role;
+    if(table==='tnt_role_permission_presets')return p==='admin'||!row.role||row.role===T?.account?.ministry_role;
     if(table==='tnt_profile_answers')return ['admin','perfiles'].includes(p)||!row.person_id||row.person_id===pid;
     if(table==='tnt_people')return PEOPLE_PAGES.has(p)||!row.id||row.id===pid;
     if(table==='tnt_accounts')return PEOPLE_PAGES.has(p)||!row.person_id||row.person_id===pid;
@@ -45,7 +48,8 @@
   function delay(){const p=page();return p==='chat'?70:p==='asistencia'?120:p==='organizacion'?180:p==='home'?420:220;}
   function schedule(){clearTimeout(timer);timer=setTimeout(flush,delay());}
   async function flush(){
-    if(!queued.size)return;
+    const T=getT();
+    if(!T||!queued.size)return;
     if(page()==='home'&&document.documentElement.dataset.tntPointerDown==='true'){schedule();return;}
     const tables=[...queued];queued.clear();const refreshIdentity=identityTouched;identityTouched=false;
     try{
@@ -65,7 +69,8 @@
   document.addEventListener('pointerup',pointerUp,{capture:true,passive:true});
   document.addEventListener('pointercancel',pointerUp,{capture:true,passive:true});
   E.subscribe=()=>{
-    if(!T.sb?.channel||!T.identity||channel)return;
+    const T=getT();
+    if(!T?.sb?.channel||!T.identity||channel)return;
     const p=page(),tables=[...new Set([...COMMON,...(PAGE_TABLES[p]||[])])];
     channel=T.sb.channel('tnt-live-scoped-'+p+'-'+T.person.id+'-'+crypto.randomUUID());
     for(const table of tables){
