@@ -6,13 +6,14 @@
   window.__TNT_BUFFET_DIRECT_FIX__ = true;
 
   let exactMode = false;
+  let settingExact = false;
   let products = [];
   let timer = 0;
 
   const style = document.createElement('style');
   style.textContent = `
 body[data-tnt-module="buffet"] .paychips{grid-template-columns:repeat(2,minmax(0,1fr))!important}
-body[data-tnt-module="buffet"] #tnt-pay-exact.sel{background:#ffe083!important;color:#211a05!important;border-color:#6a5511!important;box-shadow:0 3px 0 #6a551125!important}
+body[data-tnt-module="buffet"] #tnt-exact-pay.sel{background:#ffe083!important;color:#211a05!important;border-color:#6a5511!important;box-shadow:0 3px 0 #6a551125!important}
 body[data-tnt-module="buffet"] .tnt-exact-note{margin:-2px 0 12px;padding:11px 13px;border-radius:14px;background:#e5f8ed;border:1px solid #45aa78;color:#103d27;font-weight:900}
 body[data-tnt-module="buffet"] .pvisual img[data-direct-photo],body[data-tnt-module="buffet"] .emoji img[data-direct-photo]{display:block!important;width:100%!important;height:100%!important;object-fit:cover!important}
 `;
@@ -91,28 +92,33 @@ body[data-tnt-module="buffet"] .pvisual img[data-direct-photo],body[data-tnt-mod
     const received = document.getElementById('received');
     if(received) received.readOnly = false;
     document.querySelector('.tnt-exact-note')?.remove();
-    document.getElementById('tnt-pay-exact')?.classList.remove('sel');
+    document.getElementById('tnt-exact-pay')?.classList.remove('sel');
   }
 
   function ensureExactButton(){
     const chips = document.querySelector('.paychips');
     if(!chips) return;
-    let b = document.getElementById('tnt-pay-exact');
+    let b = document.getElementById('tnt-exact-pay');
     if(!b){
       b = document.createElement('button');
       b.type = 'button';
-      b.id = 'tnt-pay-exact';
+      b.id = 'tnt-exact-pay';
       b.className = 'chip';
       b.textContent = '✅ Pago justo';
       chips.insertBefore(b, chips.children[1] || null);
+    }
+    if(b.dataset.directExactBound !== '1'){
+      b.dataset.directExactBound = '1';
       b.addEventListener('click',()=>{
         exactMode = true;
-        const cash = chips.querySelector('[data-pay="cash"]');
+        settingExact = true;
+        const cash = document.querySelector('.paychips [data-pay="cash"]');
         cash?.click();
+        settingExact = false;
         setTimeout(()=>{
-          const btn=document.getElementById('tnt-pay-exact');
-          btn?.classList.add('sel');
+          document.getElementById('tnt-exact-pay')?.classList.add('sel');
           setReceivedExact();
+          schedule();
         },0);
       });
     }
@@ -131,7 +137,7 @@ body[data-tnt-module="buffet"] .pvisual img[data-direct-photo],body[data-tnt-mod
 
   document.addEventListener('click',e=>{
     const pay = e.target.closest?.('.paychips [data-pay]');
-    if(pay && !e.target.closest('#tnt-pay-exact')){
+    if(pay && !settingExact){
       exactMode = false;
       setTimeout(clearExactVisual,0);
     }
