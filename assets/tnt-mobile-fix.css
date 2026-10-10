@@ -1,0 +1,88 @@
+/* Mobile usability hotfix: module access must never depend on a horizontal swipe. */
+@media (max-width:700px){
+  body .module-grid[data-space-track]{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:12px!important;
+    overflow:visible!important;
+    overflow-x:visible!important;
+    overflow-y:visible!important;
+    scroll-snap-type:none!important;
+    scroll-padding:0!important;
+    padding:0!important;
+    margin:0!important;
+    perspective:none!important;
+    overscroll-behavior:auto!important;
+    touch-action:manipulation!important;
+  }
+  body .module-grid[data-space-track] .module-stack{
+    flex:none!important;
+    width:auto!important;
+    max-width:none!important;
+    min-width:0!important;
+    margin:0!important;
+    scroll-snap-align:none!important;
+    --card-turn:0!important;
+  }
+  body .module-grid[data-space-track] .module-stack[data-space="organizacion"]{grid-column:1/-1}
+  body .module-grid[data-space-track] .module-card{
+    height:176px!important;
+    min-height:176px!important;
+    padding:18px!important;
+    border-radius:16px!important;
+    transform:none!important;
+    transition:transform .12s ease,box-shadow .12s ease!important;
+  }
+  body .module-grid[data-space-track] .module-stack[data-space="organizacion"] .module-card{
+    height:150px!important;
+    min-height:150px!important;
+  }
+  body .module-grid[data-space-track] .module-art{
+    min-height:44px!important;
+    align-items:flex-start!important;
+  }
+  body .module-grid[data-space-track] .module-art>.tnt-icon{
+    width:40px!important;
+    height:40px!important;
+    border-radius:12px!important;
+    padding:7px!important;
+  }
+  body .module-grid[data-space-track] .module-stat{display:none!important}
+  body .module-grid[data-space-track] .module-bottom{
+    padding-bottom:26px!important;
+    margin-top:auto!important;
+  }
+  body .module-grid[data-space-track] .module-bottom h3{
+    margin:0!important;
+    max-width:100%!important;
+    font-size:20px!important;
+    line-height:1.08!important;
+    letter-spacing:-.045em!important;
+    overflow-wrap:normal!important;
+    word-break:normal!important;
+  }
+  body .module-grid[data-space-track] .module-bottom p{display:none!important}
+  body .module-grid[data-space-track] .module-open{
+    right:0!important;
+    bottom:-5px!important;
+    width:34px!important;
+    height:34px!important;
+  }
+  body .module-grid[data-space-track] .module-open .tnt-icon{width:19px!important;height:19px!important}
+  body .module-grid[data-space-track] .tnt-space-number{
+    top:auto!important;
+    right:14px!important;
+    bottom:48px!important;
+    font-size:48px!important;
+    opacity:.9!important;
+  }
+  body .tnt-space-controls{display:none!important}
+  body .module-grid[data-space-track] .module-stack.is-visible{animation:none!important}
+}
+@media (max-width:370px){
+  body .module-grid[data-space-track]{gap:10px!important}
+  body .module-grid[data-space-track] .module-card{height:164px!important;min-height:164px!important;padding:15px!important}
+  body .module-grid[data-space-track] .module-stack[data-space="organizacion"] .module-card{height:140px!important;min-height:140px!important}
+  body .module-grid[data-space-track] .module-bottom h3{font-size:18px!important}
+  body .module-grid[data-space-track] .tnt-space-number{font-size:42px!important;right:12px!important}
+}
