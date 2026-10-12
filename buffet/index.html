@@ -30,7 +30,7 @@
 
 .prodgrid{grid-template-columns:repeat(auto-fit,minmax(135px,1fr))}.cartbar{position:static!important;max-width:100%;margin-top:24px;border:1px solid var(--tnt-line);border-radius:22px;padding:18px;background:var(--tnt-panel)!important;color:var(--tnt-text)!important}.carthead{font-size:18px}.paychips,.btnrow,.nav{flex-wrap:wrap;overflow:visible}.checkout{gap:14px}.buffet-order-actions{margin:16px 0}.product{min-width:0}.cartitem{gap:12px}.qty{flex-shrink:0}.content{padding-bottom:125px}.top{position:static!important}.toprow{flex-wrap:wrap}.nav{bottom:10px;max-width:calc(100% - 20px);border-radius:20px}.hero h1{font-size:30px!important}@media(max-width:600px){.prodgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.content{padding-inline:14px}.cartbar{padding:15px}.paychips .chip{flex:1;white-space:normal}.nav button{font-size:13px}}
 </style>
-<link rel="stylesheet" href="/assets/tnt-ui.css?v=37"><link rel="stylesheet" href="/assets/tnt-module-theme.css?v=15"><link rel="stylesheet" href="/assets/tnt-identity.css?v=1"><link rel="stylesheet" href="/assets/tnt-experience.css?v=1"><link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/assets/tnt-design.css?v=2"><link rel="icon" type="image/svg+xml" href="/icons/icon.svg?v=2"><link rel="apple-touch-icon" href="/icons/icon-192.png?v=2"></head>
+<link rel="stylesheet" href="/assets/tnt-ui.css?v=37"><link rel="stylesheet" href="/assets/tnt-module-theme.css?v=15"><link rel="stylesheet" href="/assets/tnt-identity.css?v=1"><link rel="stylesheet" href="/assets/tnt-experience.css?v=20261012"><link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/assets/tnt-design.css?v=20261012"><link rel="icon" type="image/svg+xml" href="/icons/dynamite-app.svg?v=20261012"><link rel="apple-touch-icon" href="/icons/dynamite-app-192.png?v=20261012"></head>
 <body data-tnt-module="buffet" data-tnt-label="Buffet">
   <div id="app"></div>
   <div id="toast" class="toast" aria-live="polite"></div>
@@ -43,7 +43,7 @@
     <div id="alert-notes" class="alert-notes"></div>
     <div id="alert-actions" class="alert-actions"></div>
   </div>
-  <script src="/supabase-lite.js?v=12"></script><script src="/assets/tnt-components.js?v=40"></script><script src="/assets/tnt-profiles.js?v=2"></script><script src="/assets/tnt-experience.js?v=2"></script><script src="/assets/tnt-notifications.js?v=3"></script><script src="/assets/tnt-push.js?v=2"></script><script src="/assets/tnt-core.js?v=52" data-module="buffet" data-label="Buffet"></script><script type="module">
+  <script src="/supabase-lite.js?v=12"></script><script src="/assets/tnt-components.js?v=20261012"></script><script src="/assets/tnt-profiles.js?v=20261012"></script><script src="/assets/tnt-experience.js?v=20261012"></script><script src="/assets/tnt-notifications.js?v=20261012"></script><script src="/assets/tnt-push.js?v=20261012"></script><script src="/assets/tnt-core.js?v=20261012" data-module="buffet" data-label="Buffet"></script><script type="module">
 const {createClient}=window.supabase;
 
 
@@ -88,9 +88,11 @@ async function boot(){
 }
 
 function renderShell(){
+  if(state.tab==='sale'&&!TNT.canAction('buffet','sell'))state.tab=TNT.canAction('buffet','edit_stock')?'menu':'kitchen';
+  if(state.tab==='cash'&&!TNT.canAction('buffet','reports'))state.tab=TNT.canAction('buffet','sell')?'sale':'kitchen';
   const prep=state.role==='kitchen';
   app.innerHTML=`<div class="app ${prep?'prep-app':''}"><header class="top"><div class="toprow"><div class="brand">💣 TNT Buffet<small id="shift-label">SIN JORNADA</small><button class="pill" id="shift-history">Elegir jornada</button></div><button class="pill role-pill ${prep?'prep-pill':''}" id="role-pill">${prep?'👨‍🍳 PREPARACIÓN':'🧾 CAJA'} · ${esc(state.name)}</button></div></header>${prep?`<div class="prep-strip"><span class="prep-dot"></span><b>MODO PREPARACIÓN</b><small>Este celular recibe las órdenes nuevas en pantalla completa.</small></div>`:''}<main class="content" id="screen"></main><nav class="nav ${prep?'prep-nav':''}">${prep?`<button data-tab="kitchen"><b>👨‍🍳</b>Órdenes de preparación</button>`:`<button data-tab="sale"><b>🛒</b>Vender</button><button data-tab="kitchen"><b>👨‍🍳</b>Órdenes</button><button data-tab="menu"><b>🍽️</b>Menú</button><button data-tab="cash"><b>💰</b>Caja</button>`}</nav></div>`;
-  document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;render()});
+  document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab==='sale')b.hidden=!TNT.canAction('buffet','sell');if(b.dataset.tab==='cash')b.hidden=!TNT.canAction('buffet','reports');b.onclick=()=>{if(b.hidden)return;state.tab=b.dataset.tab;render()};});
   $('#shift-history').onclick=chooseShift;
   $('#role-pill').onclick=()=>{const next=state.role==='kitchen'?'cashier':'kitchen';state.role=next;localStorage.setItem('tnt_role',next);state.tab=next==='kitchen'?'kitchen':'sale';renderShell();render();};
 }
@@ -138,7 +140,7 @@ function shiftGate(inner){
   if(!state.shift)return `<div class="hero"><h1>Arranquemos el sábado</h1><p>Creá la jornada para configurar el menú. Podés abrir la caja después.</p></div><div class="card"><button class="btn full" id="create-shift">Crear jornada para esta fecha</button></div>`;
   return inner;
 }
-function bindCreateShift(){const b=$('#create-shift');if(b)b.onclick=async()=>{setBusy(b,true);try{const {data,error}=await db.from('tnt_shifts').insert({shift_date:state.date,status:'planning',opening_cash:0}).select().single();if(error)throw error;state.shift=data;await loadMenu();render()}catch(e){toast(errMsg(e));setBusy(b,false)}}}
+function bindCreateShift(){const b=$('#create-shift');if(b&&!TNT.canAction('buffet','edit_stock')&&!TNT.canAction('buffet','reports')){b.hidden=true;return;}if(b)b.onclick=async()=>{setBusy(b,true);try{const {data,error}=await db.from('tnt_shifts').insert({shift_date:state.date,status:'planning',opening_cash:0}).select().single();if(error)throw error;state.shift=data;await loadMenu();render()}catch(e){toast(errMsg(e));setBusy(b,false)}}}
 
 function renderSale(){
   captureCart();
@@ -281,7 +283,8 @@ async function chooseShift(){
   }catch(e){toast(errMsg(e))}
 }
 function enforceReadOnly(){
-  if(!TNT.identity||TNT.hasAccess('buffet','*','edit'))return;
+  const action={sale:'sell',kitchen:'sell',menu:'edit_stock',cash:'reports'}[state.tab]||'view';
+  if(!TNT.identity||TNT.canAction('buffet',action))return;
   document.querySelectorAll('#screen button:not(#go-menu),#screen input,#screen textarea,#screen select').forEach(el=>{if(!el.disabled)el.disabled=true;});
   const screen=document.querySelector('#screen');if(screen&&!screen.querySelector('.buffet-readonly')){const note=document.createElement('p');note.className='buffet-readonly muted';note.textContent='Acceso de lectura: podés consultar las jornadas. Para registrar cambios necesitás permiso de edición.';screen.prepend(note);}
 }

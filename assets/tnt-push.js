@@ -1,15 +1,16 @@
 (() => {
 'use strict';
 const PUBLIC_KEY='BF3EVnNKTFBmSHImqA-PpYPylaHMG9L-A-gomiSB20084j_mNWWAT_Gm282-ovE5fXBN6fkPT_QyuXSx4H8r1hI';
-const ICON='/icons/icon-192.png',BADGE='/icons/notification-badge.png';
+const ICON='/icons/dynamite-app-192.png?v=20261012',BADGE='/icons/notification-badge.png';
 function keyBytes(base64){const pad='='.repeat((4-base64.length%4)%4),raw=atob((base64+pad).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)))}
-async function registration(){if(!('serviceWorker'in navigator))throw new Error('Este navegador no admite notificaciones en segundo plano.');await navigator.serviceWorker.register('/sw.js',{scope:'/'});return navigator.serviceWorker.ready}
+async function registration(){if(!('serviceWorker'in navigator))throw new Error('Este navegador no admite notificaciones en segundo plano.');const existing=await navigator.serviceWorker.getRegistration?.('/');if(existing)return existing;await navigator.serviceWorker.register('/sw.js',{scope:'/'});return navigator.serviceWorker.ready}
 async function subscription(){
  if(!('Notification'in window)||!('PushManager'in window))throw new Error('Este teléfono no admite notificaciones web.');
- const permission=await Notification.requestPermission();
+ const permission=Notification.permission==='default'?await Notification.requestPermission():Notification.permission;
  if(permission!=='granted')throw new Error('Necesitamos permiso para mostrar avisos en el teléfono. Podés habilitarlo desde los permisos del navegador.');
  const reg=await registration();
  let sub=await reg.pushManager.getSubscription();
+ if(sub?.options?.applicationServerKey){const existing=new Uint8Array(sub.options.applicationServerKey),current=keyBytes(PUBLIC_KEY);if(existing.length!==current.length||existing.some((v,i)=>v!==current[i])){await sub.unsubscribe();sub=null;}}
  if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:keyBytes(PUBLIC_KEY)});
  return{sub,reg};
 }

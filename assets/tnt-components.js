@@ -14,7 +14,8 @@
     search:'M21 21l-5-5M10.5 3a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15',
     sun:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 1v2m0 18v2M1 12h2m18 0h2M4.2 4.2l1.4 1.4m12.8 12.8 1.4 1.4M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4',
     moon:'M21 13a9 9 0 0 1-10-10 9 9 0 1 0 10 10Z',
-    settings:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2',
+    settings:'M9 3h6l1 3 3 1 2 5-2 2-1 3-5 4-2-2-3-1-4-5 2-2 1-3 2-2Zm3 5a4 4 0 1 0 0 8 4 4 0 0 0 0-8',
+    trash:'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7',
     clock:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18m0 4v6l4 2',
     file:'M14 2H4v20h16V8l-6-6Zm0 0v6h6M8 13h8m-8 4h6',
     clip:'m8 13 6-6a3 3 0 0 1 4 4l-8 8a5 5 0 0 1-7-7l9-9',
@@ -45,8 +46,8 @@
   }
   function avatar(person={}, account={}, cls='') {
     person||={};account||={};const own=root.TNT?.person?.id===person.id?root.TNT.account||{}:{};
-    const name=account.nickname || person.full_name || person.display_name || 'Persona TNT';
-    const large=cls.includes('portrait'),url=photoUrl(account.avatar_url||person.avatar_url||own.avatar_url||'',large?512:128);
+    const name=own.nickname || account.nickname || person.full_name || person.display_name || 'Persona TNT';
+    const large=cls.includes('portrait'),url=photoUrl(own.avatar_url||account.avatar_url||person.avatar_url||(root.TNT?.person?.id===person.id?root.TNT.avatar?.():'')||'',large?512:128);
     return `<span class="tnt-person-avatar ${esc(cls)} ${url?'has-photo':'without-photo'}" title="${esc(name)}"><span aria-hidden="true">${esc(initials(name))}</span>${url?`<img src="${esc(url)}" alt="${esc(name)}" loading="${large?'eager':'lazy'}" decoding="async" ${large?'fetchpriority="high"':''} referrerpolicy="no-referrer">`:''}</span>`;
   }
   function avatarStack(ids, people, accounts, myId, max=5) {
@@ -104,7 +105,7 @@
     }
     if(!replacing&&root.history?.pushState)root.history.pushState({...root.history.state,tntSharedOverlay:true},'');
     const onBack=e=>{if(e.state?.tntSharedOverlay)return;root.removeEventListener('popstate',onBack);if(dialog.isConnected){dialog.remove();previous?.focus?.();}};root.addEventListener('popstate',onBack);dialog._tntDisposeBack=()=>root.removeEventListener('popstate',onBack);
-    const close=()=>{if(!dialog.isConnected)return;dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();if(root.history?.state?.tntSharedOverlay)return backOverlay();};
+    const close=()=>{if(!dialog.isConnected)return;dialog.dispatchEvent(new root.Event('close'));dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.({preventScroll:true});if(root.history?.state?.tntSharedOverlay)return backOverlay();};
     dialog._tntClose=close;
     dialog.querySelector('.tnt-close').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
     dialog.addEventListener('click',e=>{if(e.target===dialog)close();});
@@ -117,7 +118,7 @@
     const id='layer-'+Date.now()+'-'+Math.random().toString(36).slice(2),previous=root.document.activeElement;
     const stack=[...(root.history.state?.tntLayerStack||[]),id];
     root.history.pushState({...root.history.state,tntLayerStack:stack},'');node._tntLayerActive=true;
-    const finish=()=>{node._tntLayerActive=false;root.removeEventListener('popstate',onBack);root.document.removeEventListener('keydown',onKey);dismiss();previous?.focus?.();};
+    const finish=()=>{node._tntLayerActive=false;root.removeEventListener('popstate',onBack);root.document.removeEventListener('keydown',onKey);node.dispatchEvent(new root.Event('close'));dismiss();previous?.focus?.({preventScroll:true});};
     const onBack=e=>{if(!e.state?.tntLayerStack?.includes(id))finish();};
     const close=()=>{if(!node._tntLayerActive)return;finish();if(root.history.state?.tntLayerStack?.at(-1)===id)return backOverlay();};
     const onKey=e=>{if(e.key==='Escape'&&root.history.state?.tntLayerStack?.at(-1)===id){e.preventDefault();e.stopImmediatePropagation();close();}};
@@ -164,8 +165,8 @@
         dialog.innerHTML=`<div class="tnt-select-sheet"><header><h2>${esc(label)}</h2><button type="button" class="tnt-select-close" aria-label="Cerrar">${icon('close')}</button></header>${options.length>8?'<input type="search" class="tnt-select-search" placeholder="Buscar opción…" aria-label="Buscar opción">':''}<div class="tnt-select-list" role="listbox">${groups.map(group=>`${group.label?`<div class="tnt-select-group" role="presentation">${esc(group.label)}</div>`:''}${group.items.map(({option,index})=>`<button type="button" role="option" data-option="${index}" data-search="${esc(`${group.label} ${option.textContent.trim()}`)}" aria-selected="${option.selected}" ${option.disabled?'disabled':''}><span>${esc(option.textContent.trim())}</span>${option.selected?icon('check'):''}</button>`).join('')}`).join('')}</div></div>`;
         root.document.body.append(dialog);
         if(root.history?.pushState)root.history.pushState({...root.history.state,tntSelectOverlay:true},'');
-        const onBack=()=>{dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();};root.addEventListener('popstate',onBack);
-        let closing=false;const close=async()=>{if(closing)return;closing=true;dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.();if(root.history?.state?.tntSelectOverlay)await backOverlay();};
+        const onBack=()=>{dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.({preventScroll:true});};root.addEventListener('popstate',onBack);
+        let closing=false;const close=async()=>{if(closing)return;closing=true;dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.({preventScroll:true});if(root.history?.state?.tntSelectOverlay)await backOverlay();};
         dialog.querySelector('.tnt-select-close').onclick=close;
         dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
         dialog.addEventListener('click',e=>{if(e.target===dialog)close();});
@@ -176,9 +177,26 @@
       };
     }
   }
-  const api={esc,icon,safeUrl,photoUrl,initials,avatar,avatarStack,dateKey,addDays,date,time,completed,modal,closeModal,trackOverlay,confirm,prompt,toast,enhanceSelects,backOverlay,accessInfo};
+  function snapshotView(){
+    const selectors=['#tabs','.org-nav-track','[data-space-track]','.camp-nav','.tnt-studio-modules'];
+    return {y:root.scrollY||0,scroll:selectors.flatMap(selector=>[...root.document.querySelectorAll(selector)].map((el,index)=>({selector,index,left:el.scrollLeft}))),folds:[...root.document.querySelectorAll('[data-tnt-collapse]')].map(el=>({id:el.dataset.tntCollapse,open:el.open}))};
+  }
+  function restoreView(saved){if(!saved)return;root.requestAnimationFrame?.(()=>{for(const s of saved.scroll){const el=root.document.querySelectorAll(s.selector)[s.index];if(el)el.scrollLeft=s.left;}for(const s of saved.folds){const el=[...root.document.querySelectorAll('[data-tnt-collapse]')].find(el=>el.dataset.tntCollapse===s.id);if(el)el.open=s.open;}root.scrollTo?.({top:saved.y,behavior:'instant'});});}
+  const foldState=new Map();
+  function enhanceLists(scope=root.document){
+    const lists={'.users':'Personas','.audit':'Historial de cambios','.tnt-access-list':'Ver lista','.tnt-version-list':'Versiones anteriores','.tnt-notification-list':'Notificaciones','.person-list':'Personas del grupo','.camp-registrations':'Inscripciones','.tnt-library-list':'Recursos'};
+    for(const [selector,label] of Object.entries(lists)){
+      const nodes=scope.matches?.(selector)?[scope]:[...scope.querySelectorAll?.(selector)||[]];
+      for(const list of nodes){if(list.childElementCount<5||list.parentElement?.tagName==='DETAILS'||list.closest('details')||list.querySelector('form'))continue;
+        const d=root.document.createElement('details');d.className='tnt-fold tnt-list-fold';d.open=true;d.dataset.tntCollapse=selector+':'+(list.id||label);const s=root.document.createElement('summary');s.textContent=label+' · '+list.childElementCount;list.before(d);d.append(s,list);
+      }
+    }
+    const details=scope.matches?.('[data-tnt-collapse]')?[scope]:[...scope.querySelectorAll?.('[data-tnt-collapse]')||[]];
+    for(const d of details){if(d.dataset.tntFoldBound)continue;d.dataset.tntFoldBound='true';const key=(root.TNT?.module||'home')+':'+d.dataset.tntCollapse;if(!foldState.has(key)){try{const saved=root.sessionStorage.getItem('tnt-fold:'+root.TNT?.person?.id+':'+key);if(saved!==null)foldState.set(key,saved==='true');}catch{}}if(foldState.has(key))d.open=foldState.get(key);d.addEventListener('toggle',()=>{foldState.set(key,d.open);try{root.sessionStorage.setItem('tnt-fold:'+root.TNT?.person?.id+':'+key,String(d.open));}catch{}});}
+  }
+  const api={esc,icon,safeUrl,photoUrl,initials,avatar,avatarStack,dateKey,addDays,date,time,completed,modal,closeModal,trackOverlay,confirm,prompt,toast,enhanceSelects,backOverlay,accessInfo,snapshotView,restoreView,enhanceLists};
   root.TNTUI=api;
-  if(root.document){const init=()=>{enhanceSelects();if(root.MutationObserver){new root.MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1)enhanceSelects(node);}).observe(root.document.body,{childList:true,subtree:true});}};if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init,{once:true});else init();}
+  if(root.document){const init=()=>{enhanceSelects();enhanceLists();if(root.MutationObserver){new root.MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1){enhanceSelects(node);enhanceLists(node);}}).observe(root.document.body,{childList:true,subtree:true});}root.document.addEventListener('invalid',e=>{for(let el=e.target.parentElement;el;el=el.parentElement)if(el.tagName==='DETAILS')el.open=true;},true);};if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init,{once:true});else init();}
   root.document?.addEventListener('error',e=>{if(e.target?.matches?.('.tnt-person-avatar img')){const avatar=e.target.parentElement;avatar.classList.remove('has-photo');avatar.classList.add('without-photo');e.target.remove();}},true);
   if(typeof module!=='undefined')module.exports=api;
 })(typeof window==='undefined'?globalThis:window);

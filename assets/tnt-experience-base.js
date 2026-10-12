@@ -27,7 +27,7 @@
  function paintCover(){
   const id=moduleId(),m=E.module(id),url=E.image(m.cover||''),existing=document.getElementById('tnt-module-cover');
   if(id==='home'||id==='admin'||!url){existing?.remove();return;}
-  const app=document.querySelector('#app,#camp-app,#attendance-app');if(!app||!TNT.profileComplete||TNT.blocked)return;
+  const app=document.querySelector('#app,#camp-app,#attendance-app,.app-shell');if(!app||!TNT.profileComplete||TNT.blocked)return;
   const d=existing||document.createElement('section');d.id='tnt-module-cover';d.dataset.tntRecord='true';
   d.style.setProperty('--tnt-cover',`url("${url.replaceAll('"','%22')}")`);d.innerHTML=`<span>TNT · ${esc(MODULES.find(x=>x[0]===id)?.[1]||id)}</span><h1>${esc(m.title||MODULES.find(x=>x[0]===id)?.[1]||'TNT')}</h1><p>${esc(m.description||'')}</p>`;
   if(!existing)app.before(d);

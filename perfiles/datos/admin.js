@@ -475,12 +475,13 @@
       const extra = document.createElement('div');
       extra.dataset.profileInterests = '';
       extra.className = 'profile-detail-extra';
-      extra.innerHTML = '<h3>Intereses y proyectos</h3>' + Object.entries(ctx.fields).filter(([k,f]) => !window.TNTProfiles.baseKeys.includes(k) && f.visible !== false && (k!=='health'||window.TNT.isAdmin||String(record.id)===String(window.TNT.person?.id))).map(([k,f]) => {
+      extra.innerHTML = '<h3>Intereses y proyectos</h3>' + Object.entries(ctx.fields).filter(([k,f]) => !window.TNTProfiles.baseKeys.includes(k) && f.visible !== false && TNTProfiles.applies(f,profileAccounts.find(a=>a.person_id===record.id)?.ministry_role||ctx.values._ministry_role,ctx.values._profile_roles||[]) && (k!=='health'||window.TNT.isAdmin||String(record.id)===String(window.TNT.person?.id))).map(([k,f]) => {
         let value = ctx.values[k];
         if (k === 'efe_group') value = value === 'none' ? 'Todavía no va a un EFE' : ctx.groups.find(g => g.code === value)?.name;
         if (Array.isArray(value)) value = value.join(', ');
         if (k === 'leadership_strengths') {
-          if (!profileAccounts.find(a=>a.person_id===record.id&&a.ministry_role==='Líder')) return '';
+          const role=profileAccounts.find(a=>a.person_id===record.id)?.ministry_role||ctx.values._ministry_role;
+          if(!TNTProfiles.applies(f,role,ctx.values._profile_roles||[]))return '';
           value=value&&typeof value==='object'?Object.entries(value).map(([area,score])=>`${area}: ${score}%`).join(' · '):'';
         }
         return detailItem(f.label, value || 'Sin completar', ['dreams','studies','interests'].includes(k) || f.type === 'textarea' || String(value || '').length > 60);
@@ -490,24 +491,11 @@
       if(account?.skills?.length)extra.innerHTML+=detailItem('Habilidades',account.skills.join(', '),true);
       if(account?.bio)extra.innerHTML+=detailItem('Sobre mí',account.bio,true);
       if(account?.service_areas?.length)extra.innerHTML+=detailItem('Áreas donde participa',account.service_areas.join(', '),true);
-      if ((canEdit()||String(record.id)===String(window.TNT.person?.id)) && profileState === 'active') {
-        const button = document.createElement('button');
-        button.className = 'tnt-button primary';button.textContent = 'Editar perfil completo';
-        button.onclick = openEdit;
-        extra.append(button);
-      }
       $("detailData").append(extra);
     } catch(error) { console.warn('Datos ampliados del perfil',error); }
   }
 
-  function editProfileInterests(record,ctx) {
-    const U=window.TNTUI,P=window.TNTProfiles;
-    const role=profileAccounts.find(a=>a.person_id===record.id)?.ministry_role;
-    const fields={...ctx.fields};if(!window.TNT.isAdmin&&String(record.id)!==String(window.TNT.person?.id)){delete fields.health;delete fields.dni;}
-    const o=U.modal('Editar perfil completo',`<form class="tnt-form">${P.render(fields,ctx.values,ctx.groups,{role})}<button class="tnt-button primary" type="submit">Guardar perfil</button><p role="status"></p></form>`,false,{stack:true});
-    const form=o.querySelector('form');P.bind(form,ctx.fields,ctx.values,ctx.groups);
-    form.onsubmit=async e=>{e.preventDefault();if(!P.validate(form,ctx.fields))return;const button=form.querySelector('[type=submit]');button.disabled=true;try{const r=await window.TNT.sb.rpc('tnt_save_central_profile',{p_person:record.id,p_values:P.collect(form,ctx.fields)});if(r.error)throw r.error;await U.closeModal(o);await loadProfileInterests(record);showToast('Perfil actualizado.');}catch(err){form.querySelector('[role=status]').textContent=err.message;}finally{button.disabled=false;}};
-  }
+  function editProfileInterests(record){return window.TNTProfileEditor.open(record.id);}
 
   function closeFilters() {
     window.TNTUI.closeModal(filterSheet);
@@ -601,7 +589,7 @@
   async function openEdit() {
     const record = currentRecord();
     if (!record || profileState !== 'active') return;
-    if(String(record.id)===String(window.TNT.person?.id)){await closeDetail();return window.TNT.editProfile();}
+    if(String(record.id)===String(window.TNT.person?.id)){await closeDetail();return window.TNTProfileEditor.open(record.id);}
     if(!canEdit())return;
     const result=await window.TNT.sb.rpc('tnt_profile_detail',{p_person:record.id});
     if(result.error)return showToast(result.error.message);
@@ -755,7 +743,7 @@
     if (symbol) symbol.textContent = active ? "…" : "↻";
   }
 
-  document.addEventListener('tnt:data',e=>{if((e.detail?.tables||[]).some(t=>['tnt_people','tnt_accounts','tnt_settings'].includes(t))&&!bulkBusy)loadData('central',{silent:true}).catch(e=>showToast(e.message));});
+  document.addEventListener('tnt:data',e=>{if((e.detail?.tables||[]).some(t=>['tnt_people','tnt_accounts','tnt_settings'].includes(t))&&!bulkBusy&&!TNT.ownProfilePage?.())loadData('central',{silent:true}).catch(e=>showToast(e.message));});
   async function loadData(token, options = {}) {
     const sb = window.TNT?.sb;
     if (!sb) throw new Error("No se pudo conectar con la base.");
@@ -807,6 +795,7 @@
     passwordInput.focus();
   });
 
+  document.getElementById("myProfileBtn")?.addEventListener("click",()=>TNT.showMyProfile());
   $("themeToggle").addEventListener("click", () => {
     window.TNT.toggleTheme();
   });
@@ -1031,6 +1020,18 @@
 
   async function restorePanelSession() {
     await window.TNT?.ready;
+    if(TNT.ownProfilePage?.()&&TNT.identity&&!TNT.blocked){
+      loginView.hidden=true;dashboardView.hidden=false;
+      const main=document.querySelector('.app-shell');
+      [...main.children].filter(el=>el.id!=='my-profile-view'&&!el.matches('header')).forEach(el=>el.hidden=true);
+      let own=document.getElementById('my-profile-view');if(!own){own=document.createElement('section');own.id='my-profile-view';main.append(own);}
+      const paintOwn=()=>{const ctx=TNT.profileContext,values=ctx.values,fields=TNTProfiles.config(ctx.fields);
+        own.innerHTML=`<div class="tnt-own-profile-hero">${TNTUI.avatar(TNT.person,{...TNT.account,avatar_url:TNT.avatar()},'portrait')}<div><span class="eyebrow-pill">MI PERFIL</span><h1>${escapeHtml(TNT.person.full_name)}</h1><p>${escapeHtml(TNT.account.ministry_role||'Comunidad TNT')}</p><button class="tnt-button primary" data-edit-my-profile>Editar perfil completo</button></div></div><div class="profile-detail-grid">${Object.entries(fields).filter(([k,f])=>f.visible!==false&&TNTProfiles.applies(f,TNT.account.ministry_role,values._profile_roles||[])).map(([k,f])=>{let value=values[k];if(k==='efe_group')value=value==='none'?'Todavía no voy a un EFE':ctx.groups.find(g=>g.code===value)?.name;if(k==='sex')value={M:'Varón',F:'Mujer'}[value];if(Array.isArray(value))value=value.join(', ');if(value&&typeof value==='object')value=Object.entries(value).map(([area,score])=>area+': '+score+'%').join(' · ');return detailItem(f.label,value||'Sin completar',f.type==='textarea'||f.type==='leadership');}).join('')}</div>`;
+        own.querySelector('[data-edit-my-profile]').onclick=()=>TNTProfileEditor.open();};
+      paintOwn();document.addEventListener('tnt:profile',paintOwn);
+      if(new URLSearchParams(location.search).get('edit')==='1'){const url=new URL(location.href);url.searchParams.delete('edit');history.replaceState(history.state,'',url);TNTProfileEditor.open();}
+      return;
+    }
     if (!window.TNT?.identity || window.TNT.blocked || !window.TNT.hasAccess('perfiles','*','view')) {
       loginMessage.textContent = "Necesitás permiso para ver Perfiles. Podés solicitarlo desde tu Cuenta TNT.";
       loginView.hidden = false;

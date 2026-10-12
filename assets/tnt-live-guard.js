@@ -19,7 +19,7 @@
     admin:['tnt_access_requests','tnt_role_requests','tnt_profile_change_requests','tnt_profile_link_requests','tnt_profile_public_requests','tnt_audit_log']
   };
   const IDENTITY=new Set(['tnt_accounts','tnt_access_grants','tnt_role_permission_presets','tnt_person_permission_overrides','tnt_people','tnt_profile_answers','tnt_settings']);
-  const PEOPLE_PAGES=new Set(['admin','perfiles','organizacion','chat','asistencia','campamento']);
+  const PEOPLE_PAGES=new Set(['home','admin','perfiles','organizacion','chat','asistencia','campamento']);
   let channel=null,timer=null,identityTouched=false;
   const queued=new Set();
   const rowOf=p=>p?.new&&Object.keys(p.new).length?p.new:(p?.old||{});
@@ -59,7 +59,7 @@
         document.dispatchEvent(new CustomEvent('tnt:permissions'));
         document.dispatchEvent(new CustomEvent('tnt:config',{detail:E.config}));
         if(T.module&&!T.profileComplete){T.blocked=true;location.replace('/?onboarding=1');return;}
-        if(T.module&&!T.isAdmin&&!T.hasAccess(T.module,T.scope||'*')){T.blocked=true;location.replace('/');return;}
+        if(T.module&&!T.isAdmin&&!T.ownProfilePage?.()&&!T.hasAccess(T.module,T.scope||'*')){T.blocked=true;location.replace('/');return;}
       }
       document.dispatchEvent(new CustomEvent('tnt:data',{detail:{tables}}));
     }catch(e){console.warn('TNT scoped live update',e);}
