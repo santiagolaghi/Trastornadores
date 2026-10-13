@@ -14,7 +14,7 @@ begin
     update public.tnt_people set full_name='TNT Push Test '||auth_id,first_name='TNT',last_name='Push Test',birthday='2000-01-01',sex='M',phone='1100000000',instagram='@tnt_test',profile_consent=true where id=push_pid;
     update public.tnt_accounts a set onboarding_completed_at=now(),staff_status='community' where a.person_id=push_pid;
     insert into public.tnt_profile_private_fields(person_id,dni) values(push_pid,'00000000') on conflict on constraint tnt_profile_private_fields_pkey do update set dni=excluded.dni;
-    insert into public.tnt_profile_answers(person_id,answers) values(push_pid,'{"interests":["Música"],"studies":"Prueba","dreams":"Prueba","efe_group":"none"}') on conflict on constraint tnt_profile_answers_pkey do update set answers=excluded.answers;
+    insert into public.tnt_profile_answers(person_id,answers) values(push_pid,'{"interests":["Música"],"studies":"Prueba","dreams":"Prueba","health":"Ninguna","efe_group":"none"}') on conflict on constraint tnt_profile_answers_pkey do update set answers=excluded.answers;
   end loop;
   perform set_config('tnt.push.first_auth', first_auth::text, true);
   perform set_config('tnt.push.second_auth', second_auth::text, true);

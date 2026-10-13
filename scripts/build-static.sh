@@ -3,13 +3,13 @@ set -euo pipefail
 
 rm -rf public
 mkdir -p public
-cp -r assets admin asistencia buffet campamento chat efe glosario icons organizacion lista-sabados perfiles manifest.webmanifest index.html sw.js public/
+cp -r assets admin asistencia buffet campamento chat efe glosario icons organizacion lista-sabados perfiles manifest.webmanifest icon.svg index.html sw.js public/
 
 python3 <<'PY'
 from pathlib import Path
 p = Path('public/buffet/index.html')
 s = p.read_text(encoding='utf-8')
-s = s.replace('/assets/tnt-experience.js?v=2', '/assets/tnt-experience.js?v=65')
+s = s.replace('src="/assets/tnt-experience.js?v=2"', 'src="/assets/tnt-experience.js?v=20261013"')
 needle = '<script type="module">'
 inject = '<script src="/assets/tnt-buffet-direct.js?v=2"></script>' + needle
 if '/assets/tnt-buffet-direct.js?v=2' not in s:

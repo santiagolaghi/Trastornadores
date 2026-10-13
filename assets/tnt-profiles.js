@@ -10,7 +10,7 @@ const defaults={
  studies:{label:'¿Qué estudiás o a qué te dedicás?',type:'text'},dreams:{label:'¿Cuáles son tus sueños?',type:'textarea'},
  health:{label:'¿Tenés alguna enfermedad, alergia o condición de salud que debamos conocer?',type:'textarea'},
  leadership_strengths:{label:'Habilidades para acompañar jóvenes y adolescentes',type:'leadership',required:true,roles:['Líder','Pastor/a'],default:50},
- efe_group:{label:'¿A qué EFE vas?',type:'efe'}
+ efe_group:{label:'¿A qué EFE vas?',type:'efe'},efe_service_role:{label:'Mi lugar en este EFE',type:'select',required:false,roles:['Admin','Pastor/a','Líder','Timoteo','Colaborador'],options:['Participo','Soy líder de este EFE','Soy Timoteo de este EFE']}
 };
 function config(fields){const order=Object.keys(defaults);return Object.fromEntries(Object.entries(fields||defaults).sort(([a],[b])=>(order.includes(a)?order.indexOf(a):100)-(order.includes(b)?order.indexOf(b):100)).map(([k,f])=>[k,{visible:true,required:true,...defaults[k],...f}]));}
 function applies(f,role='',roles=[]){return !f.roles?.length||f.roles.includes(role||'Comunidad')||roles.some(r=>f.roles.includes(r));}
@@ -39,14 +39,14 @@ function field(key,f,v='',groups=[],locked=false){
  return `<div class="profile-field ${f.type==='multiselect'||f.type==='textarea'?'profile-field-wide':''}"><label ${f.type==='multiselect'?'':`for="${id}"`}>${label}<span class="profile-requirement">${hint}</span></label>${input}${help?`<small>${help}</small>`:''}${lock?'<small>Dato guardado. Podés solicitar su corrección desde Mi perfil.</small>':''}</div>`;
 }
 function render(fields,values={},groups=[],{mode='all',locked=false,role=''}={}){
- const entries=Object.entries(config(fields)).filter(([k,f])=>applies(f,role,values._profile_roles||[])&&(mode==='all'||(mode==='base'?baseKeys.includes(k):!baseKeys.includes(k))));
- const base=entries.filter(([k])=>baseKeys.includes(k)),extra=entries.filter(([k])=>!baseKeys.includes(k));
- return `${base.length?`<fieldset class="profile-section"><legend>01 · Tus datos</legend><div class="profile-grid">${base.map(([k,f])=>field(k,f,values[k]||'',groups,locked)).join('')}</div></fieldset>`:''}${extra.length?`<fieldset class="profile-section"><legend>${base.length?'02 · ':' '}Lo que te hace vos</legend><p>Queremos conocerte, acompañarte y hacer lugar a tus ideas.</p><div class="profile-grid">${extra.map(([k,f])=>field(k,f,values[k]||'',groups)).join('')}</div></fieldset>`:''}`;
+ const entries=Object.entries(config(fields)).filter(([k,f])=>f.visible!==false&&applies(f,role,values._profile_roles||[])&&(mode==='all'||(mode==='base'?baseKeys.includes(k):!baseKeys.includes(k))));
+ const base=entries.filter(([k])=>baseKeys.includes(k)),extra=entries.filter(([k])=>!baseKeys.includes(k)&&!['efe_group','efe_service_role'].includes(k)),efeFields=entries.filter(([k])=>['efe_group','efe_service_role'].includes(k));
+ return `${base.length?`<fieldset class="profile-section"><legend>01 · Tus datos</legend><div class="profile-grid">${base.map(([k,f])=>field(k,f,values[k]||'',groups,locked)).join('')}</div></fieldset>`:''}${extra.length?`<fieldset class="profile-section"><legend>${base.length?'02 · ':' '}Lo que te hace vos</legend><p>Queremos conocerte, acompañarte y hacer lugar a tus ideas.</p><div class="profile-grid">${extra.map(([k,f])=>field(k,f,values[k]||'',groups)).join('')}</div></fieldset>`:''}${efeFields.length?`<fieldset class="profile-section"><legend>Tu EFE</legend><div class="profile-grid">${efeFields.map(([k,f])=>field(k,f,values[k]||'',groups)).join('')}</div></fieldset>`:''}`;
 }
 function collect(form,fields){
  const fd=new FormData(form),out={};
  for(const [k,f] of Object.entries(config(fields))){
-  if(f.visible===false||!form.querySelector(`[name="${k}"]`))continue;
+  if(f.visible===false||!form.querySelector(`[name="${k}"]`)||form.querySelector(`[name="${k}"]`).disabled)continue;
   if(f.type==='multiselect')out[k]=[...new Set([...fd.getAll(k),...String(fd.get(k+'_other')||'').split(',').map(x=>x.trim()).filter(Boolean)])];
   else if(f.type==='leadership'){if(form.querySelector(`[name="${k}_confirmed"]`)?.checked)out[k]=Object.fromEntries([...form.querySelectorAll(`[name="${k}"][data-area]`)].map(el=>[el.dataset.area,Number(el.value)]));}
   else out[k]=String(fd.get(k)||'').trim();
@@ -75,7 +75,8 @@ function bind(form,fields,values={},groups=[]){
  form.querySelectorAll('.profile-leadership input[type=range]').forEach(input=>input.oninput=()=>{input.nextElementSibling.textContent=input.value+'%';input.style.setProperty('--profile-score',input.value+'%');});
  const efe=form.querySelector('[name="efe_group"]');let manual=!!values.efe_group;
  const update=()=>{if(!efe||manual)return;const code=suggest(form.querySelector('[name="birthday"]')?.value||values.birthday,form.querySelector('[name="sex"]')?.value||values.sex);if(code&&groups.some(g=>g.code===code)){efe.value=code;const hint=form.querySelector('[data-efe-hint]');if(hint)hint.textContent='Sugerido por tu edad y sexo. Podés cambiarlo.';U.enhanceSelects(form);}};
- efe?.addEventListener('change',()=>manual=true);form.querySelector('[name="birthday"]')?.addEventListener('change',update);form.querySelector('[name="sex"]')?.addEventListener('change',update);update();U.enhanceSelects(form);
+ const service=form.querySelector('[name=efe_service_role]');const syncService=()=>{if(!service||service.closest('[data-efe-service-role]'))return;const show=!!efe?.value&&efe.value!=='none';service.closest('.profile-field').hidden=!show;service.disabled=!show;};
+ efe?.addEventListener('change',()=>{manual=true;syncService();});syncService();form.querySelector('[name="birthday"]')?.addEventListener('change',update);form.querySelector('[name="sex"]')?.addEventListener('change',update);update();U.enhanceSelects(form);
 }
 root.TNTProfiles={defaults,baseKeys,config,field,render,collect,validate,suggest,bind,applies};
 if(typeof module==='object'&&module.exports)module.exports=root.TNTProfiles;

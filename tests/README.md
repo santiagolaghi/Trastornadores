@@ -52,3 +52,16 @@ Authenticated Google login is preserved. Browser UI review uses a separate synth
 - Eliminar mueve el perfil a Papelera; Archivar sigue siendo una acción independiente. Se comprueban la revisión de registros coincidentes, cancelación con Atrás, errores conservando la ficha y reintentos sin duplicar operaciones.
 - `tests/profile-deletion.sql` pasó en una transacción revertida con cuentas sintéticas. Comprueba permisos de lectura y eliminación, bloqueo para perfiles incompletos, protección de la cuenta propia, conservación de identidad Google, asistencias y pagos, restauración de membresías y conservación del estado archivado anterior.
 - El recuento posterior confirmó cero cuentas y campamentos temporales. Las dos nuevas funciones requieren autenticación y permiso de eliminación; cuentas vinculadas a Google requieren administración. No se agregaron funciones accesibles al público sin iniciar sesión.
+
+## Corrección funcional y visual del 13 de octubre de 2026
+
+- 137 regresiones de interfaz, permisos, caché y avisos, más `browser-flows.cjs` con el HTML publicado, carga real de scripts y el SDK oficial de Supabase. El navegador usa respuestas HTTP sintéticas y comprueba móvil, escritorio y tema oscuro.
+- La carga inicial incluye revisión de vínculos, una ficha de perfil completa y un editor único. Se retira la presentación adicional; Mi perfil queda fijo en las acciones de Perfiles. El perfil propio sigue disponible sin acceder al directorio.
+- Encuentros reúne sábados y eventos. La coordinación cuenta como responsabilidad aunque no haya actividades individuales. Se comprueban el banner interactivo, asignaciones directas, ausencia de confirmaciones y controles de estados, edición y eliminación recuperable.
+- Plantillas se edita como un programa visual. Reordenar conserva el borrador; un error no guarda partes sueltas. El servidor comprueba permisos, versión y pertenencia de cada actividad.
+- Asistencia y las listas largas se pliegan sin perder filtros. Campamento agrupa sus permisos de salud sin ampliar quién puede leerlos. Recursos acepta enlaces sin esquema y usa el módulo y columna de autor correctos.
+- `oct13-flows.sql`, `refinements.sql` y `phone-notifications.sql` pasan dentro de transacciones revertidas. Cubren EFE sin autoautorizar permisos, plantillas atómicas, archivos de Organización con Glosario pausado, conservación de historial y permisos de Buffet, avisos de asignación directa y suscripciones de teléfono aisladas por cuenta.
+- Se reemplazan SVG, favicon PNG, iconos de instalación y máscara de Android; las portadas predeterminadas se sirven desde archivos locales. Los avisos se muestran en la misma capa de la ventana abierta.
+- Esta revisión no incluye un teléfono Android físico ni una sesión Google real. La renovación del icono instalado y la entrega de avisos en ese dispositivo dependen también del navegador y de la autorización del teléfono.
+
+Para ejecutar las pruebas en navegador, instalar `playwright-core`, proporcionar Chromium en `TNT_TEST_BROWSER` y el UMD indicado por `vercel.json` en `TNT_TEST_SDK`; ejecutar `node tests/browser-flows.cjs`. Las capturas y los datos sintéticos no se publican como contenido de la aplicación.

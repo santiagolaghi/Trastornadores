@@ -2,7 +2,7 @@
 'use strict';
 const U=TNTUI,sb=TNT.sb,E=U.esc,app=document.getElementById('attendance-app');
 const qs=new URLSearchParams(location.search);
-const S={mode:qs.get('mode')||'',people:[],accounts:[],groups:[],members:[],saturdayMembers:[],events:[],meetings:[],attendance:[],followups:[],audit:[],group:null,date:'',tab:'attendance',query:'',filter:'all',loading:false,busy:new Set(),writes:new Map(),failed:new Map(),deck:null};
+const S={mode:qs.get('mode')||'',people:[],accounts:[],groups:[],members:[],saturdayMembers:[],events:[],meetings:[],attendance:[],followups:[],audit:[],group:null,date:'',tab:'attendance',query:'',filter:'all',loading:false,busy:new Set(),writes:new Map(),failed:new Map(),deck:null,listOpen:true};
 const labels={present:'Presente',absent:'Ausente',pending:'Sin registrar'};
 const followLabels={pending:'Pendiente',contacted:'Le hablé',waiting:'Esperando respuesta',talking:'Conversando',no_response:'No respondió',resolved:'Cerrado'};
 const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
@@ -186,7 +186,12 @@ function filteredRows(){
 }
 function membership(id){return S.members.find(m=>m.person_id===id&&m.group_id===S.group)}
 function paintContent(){
- const host=app.querySelector('#attendanceContent');if(!host)return;
+ const section=app.querySelector('#attendanceContent');if(!section)return;
+ let fold=section.querySelector('.tnt-attendance-list-fold');
+ if(!fold){section.innerHTML=`<details class="tnt-fold tnt-attendance-list-fold" ${S.listOpen?'open':''}><summary><b data-list-title></b><span data-list-count></span></summary><div id="attendanceRows" class="tnt-fold-content"></div></details>`;fold=section.firstElementChild;fold.addEventListener('toggle',()=>{S.listOpen=fold.open;});}
+ fold.querySelector('[data-list-title]').textContent=tabs().find(([id])=>id===S.tab)?.[1]||'Asistencia';
+ const n=S.tab==='history'?S.audit.length:filteredRows().length;fold.querySelector('[data-list-count]').textContent=n+' '+(S.tab==='history'?'registros':'personas');
+ const host=section.querySelector('#attendanceRows');
  if(S.loading){host.innerHTML='<div class="att-loading">Cargando encuentro…</div>';return}
  if(S.tab==='history'){paintHistory(host);return}
  if(S.tab==='people'){paintPeople(host);return}

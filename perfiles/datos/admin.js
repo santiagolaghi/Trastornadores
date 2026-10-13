@@ -526,53 +526,26 @@
     `;
   }
 
-  function openDetail(id) {
-    const record = records.find((item) => String(item.id) === String(id));
-    if (!record) return;
-    currentDetailId = String(record.id);
-
-    const age = ageFromBirthdate(record.fecha_nacimiento);
-    const group = groupFor(record);
-    const phone = String(record.telefono || "").trim();
-    const instagram = String(record.instagram || "").trim();
-    const wa = whatsappUrl(phone);
-    const ig = instagramUrl(instagram);
-
-    $("detailAvatar").innerHTML = profilePhoto(record);
-    $("detailName").textContent = [record.nombre, record.apellido].filter(Boolean).join(" ");
-    $("detailSummary").textContent = (age === null ? 'Nacimiento sin completar' : age + ' años · ' + group) + " · " + (record.genero || "Sexo sin definir");
-    $("detailData").innerHTML = [
-      detailItem("Fecha de nacimiento", formatDate(record.fecha_nacimiento)),
-      detailItem("Edad actual", age === null ? 'Sin fecha de nacimiento' : age + " años"),
-      detailItem("Grupo", group),
-      detailItem("Género", record.genero || "—"),
-      detailItem("Teléfono", phone || "—"),
-      detailItem("Instagram", instagram || "—"),
-      detailItem("Registrado", formatDate(record.creado_en, true), true),
-    ].join("");
-
-    $("detailActions").innerHTML = `
-      <a class="detail-action whatsapp ${wa ? "" : "disabled"}" ${wa ? `href="${wa}" target="_blank" rel="noopener"` : ""}>${icons.whatsapp}<span>WhatsApp</span></a>
-      <a class="detail-action instagram ${ig ? "" : "disabled"}" ${ig ? `href="${ig}" target="_blank" rel="noopener"` : ""}>${icons.instagram}<span>Instagram</span></a>
-      <button class="detail-action copy-detail ${phone ? "" : "disabled"}" type="button" data-copy-phone="${escapeHtml(phone)}">${icons.copy}<span>Copiar teléfono</span></button>
-    `;
-
-    $("editProfileBtn").hidden = (!canEdit()&&String(record.id)!==String(window.TNT.person?.id)) || profileState !== 'active';
-    $("deleteProfileBtn").hidden = !canArchive();
-    $("deleteProfileBtn").textContent = profileState === 'trash' ? 'Restaurar desde Papelera' : profileState === 'archived' ? 'Restaurar perfil' : 'Archivar perfil';
-    $('removeProfileBtn').hidden = !canArchive() || profileState === 'trash' || String(record.id) === String(window.TNT.person?.id);
-    detailBackdrop.hidden = false;
-    detailSheet.classList.add("open");
-    detailSheet.setAttribute("aria-hidden", "false");
-    window.TNTUI.trackOverlay(detailSheet, () => {
-      detailSheet.classList.remove("open");
-      detailSheet.setAttribute("aria-hidden", "true");
-      detailBackdrop.hidden = true;
-      document.body.style.overflow = document.querySelector('.bottom-sheet.open') ? 'hidden' : '';
-    });
-    document.body.style.overflow = "hidden";
-    loadProfileInterests(record);
-  }
+  async function openDetail(id) {
+ const record=records.find(item=>String(item.id)===String(id));if(!record)return;
+ currentDetailId=String(record.id);
+ $('detailName').textContent=[record.nombre,record.apellido].filter(Boolean).join(' ');
+ $('detailData').innerHTML='<div class="tnt-profile-loading" role="status">Cargando perfil…</div>';
+ $('detailActions').innerHTML='';$('editProfileBtn').hidden=true;
+ $('deleteProfileBtn').hidden=!canArchive();$('deleteProfileBtn').textContent=profileState==='trash'?'Restaurar desde Papelera':profileState==='archived'?'Desarchivar perfil':'Archivar perfil';
+ $('removeProfileBtn').hidden=!canArchive()||profileState==='trash'||String(record.id)===String(TNT.person.id);
+ detailBackdrop.hidden=true;detailSheet.classList.add('open');detailSheet.setAttribute('aria-hidden','false');
+ if(detailSheet.showModal)detailSheet.showModal();else detailSheet.setAttribute('open','');
+ TNTUI.trackOverlay(detailSheet,()=>{detailSheet.close?.();detailSheet.removeAttribute('open');detailSheet.classList.remove('open');detailSheet.setAttribute('aria-hidden','true');detailBackdrop.hidden=true;document.body.style.overflow='';});
+ document.body.style.overflow='hidden';
+ try {
+  const result=await TNT.sb.rpc('tnt_profile_detail',{p_person:record.id});if(result.error)throw result.error;
+  if(!window.document||currentDetailId!==String(id)||!detailSheet.classList.contains('open'))return;
+  const account=profileAccounts.find(a=>String(a.person_id)===String(id))||{};
+  $('detailData').innerHTML=TNTProfileView.content(result.data,record.id,{id:record.id,full_name:[record.nombre,record.apellido].join(' '),avatar_url:record.avatar_url},account);
+  TNTProfileView.bind($('detailData'));
+ }catch(error){if(window.document&&detailSheet.classList.contains('open'))$('detailData').innerHTML='<p class="tnt-error" role="alert">'+escapeHtml(error.message)+'</p>';}
+}
 
   function closeDetail() {
     return window.TNTUI.closeModal(detailSheet);
@@ -654,11 +627,11 @@
     $('deleteStatus').textContent = '';
     $('deleteProfileName').textContent = [record.nombre,record.apellido].filter(Boolean).join(' ');
     setDeleteLoading(false);
-    $('deleteBackdrop').hidden = false;
+    $('deleteBackdrop').hidden = true;
     $('deleteSheet').classList.add('open');
-    $('deleteSheet').setAttribute('aria-hidden','false');
+    $('deleteSheet').setAttribute('aria-hidden','false');if($('deleteSheet').showModal)$('deleteSheet').showModal();else $('deleteSheet').setAttribute('open','');
     window.TNTUI.trackOverlay($('deleteSheet'), () => {
-      $('deleteSheet').classList.remove('open');
+      $('deleteSheet').close?.();$('deleteSheet').removeAttribute('open');$('deleteSheet').classList.remove('open');
       $('deleteSheet').setAttribute('aria-hidden','true');
       $('deleteBackdrop').hidden = true;
       document.body.style.overflow = document.querySelector('.bottom-sheet.open') ? 'hidden' : '';
@@ -1020,14 +993,14 @@
 
   async function restorePanelSession() {
     await window.TNT?.ready;
+    const dock=document.querySelector('.mobile-bottom-actions');
+    if(dock&&TNT.identity&&!TNT.blocked){document.body.append(dock);dock.hidden=false;const ownPage=TNT.ownProfilePage?.();dock.classList.toggle('is-own-profile',!!ownPage);if(ownPage){dock.querySelectorAll('button,#mobileNewProfileBtn').forEach(el=>el.hidden=true);if(TNT.hasAccess('perfiles','*','view')){const back=document.createElement('a');back.href='/perfiles/datos/';back.innerHTML=TNTUI.icon('people')+'<span>Personas</span>';dock.append(back);}}}
     if(TNT.ownProfilePage?.()&&TNT.identity&&!TNT.blocked){
       loginView.hidden=true;dashboardView.hidden=false;
       const main=document.querySelector('.app-shell');
       [...main.children].filter(el=>el.id!=='my-profile-view'&&!el.matches('header')).forEach(el=>el.hidden=true);
       let own=document.getElementById('my-profile-view');if(!own){own=document.createElement('section');own.id='my-profile-view';main.append(own);}
-      const paintOwn=()=>{const ctx=TNT.profileContext,values=ctx.values,fields=TNTProfiles.config(ctx.fields);
-        own.innerHTML=`<div class="tnt-own-profile-hero">${TNTUI.avatar(TNT.person,{...TNT.account,avatar_url:TNT.avatar()},'portrait')}<div><span class="eyebrow-pill">MI PERFIL</span><h1>${escapeHtml(TNT.person.full_name)}</h1><p>${escapeHtml(TNT.account.ministry_role||'Comunidad TNT')}</p><button class="tnt-button primary" data-edit-my-profile>Editar perfil completo</button></div></div><div class="profile-detail-grid">${Object.entries(fields).filter(([k,f])=>f.visible!==false&&TNTProfiles.applies(f,TNT.account.ministry_role,values._profile_roles||[])).map(([k,f])=>{let value=values[k];if(k==='efe_group')value=value==='none'?'Todavía no voy a un EFE':ctx.groups.find(g=>g.code===value)?.name;if(k==='sex')value={M:'Varón',F:'Mujer'}[value];if(Array.isArray(value))value=value.join(', ');if(value&&typeof value==='object')value=Object.entries(value).map(([area,score])=>area+': '+score+'%').join(' · ');return detailItem(f.label,value||'Sin completar',f.type==='textarea'||f.type==='leadership');}).join('')}</div>`;
-        own.querySelector('[data-edit-my-profile]').onclick=()=>TNTProfileEditor.open();};
+      const paintOwn=()=>TNTProfileView.renderOwn(own);
       paintOwn();document.addEventListener('tnt:profile',paintOwn);
       if(new URLSearchParams(location.search).get('edit')==='1'){const url=new URL(location.href);url.searchParams.delete('edit');history.replaceState(history.state,'',url);TNTProfileEditor.open();}
       return;
