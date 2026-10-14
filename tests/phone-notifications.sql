@@ -40,6 +40,17 @@ begin
   exception when invalid_parameter_value then null;
   end;
 end $$;
+do $$
+declare first_test jsonb; repeated jsonb;
+begin
+ first_test:=public.tnt_push_test(current_setting('tnt.push.endpoint'));
+ repeated:=public.tnt_push_test(current_setting('tnt.push.endpoint'));
+ if first_test->>'id' is distinct from repeated->>'id' or first_test->>'status'<>'pending' then
+  raise exception 'Double tap created duplicate tests or returned the wrong status';end if;
+ if public.tnt_push_test_status((first_test->>'id')::uuid)->>'status'<>'pending' then
+  raise exception 'Own queued test is not visible';end if;
+ perform set_config('tnt.push.test_id',first_test->>'id',true);
+end $$;
 select set_config('request.jwt.claims', jsonb_build_object('sub',current_setting('tnt.push.second_auth'),'role','authenticated')::text,true);
 select public.tnt_ensure_account();
 do $$
@@ -48,6 +59,14 @@ begin
     raise exception 'Another account can read the first account subscription';
   end if;
   perform public.tnt_push_unsubscribe(current_setting('tnt.push.endpoint'));
+  begin
+   perform public.tnt_push_test(current_setting('tnt.push.endpoint'));
+   raise exception 'Another account can send a test to this device';
+  exception when insufficient_privilege then null;end;
+  begin
+   perform public.tnt_push_test_status(current_setting('tnt.push.test_id')::uuid);
+   raise exception 'Another account can see this test status';
+  exception when insufficient_privilege then null;end;
 end $$;
 select set_config('request.jwt.claims', jsonb_build_object('sub',current_setting('tnt.push.first_auth'),'role','authenticated')::text,true);
 do $$
@@ -60,6 +79,10 @@ begin
     raise exception 'Own unsubscribe did not remove the device subscription';
   end if;
 end $$;
+do $$begin
+ if public.tnt_push_test_status(current_setting('tnt.push.test_id')::uuid)->>'status'<>'skipped' then
+  raise exception 'Unsubscribe left a test eligible for delivery';end if;
+end $$;
 select set_config('request.jwt.claims','{"role":"authenticated"}',true);
 do $$
 begin
@@ -69,5 +92,18 @@ begin
   exception when insufficient_privilege then null;
   end;
 end $$;
-select 'repeated activation, updated key, invalid endpoint, RLS isolation, unsubscribe ownership, unauthenticated rejection' as passed;
+do $$begin
+ begin
+  perform public.tnt_push_test(current_setting('tnt.push.endpoint'));
+  raise exception 'Unauthenticated test accepted';
+ exception when insufficient_privilege then null;end;
+ begin
+  perform public.tnt_push_test_status(current_setting('tnt.push.test_id')::uuid);
+  raise exception 'Unauthenticated status accepted';
+ exception when insufficient_privilege then null;end;
+ if has_function_privilege('anon','public.tnt_push_test(text)','execute')
+  or has_function_privilege('anon','public.tnt_push_test_status(uuid)','execute') then
+  raise exception 'Public caller can execute the phone test RPCs';end if;
+end $$;
+select 'activation, key update, device isolation, test rate limit, own test status, unsubscribe cancels test, unauthenticated rejection' as passed;
 rollback;

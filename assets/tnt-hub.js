@@ -139,6 +139,5 @@ document.addEventListener('tnt:data',()=>{clearTimeout(homeRefreshTimer);homeRef
 document.addEventListener('tnt:config',()=>{if(TNT.profileComplete){if(TNT.isStaff||TNT.isAdmin)render();else renderCommunity();}});
 
 // Invalidate only old application caches; personal data and the sign-in session stay intact.
-(async()=>{try{if(localStorage.getItem('tnt-assets-version')!=='20261012'){if('serviceWorker'in navigator)await navigator.serviceWorker.register('/sw.js');if('caches'in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>/^tnt-|lista-sabados|efe/i.test(k)).map(k=>caches.delete(k)));}localStorage.setItem('tnt-assets-version','20261012');}}catch(e){console.warn('Cache refresh',e);}})();
  document.addEventListener('tnt:profile',()=>TNT.isStaff||TNT.isAdmin?render():loadCommunity());document.addEventListener('tnt:membership',()=>{if(!TNT.profileComplete)renderProfileGate();else if(TNT.isStaff||TNT.isAdmin)load();else loadCommunity();});boot();
 })();

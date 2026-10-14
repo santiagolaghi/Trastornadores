@@ -48,7 +48,7 @@ TNT.canAction=(mod,action,scope='*')=>{
 };
 TNT.displayName=function(){return TNT.identity?.display_name||TNT.account?.nickname||TNT.person?.full_name||TNT.identity?.email||'TNT'};
 TNT.avatar=function(){return TNT.account?.avatar_url||TNT.identity?.avatar_url||''};
-TNT.logout=async function(){try{const sub=await window.TNTPush?.current();if(sub)await sb.rpc('tnt_push_unsubscribe',{p_endpoint:sub.endpoint});}catch{}await sb?.auth?.signOut?.();localStorage.removeItem('tnt-central-user');location.replace('/?v=14')};
+TNT.logout=async function(){window.TNTPush?.forget();try{const sub=await window.TNTPush?.current();if(sub)await sb.rpc('tnt_push_unsubscribe',{p_endpoint:sub.endpoint});}catch{}await sb?.auth?.signOut?.();localStorage.removeItem('tnt-central-user');location.replace('/?v=14')};
 function avatarHtml(cls='tnt-avatar'){return TNTUI.avatar(TNT.person,{...TNT.account,avatar_url:TNT.avatar()},cls);}
 async function ensureIdentity(session){
  if(!sb||!session)return null;

@@ -3,11 +3,15 @@
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
 const {chromium}=require('playwright-core');
 const root=path.resolve(__dirname,'..'),servedRoot=process.env.TNT_TEST_ROOT||path.join(root,'public'),out=process.env.TNT_TEST_OUTPUT||path.resolve(root,'../tnt-tools/screenshots');
+const phoneMode=process.env.TNT_TEST_PHONE==='1';
+const mockPhoneOS=process.env.TNT_TEST_MOCK_NOTIFICATIONS==='1',displayed=[];
 const pid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 function fixtureScript(){return fs.readFileSync(path.join(__dirname,'fixtures/runtime.js'),'utf8').replace("if(!location.pathname.includes('/hub'))","if(false)");}
 const sdk=fs.readFileSync(process.env.TNT_TEST_SDK,'utf8')+`\nconst originalClient=supabase.createClient;supabase.createClient=(...args)=>{eval(${JSON.stringify(fixtureScript())});window.__fixtureSB=TNT.sb;window.__fixtureValues={};window.__profileValues={efe_group:'varones'};const db=window.__fixtureDB;db.tnt_people[0].first_name='Nora';db.tnt_people[0].last_name='Pérez';db.tnt_profiles_central=db.tnt_people.map(p=>({...p,nombre:p.full_name.split(' ')[0],apellido:p.full_name.split(' ').slice(1).join(' '),fecha_nacimiento:p.birthday,genero:p.sex==='F'?'Mujer':'Varón',telefono:'1112345678',creado_en:new Date().toISOString()}));db.tnt_efe_groups=[{id:'efe-group',code:'varones',name:'EFE Varones',active:true}];db.tnt_efe_memberships=db.tnt_people.map(p=>({person_id:p.id,group_id:'efe-group',active:true}));db.tnt_efe_meetings=[{id:'efe-meeting',group_id:'efe-group',meeting_date:TNTUI.dateKey(),active:true,title:'Miércoles EFE'}];db.tnt_saturday_members=db.tnt_people.map(p=>({person_id:p.id,active:true}));db.tnt_saturday_attendance=[];db.tnt_access_grants=[...TNT.grants,{module:'perfiles',scope:'*',enabled:true,access_level:'manage'}].map(g=>({...g,person_id:db.tnt_people[0].id}));if(new URLSearchParams(location.search).has('fixture-onboarding'))db.tnt_accounts[0].onboarding_completed_at=null;if(new URLSearchParams(location.search).has('fixture-community')){Object.assign(db.tnt_accounts[0],{staff_status:'community',ministry_role:null,system_role:'user'});db.tnt_access_grants=[];}return originalClient(...args)};`;
 const server=http.createServer((req,res)=>{
  const u=new URL(req.url,'http://localhost');
+ if(mockPhoneOS&&u.pathname==='/__preview__/phone-display'){let data='';req.on('data',part=>data+=part);req.on('end',()=>{displayed.push(JSON.parse(data));res.end('{}')});return;}
+ if(mockPhoneOS&&u.pathname==='/sw.js'){res.setHeader('Content-Type','text/javascript');res.end(`self.registration.showNotification=async(title,options)=>{const response=await fetch('/__preview__/phone-display',{method:'POST',body:JSON.stringify({title,options})});if(!response.ok)throw new Error('Display failed')};\n`+fs.readFileSync(path.join(servedRoot,'sw.js'),'utf8'));return;}
  if(u.pathname==='/supabase-lite.js'){res.setHeader('Content-Type','text/javascript');res.end(sdk);return;}
  if(u.pathname.startsWith('/__preview__/avatar/')){const i=Number(u.pathname.split('/').at(-1).split('.')[0])||0;res.setHeader('Content-Type','image/svg+xml');res.end(`<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180"><rect width="180" height="180" rx="90" fill="${['#996acd','#ff7948','#a8d8eb'][i%3]}"/><circle cx="90" cy="63" r="27" fill="#f7e0cd"/><path d="M38 165v-28a52 45 0 0 1 104 0v28" fill="#34314d"/></svg>`);return;}
  let file=path.join(servedRoot,u.pathname);if(!file.startsWith(servedRoot)){res.writeHead(403);res.end();return;}
@@ -17,12 +21,14 @@ const server=http.createServer((req,res)=>{
  res.setHeader('Content-Type',types[path.extname(file)]||'application/octet-stream');res.end(fs.readFileSync(file));
 });
 async function mockAPI(page){
- await page.route('https://oeodnnomgiddkblnlzay.supabase.co/**',async route=>{
+ await (phoneMode?page.context():page).route('https://oeodnnomgiddkblnlzay.supabase.co/**',async route=>{
   try{
   const req=route.request(),url=new URL(req.url()),parts=url.pathname.split('/'),name=parts.at(-1),args=req.postDataJSON()||{};
   if(url.pathname.startsWith('/auth/')){await route.fulfill({json:{id:pid(100),email:'demo@example.test',aud:'authenticated',role:'authenticated',user_metadata:{}}});return;}
   if(url.pathname.includes('/rpc/')){
    const r=await page.evaluate(async({name,args})=>{
+    if(name==='tnt_push_test'){__fixtureCalls.push({rpc:name,args});window.__phoneTest={id:'00000000-0000-4000-8000-000000009900',status:'sent',attempts:1};return{data:__phoneTest,error:null};}
+    if(name==='tnt_push_test_status')return{data:__phoneTest,error:null};
     if(name==='tnt_save_org_template'){
      if(__fixtureFailures['rpc:'+name])return{error:{message:__fixtureFailures['rpc:'+name]}};
      __fixtureCalls.push({rpc:name,args});const db=__fixtureDB,id=args.p_id||crypto.randomUUID();let t=db.tnt_templates.find(t=>t.id===id);if(t)Object.assign(t,args.p_values,{version:(t.version||0)+1});else db.tnt_templates.push({id,...args.p_values,version:1});db.tnt_template_items=db.tnt_template_items.filter(i=>i.template_id!==id).concat(args.p_items.map((i,n)=>({...i,template_id:id,sort_order:n})));return{data:id,error:null};
@@ -53,12 +59,52 @@ async function mockAPI(page){
 (async()=>{
  fs.mkdirSync(out,{recursive:true});await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
  let args=['--no-sandbox','--disable-dev-shm-usage'];try{const {default:b}=await import('@sparticuz/chromium');args=b.args;}catch{try{const {default:b}=await import('../..//tnt-tools/node_modules/@sparticuz/chromium/build/index.js');args=b.args;}catch{}}
- const browser=await chromium.launch({executablePath:process.env.TNT_TEST_BROWSER,args,headless:true});
- const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,deviceScaleFactor:1,serviceWorkers:'block'});
+ if(process.env.TNT_TEST_FULL_BROWSER==='1')args=['--no-sandbox','--disable-dev-shm-usage'];
+ const browser=await chromium.launch({executablePath:process.env.TNT_TEST_BROWSER,args,headless:true}).catch(async error=>{await new Promise(r=>server.close(r));throw error});
+ const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,deviceScaleFactor:1,serviceWorkers:phoneMode?'allow':'block'});
  await context.addInitScript(({id,key})=>{if(location.protocol!=='http:')return;const enc=v=>btoa(JSON.stringify(v)).replaceAll('=','').replaceAll('+','-').replaceAll('/','_');const token=enc({alg:'HS256',typ:'JWT'})+'.'+enc({sub:id,role:'authenticated',aud:'authenticated',exp:Math.floor(Date.now()/1000)+86400})+'.test';localStorage.setItem(key,JSON.stringify({access_token:token,refresh_token:'synthetic-test-refresh-token',expires_at:Math.floor(Date.now()/1000)+86400,expires_in:86400,token_type:'bearer',user:{id,email:'demo@example.test',aud:'authenticated',role:'authenticated',user_metadata:{}}}));localStorage.setItem('tnt-theme','light');}, {id:pid(100),key:'sb-oeodnnomgiddkblnlzay-auth-token'});
  const page=await context.newPage(),errors=[];page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.stack));await mockAPI(page);
  async function visit(url,selector){await page.goto(base+url);await page.waitForFunction(()=>window.TNT?.identity&&!TNT.error,{timeout:10000});await page.locator(selector).first().waitFor({timeout:10000});await page.evaluate(()=>{for(const key of ['home','organizacion','asistencia','perfiles'])localStorage.setItem('tnt-tutorial:'+TNT.person.id+':'+key+':2','true');});await page.waitForTimeout(160);}
  try{
+  if(phoneMode){
+   await context.grantPermissions(['notifications']);
+   await context.addInitScript(mockOS=>{
+    if(mockOS)Object.defineProperty(Notification,'permission',{value:'granted',configurable:true});
+    localStorage.setItem('tnt-assets-version','20261012');
+    const sub={endpoint:'https://push.example.invalid/browser-test',toJSON(){return{endpoint:this.endpoint,keys:{auth:'fixture',p256dh:'fixture'}}}};
+    Object.defineProperty(PushManager.prototype,'getSubscription',{value:async()=>sub});
+   },mockPhoneOS);
+   const cdp=await context.newCDPSession(page);let resolveReg;
+   const registration=new Promise(resolve=>resolveReg=resolve);
+   cdp.on('ServiceWorker.workerRegistrationUpdated',e=>{for(const r of e.registrations)if(r.scopeURL===base+'/'&&!r.isDeleted)resolveReg(r.registrationId)});
+   await cdp.send('ServiceWorker.enable');
+   await visit('/organizacion/?view=my','.org-nav');
+   await page.waitForFunction(()=>navigator.serviceWorker.controller,{timeout:15000});
+   const registrationId=await registration;
+   await page.evaluate(async()=>{
+    const name=(await caches.keys()).find(k=>k.includes('phone-updates')),cache=await caches.open(name);
+    await cache.put('/manifest.webmanifest?v=20261013',new Response('{"icons":[{"src":"old.png"}]}'));
+    await cache.put('/icons/icon-192.png',new Response('old icon'));
+   });
+   const manifest=await page.evaluate(async()=> (await fetch('/manifest.webmanifest?v=20261013')).json());
+   assert(manifest.icons[0].src.includes('20261014'));
+   const icon=await page.evaluate(async()=>Array.from(new Uint8Array(await(await fetch('/icons/icon-192.png')).arrayBuffer())).slice(0,8));assert.deepEqual(icon,[137,80,78,71,13,10,26,10]);
+   await context.setOffline(true);const offline=await page.evaluate(async()=> (await fetch('/manifest.webmanifest?v=20261013')).json());assert.deepEqual(offline,manifest);await context.setOffline(false);
+   await page.evaluate(async()=>{__fixtureDB.tnt_push_subscriptions=[{person_id:TNT.person.id,endpoint:'https://push.example.invalid/browser-test'}];await TNTNotifications.phone()});
+   const modal=page.locator('dialog[open]').last();await modal.locator('[data-test]').waitFor({state:'visible'});await modal.locator('[data-test]').click();
+   await page.waitForFunction(()=>__fixtureCalls.some(c=>c.rpc==='tnt_push_test'));
+   await modal.locator('.tnt-phone-panel > [role=status]').filter({hasText:'Enviado desde TNT'}).waitFor();
+   assert(!(await modal.innerText()).includes('La prueba llegó'));
+   await cdp.send('ServiceWorker.deliverPushMessage',{origin:base,registrationId,data:JSON.stringify({title:'Prueba de avisos TNT',body:'Prueba aislada de Chromium',test_id:'00000000-0000-4000-8000-000000009900',url:'/'})});
+   await modal.locator('.tnt-phone-panel > [role=status]').filter({hasText:'La prueba llegó a este teléfono'}).waitFor({timeout:10000});
+   if(mockPhoneOS){assert(displayed.some(n=>n.title==='Prueba de avisos TNT'));assert(displayed[0].options.icon.includes('20261014'));}
+   else assert.equal(await page.evaluate(async()=> (await(await navigator.serviceWorker.ready).getNotifications()).some(n=>n.title==='Prueba de avisos TNT')),true);
+   await modal.locator('details.tnt-phone-panel > summary').click();const before=page.url();await modal.locator('[data-update]').click();await modal.locator('[data-reopen]').waitFor({state:'visible'});assert.equal(page.url(),before);assert((await modal.locator('[data-update-status]').innerText()).includes('última versión'));
+   await page.screenshot({path:path.join(out,'phone-mobile.png')});await page.evaluate(()=>TNT.setTheme('dark'));await page.screenshot({path:path.join(out,'phone-dark-mobile.png')});
+   assert.equal(await modal.locator('.tnt-phone-panel').first().evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(32, 32, 32)');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+   console.log('PWA: direct module entry updates the worker; legacy manifests/icons refresh; offline fallback works; the native Chromium push event reaches the reception UI; updates preserve the open page. OS display:',mockPhoneOS?'mocked':'native');
+   assert.deepEqual(errors,[]);return;
+  }
   await visit('/', '.module-card');
   assert.equal(await page.evaluate(()=>!!TNTProfileLinks&&!!TNTProfileView&&!!TNTTemplateBuilder),true);
   assert.equal(await page.locator('.module-card .tnt-space-cover').count(),await page.locator('.module-card').count());

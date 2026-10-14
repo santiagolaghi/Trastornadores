@@ -353,6 +353,7 @@ body .community-news-feature.tnt-news-fold{padding:0!important;min-height:0}
 .swipe-delete{background:#fbd1c5;color:#6e211c;justify-content:flex-end}
 [data-swipe=read] .swipe-read,[data-swipe=delete] .swipe-delete{opacity:1}
 body .tnt-sheet-head{position:sticky;top:0;z-index:5;background:var(--tnt-panel)}
+body .tnt-sheet-head::before{content:'';position:absolute;inset:-26px -26px 0;background:var(--tnt-panel);z-index:-1;pointer-events:none}
 body .tnt-sheet-head h2{overflow-wrap:normal}
 body .tnt-sheet{scroll-padding-top:100px}
 #tnt-account-menu{top:calc(var(--tnt-shell-h) + 8px)!important;max-height:calc(100dvh - var(--tnt-shell-h) - 28px);overflow:auto}
@@ -477,3 +478,14 @@ body .coordination-duty{color:#171717!important}body .coordination-duty :is(b,sm
 body .tnt-template-intro,body .tnt-template-intro :is(h3,p,small,span,.tnt-icon),body .tnt-template-order,body .tnt-template-presets button{color:#171717!important}.tnt-template-intro>span{background:#fff6ec!important}
 body .tnt-template-kind :checked+span,body .tnt-template-kind :checked+span *{color:#171717!important}
 body .tnt-encounter-kinds .tnt-button,body .tnt-encounter-kinds .tnt-button *{color:#171717!important}
+
+/* Device notices and updates stay readable, compact and independently foldable. */
+.tnt-phone-panel{border:1px solid var(--tnt-line);border-radius:20px;padding:20px;margin:18px 0;background:var(--tnt-panel)}
+.tnt-phone-panel>summary{font-weight:800;cursor:pointer;list-style:none;display:flex;gap:16px;align-items:center;justify-content:space-between}
+.tnt-phone-panel>summary::after{content:'+';font-size:26px;line-height:1}
+.tnt-phone-panel[open]>summary::after{content:'−'}
+.tnt-phone-panel .tnt-studio-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.tnt-phone-panel [data-enable],.tnt-phone-panel [data-test]{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:10px}
+.tnt-phone-panel [role=status]{margin-bottom:0;line-height:1.6}
+.tnt-phone-icon-help{margin-top:18px;font-size:14px;line-height:1.6}
+.tnt-phone-icon-help summary{font-weight:700;cursor:pointer}

@@ -3,8 +3,8 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 const VAPID_PUBLIC = "BF3EVnNKTFBmSHImqA-PpYPylaHMG9L-A-gomiSB20084j_mNWWAT_Gm282-ovE5fXBN6fkPT_QyuXSx4H8r1hI";
 const APP_ORIGIN = "https://trastornadores.vercel.app";
-const ICON = APP_ORIGIN + "/icons/icon-192.png";
-const BADGE = APP_ORIGIN + "/icons/notification-badge.png";
+const ICON = APP_ORIGIN + "/icons/dynamite-app-192.png?v=20261014";
+const BADGE = APP_ORIGIN + "/icons/notification-badge.png?v=20261014";
 const escapeHtml = (s: string) => String(s || "").replace(/[&<>\"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c] || c));
 const fullUrl = (href: string) => href?.startsWith("http") ? href : APP_ORIGIN + (href || "/campamento/");
 
@@ -103,6 +103,7 @@ Deno.serve(async (req: Request) => {
 
   // Each message/device pair is queued once. Never deliver resolved or dismissed alerts.
   const teamClaim = await sb.rpc("tnt_claim_push", {p_limit:100});
+  if (teamClaim.error) return new Response(JSON.stringify({ok:false,error:"push_queue_unavailable"}),{status:503,headers:{"content-type":"application/json"}});
   let teamSent=0,teamSkipped=0,teamFailed=0;
   if (!teamClaim.error) for (const row of teamClaim.data || []) {
     try {

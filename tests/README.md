@@ -65,3 +65,12 @@ Authenticated Google login is preserved. Browser UI review uses a separate synth
 - Esta revisión no incluye un teléfono Android físico ni una sesión Google real. La renovación del icono instalado y la entrega de avisos en ese dispositivo dependen también del navegador y de la autorización del teléfono.
 
 Para ejecutar las pruebas en navegador, instalar `playwright-core`, proporcionar Chromium en `TNT_TEST_BROWSER` y el UMD indicado por `vercel.json` en `TNT_TEST_SDK`; ejecutar `node tests/browser-flows.cjs`. Las capturas y los datos sintéticos no se publican como contenido de la aplicación.
+
+## Notificaciones y actualización del 14 de octubre de 2026
+
+- 148 pruebas de interfaz, permisos, caché, worker y teléfono. `phone-client.cjs` comprueba activación sin confundir avisos locales con push, recuperación solo para cuentas que optaron por avisos, desactivación, cambio de cuenta y recepción confirmada por el worker.
+- `pwa-worker.cjs` comprueba renovación de manifiestos e iconos antiguos con fallback sin conexión, instalación parcial ante un módulo caído y confirmación de recepción después de mostrar el aviso.
+- `phone-notifications.sql` también comprueba las RPC de prueba real: aislamiento por cuenta y dispositivo, deduplicación por minuto, consulta del estado propio y cancelación al desactivar. Toda la prueba se revierte. Las RPC públicas son invocadores; el acceso privilegiado vive en el esquema no expuesto `tnt_phone`.
+- `TNT_TEST_PHONE=1 node tests/browser-flows.cjs` activa el service worker de Chromium y entrega un evento push mediante CDP. Verifica entrada directa a Organización, renovación de iconos/manifiestos antiguos, caché sin conexión, actualización sin recargar un borrador y recepción tardía después de que el servidor ya informó «enviado».
+- Si el navegador de pruebas no admite visualización nativa de avisos, usar `TNT_TEST_MOCK_NOTIFICATIONS=1`; solo el permiso y la visualización del sistema operativo se simulan. El worker, el evento push, los mensajes al cliente, el caché y la interfaz se ejecutan en Chromium. Esa opción fue necesaria en este entorno y no sustituye la prueba en un teléfono físico.
+- El servidor remoto conserva autenticación por secreto, despacha cada 30 segundos y responde 200. Un fallo al reclamar la cola ahora informa error; los iconos del payload llevan versión. La pantalla «Avisos en el teléfono» permite enviar y comprobar una prueba desde el servidor.
