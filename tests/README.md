@@ -1,5 +1,13 @@
 # TNT regression checks
 
+## Avisos, perfiles y programa del 16 de octubre de 2026
+
+- Las regresiones de interfaz, permisos, caché y push se ejecutan con `node --test tests/regression.cjs tests/permissions-and-cache.cjs tests/phone-client.cjs tests/pwa-worker.cjs tests/push-worker.cjs` (152 pruebas). La configuración conserva todas las preguntas visibles como obligatorias y respeta sus roles; también se comprueba que un administrador pueda responder una pregunta exclusiva de su rol.
+- `browser-flows.cjs` ejecuta el HTML de producción y el SDK oficial con respuestas HTTP sintéticas. Comprueba el arrastre táctil de Canciones antes de Reflexión, ajuste de horarios, persistencia tras recargar y restauración ante conflictos. Una cuenta ya registrada queda bloqueada por una respuesta pendiente y vuelve a entrar después de completarla. La vinculación tiene una confirmación de identidad, prioridad automática de Google y valores finales plegables.
+- `requests-links-order.sql` pasó en Supabase dentro de una transacción revertida. Comprueba avisos con nombre y acción, un solo aviso de alta por cuenta, campos modificados sin revelar respuestas privadas, prioridad de Google incluso con clientes anteriores, omisión de habilidades nulas, conservación del historial, foto y permisos, orden y horarios atómicos en Buenos Aires, rechazo de versiones antiguas y bloqueo de usuarios sin permiso o con perfil incompleto.
+- El nuevo RPC público de orden es un invocador autenticado; la implementación privilegiada vive en el esquema no expuesto `tnt_actions`. Las advertencias existentes de funciones privilegiadas y extensión pública siguen documentadas por el [analizador de seguridad de Supabase](https://supabase.com/docs/guides/database/database-linter). No se agregan funciones privilegiadas anónimas ni se fusionan personas reales durante las pruebas.
+- El worker y las referencias de los archivos modificados usan la versión `20261016`, conservando el manifiesto canónico y los iconos vigentes. La prueba de teléfono en Chromium usa el worker real y simula únicamente el permiso y la visualización del sistema operativo; no representa una prueba en un teléfono físico.
+
 Run DOM tests from the repository root with Node 22 or later and jsdom 26.1.0 / acorn 8.15.0 on NODE_PATH:
 
 ```sh

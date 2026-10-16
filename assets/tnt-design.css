@@ -489,3 +489,16 @@ body .tnt-encounter-kinds .tnt-button,body .tnt-encounter-kinds .tnt-button *{co
 .tnt-phone-panel [role=status]{margin-bottom:0;line-height:1.6}
 .tnt-phone-icon-help{margin-top:18px;font-size:14px;line-height:1.6}
 .tnt-phone-icon-help summary{font-weight:700;cursor:pointer}
+
+/* Automatic account linking and direct manipulation of the service program. */
+.profile-link-summary{padding:24px;border-radius:20px;background:var(--tnt-lilac);color:var(--tnt-ink);border:1.5px solid var(--tnt-edge);margin:8px 0 22px}
+.profile-link-summary h3{font-family:var(--tnt-display);font-size:26px;line-height:1.2;margin:14px 0}
+body .profile-link-summary p{color:var(--tnt-ink);margin:0 0 16px}.profile-link-summary small{display:block;line-height:1.6}
+.profile-link-result{margin:0;display:grid;gap:0}.profile-link-result>div{padding:16px 0;border-bottom:1px solid var(--tnt-line)}.profile-link-result>div:last-child{border-bottom:0}
+.profile-link-result dt{font-size:12px;font-weight:700;color:var(--tnt-muted)}.profile-link-result dd{margin:6px 0 0;font-size:15px;overflow-wrap:anywhere}
+.schedule-order-hint{font-size:13px;color:var(--tnt-muted);margin:18px 0;line-height:1.6}
+body .schedule-drag-handle{touch-action:none;cursor:grab;display:grid;place-items:center;width:44px;height:44px;border:1px dashed var(--tnt-line);border-radius:12px;margin:16px 0 0;background:var(--tnt-panel2);color:var(--tnt-text);padding:6px}
+.schedule-drag-handle svg{width:22px;height:22px;stroke:none}.schedule-drag-handle:active{cursor:grabbing}
+.is-order-placeholder{opacity:.25;outline:2px dashed var(--tnt-accent);outline-offset:-3px;border-radius:22px}
+.schedule-order-ghost{position:fixed!important;z-index:150!important;margin:0!important;pointer-events:none!important;opacity:.96;box-shadow:0 14px 35px #0004;transform-origin:center;will-change:transform}
+.is-schedule-dragging{user-select:none;cursor:grabbing}.is-order-saving{opacity:.65;pointer-events:none}

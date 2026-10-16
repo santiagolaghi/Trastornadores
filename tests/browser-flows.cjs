@@ -7,7 +7,7 @@ const phoneMode=process.env.TNT_TEST_PHONE==='1';
 const mockPhoneOS=process.env.TNT_TEST_MOCK_NOTIFICATIONS==='1',displayed=[];
 const pid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 function fixtureScript(){return fs.readFileSync(path.join(__dirname,'fixtures/runtime.js'),'utf8').replace("if(!location.pathname.includes('/hub'))","if(false)");}
-const sdk=fs.readFileSync(process.env.TNT_TEST_SDK,'utf8')+`\nconst originalClient=supabase.createClient;supabase.createClient=(...args)=>{eval(${JSON.stringify(fixtureScript())});window.__fixtureSB=TNT.sb;window.__fixtureValues={};window.__profileValues={efe_group:'varones'};const db=window.__fixtureDB;db.tnt_people[0].first_name='Nora';db.tnt_people[0].last_name='Pérez';db.tnt_profiles_central=db.tnt_people.map(p=>({...p,nombre:p.full_name.split(' ')[0],apellido:p.full_name.split(' ').slice(1).join(' '),fecha_nacimiento:p.birthday,genero:p.sex==='F'?'Mujer':'Varón',telefono:'1112345678',creado_en:new Date().toISOString()}));db.tnt_efe_groups=[{id:'efe-group',code:'varones',name:'EFE Varones',active:true}];db.tnt_efe_memberships=db.tnt_people.map(p=>({person_id:p.id,group_id:'efe-group',active:true}));db.tnt_efe_meetings=[{id:'efe-meeting',group_id:'efe-group',meeting_date:TNTUI.dateKey(),active:true,title:'Miércoles EFE'}];db.tnt_saturday_members=db.tnt_people.map(p=>({person_id:p.id,active:true}));db.tnt_saturday_attendance=[];db.tnt_access_grants=[...TNT.grants,{module:'perfiles',scope:'*',enabled:true,access_level:'manage'}].map(g=>({...g,person_id:db.tnt_people[0].id}));if(new URLSearchParams(location.search).has('fixture-onboarding'))db.tnt_accounts[0].onboarding_completed_at=null;if(new URLSearchParams(location.search).has('fixture-community')){Object.assign(db.tnt_accounts[0],{staff_status:'community',ministry_role:null,system_role:'user'});db.tnt_access_grants=[];}return originalClient(...args)};`;
+const sdk=fs.readFileSync(process.env.TNT_TEST_SDK,'utf8')+`\nconst originalClient=supabase.createClient;supabase.createClient=(...args)=>{eval(${JSON.stringify(fixtureScript())});window.__fixtureSB=TNT.sb;window.__fixtureValues={};window.__profileValues={efe_group:'varones'};const db=window.__fixtureDB;db.tnt_people[0].first_name='Nora';db.tnt_people[0].last_name='Pérez';db.tnt_profiles_central=db.tnt_people.map(p=>({...p,nombre:p.full_name.split(' ')[0],apellido:p.full_name.split(' ').slice(1).join(' '),fecha_nacimiento:p.birthday,genero:p.sex==='F'?'Mujer':'Varón',telefono:'1112345678',creado_en:new Date().toISOString()}));db.tnt_efe_groups=[{id:'efe-group',code:'varones',name:'EFE Varones',active:true}];db.tnt_efe_memberships=db.tnt_people.map(p=>({person_id:p.id,group_id:'efe-group',active:true}));db.tnt_efe_meetings=[{id:'efe-meeting',group_id:'efe-group',meeting_date:TNTUI.dateKey(),active:true,title:'Miércoles EFE'}];db.tnt_saturday_members=db.tnt_people.map(p=>({person_id:p.id,active:true}));db.tnt_saturday_attendance=[];db.tnt_access_grants=[...TNT.grants,{module:'perfiles',scope:'*',enabled:true,access_level:'manage'}].map(g=>({...g,person_id:db.tnt_people[0].id}));if(new URLSearchParams(location.search).has('fixture-incomplete'))window.__profileValues.health='';if(new URLSearchParams(location.search).has('fixture-onboarding'))db.tnt_accounts[0].onboarding_completed_at=null;if(new URLSearchParams(location.search).has('fixture-community')){Object.assign(db.tnt_accounts[0],{staff_status:'community',ministry_role:null,system_role:'user'});db.tnt_access_grants=[];}return originalClient(...args)};`;
 const server=http.createServer((req,res)=>{
  const u=new URL(req.url,'http://localhost');
  if(mockPhoneOS&&u.pathname==='/__preview__/phone-display'){let data='';req.on('data',part=>data+=part);req.on('end',()=>{displayed.push(JSON.parse(data));res.end('{}')});return;}
@@ -82,7 +82,7 @@ async function mockAPI(page){
    await page.waitForFunction(()=>navigator.serviceWorker.controller,{timeout:15000});
    const registrationId=await registration;
    await page.evaluate(async()=>{
-    const name=(await caches.keys()).find(k=>k.includes('phone-updates')),cache=await caches.open(name);
+    const name=(await caches.keys()).find(k=>k.includes('profile-schedule')),cache=await caches.open(name);
     await cache.put('/manifest.webmanifest?v=20261013',new Response('{"icons":[{"src":"old.png"}]}'));
     await cache.put('/icons/icon-192.png',new Response('old icon'));
    });
@@ -113,6 +113,33 @@ async function mockAPI(page){
   await page.locator('[data-hero-next]').click();assert((await page.locator('[data-hero-event]').innerText()).includes('United Camp'));
   await page.locator('[data-hero-prev]').click();await page.locator('[data-hero-event]').click();await page.locator('.schedule-top').waitFor();assert(page.url().includes('event='+pid(20)));
   assert.equal(await page.locator('[data-view=activities]').count(),0);assert.equal(await page.locator('[data-view=events]').count(),0);
+  await page.evaluate(async()=>{
+   const names=['Reflexión','Ofrenda','Canciones','Adoración'],times=['19:20:00','19:25:00','19:30:00','19:12:00'],durations=[5,5,15,8];
+   __fixtureDB.tnt_schedule_items.forEach((row,index)=>Object.assign(row,{title:names[index],starts_at:times[index],duration_minutes:durations[index]}));
+   await loadAll();render();
+  });
+  const order=()=>page.locator('[data-order-day] > [data-schedule-order-item]').evaluateAll(rows=>rows.map(row=>row.dataset.scheduleOrderItem));
+  assert.deepEqual(await order(),[pid(53),pid(50),pid(51),pid(52)]);
+  const touch=await context.newCDPSession(page);
+  async function moveBefore(id,before){
+   const handle=page.locator('[data-schedule-drag="'+id+'"]');await handle.evaluate(el=>el.scrollIntoView({block:'center'}));
+   const start=await handle.boundingBox(),target=await page.locator('[data-schedule-order-item="'+before+'"]:not(.schedule-order-ghost)').boundingBox(),x=start.x+start.width/2,y=start.y+start.height/2,end=Math.max(104,target.y+12);
+   await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+   for(let step=1;step<=8;step++)await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:y+(end-y)*step/8}]});
+   await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+   await page.waitForFunction(()=>!TNTScheduleOrder.busy);
+  }
+  await moveBefore(pid(52),pid(51));await moveBefore(pid(52),pid(50));
+  assert.deepEqual(await order(),[pid(53),pid(52),pid(50),pid(51)]);
+  assert.equal(await page.evaluate(()=>__fixtureDB.tnt_schedule_items.find(i=>i.title==='Reflexión').starts_at),'19:35:00');
+  await page.evaluate(async()=>{await loadAll();render()});assert.deepEqual(await order(),[pid(53),pid(52),pid(50),pid(51)]);
+  const savedOrder=await order();await page.evaluate(()=>__fixtureFailures['rpc:tnt_reorder_schedule']='El cronograma cambió en otro dispositivo.');
+  await page.locator('[data-schedule-drag="'+pid(52)+'"]').focus();await page.keyboard.press('ArrowUp');await page.waitForFunction(()=>!TNTScheduleOrder.busy);
+  assert.deepEqual(await order(),savedOrder);assert((await page.locator('#tnt-toast').innerText()).includes('otro dispositivo'));await page.evaluate(()=>delete __fixtureFailures['rpc:tnt_reorder_schedule']);
+  await page.evaluate(()=>__fixtureFailures['tnt_schedule_items:read']='Lectura interrumpida');await page.locator('[data-schedule-drag="'+pid(52)+'"]').focus();await page.keyboard.press('ArrowUp');await page.waitForFunction(()=>!TNTScheduleOrder.busy);
+  assert.deepEqual(await order(),[pid(52),pid(53),pid(50),pid(51)]);await page.evaluate(async()=>{delete __fixtureFailures['tnt_schedule_items:read'];await loadAll();render()});
+  await page.locator('[data-order-day]').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,'program-order-mobile.png'),fullPage:true});
+  console.log('Program: chronological display, touch reorder, adjusted times, reload persistence and rollback on conflict.');
   await page.locator('.timeline [data-item-open]').first().click();await page.locator('#editTask').waitFor();
   assert.equal(await page.locator('[data-response],[data-task-status],.live-controls').count(),0);
   await visit('/organizacion/?view=my','.org-nav');await page.evaluate(async()=>{__fixtureDB.tnt_tasks=[];__fixtureDB.tnt_task_assignees=[];__fixtureDB.tnt_schedule_items=[];__fixtureDB.tnt_schedule_responsibles=[];await loadAll();render();});
@@ -130,6 +157,21 @@ async function mockAPI(page){
   await visit('/perfiles/datos/?me=1&fixture-community=1','#my-profile-view .tnt-profile-complete');assert.equal(await page.locator('[data-tnt-admin]').count(),0);assert.equal(await page.locator('.tnt-profile-dock-me').isVisible(),true);assert.equal(await page.evaluate(()=>TNT.hasAccess('perfiles')),false);assert.equal(await page.evaluate(()=>__fixtureCalls.some(c=>c.table==='tnt_profiles_central')),false);
   await visit('/?fixture-onboarding=1','#tnt-membership');await page.locator('[data-next]').click();await page.locator('[data-next]').click();assert.equal(await page.locator('[data-efe-service-role]').isVisible(),true);assert((await page.locator('[name=efe_service_role]').innerText()).includes('Soy líder de este EFE'));
   console.log('Profiles: one complete editor, no presentation form, EFE role choices, accessible own profile and top-layer notices.');
+  await visit('/?fixture-incomplete=1','#tnt-membership');assert.equal(await page.locator('.module-card').count(),0);
+  await page.locator('[data-next]').click();assert.equal(await page.locator('[name=health]').evaluate(el=>el.required),true);
+  await page.locator('[name=health]').fill('No tengo condiciones de salud');await page.locator('[data-next]').click();await page.locator('[name=consent]').check();await page.locator('#tnt-membership [type=submit]').click();
+  await page.locator('.module-card').first().waitFor();assert.equal(await page.evaluate(()=>TNT.profileComplete),true);
+  console.log('Existing account: missing mandatory answer blocks modules, completing it restores entry.');
+  await visit('/admin/','[data-tab=roles]');await page.evaluate(async()=>{
+   __profileLinkPreview={fields:TNTProfiles.config(),source:{first_name:'Nora',last_name:'Pérez',phone:'1112345678',dreams:'Servir con el equipo'},target:{first_name:'Nora María',last_name:'Pérez',phone:'2222222222',health:'Sin alergias'},history:{saturdays:12,efe:3},revision:'browser-revision'};
+   await TNTProfileLinks.review('browser-link');
+  });
+  assert.equal(await page.locator('.profile-link-choices [type=radio]').count(),0);assert.equal(await page.locator('.profile-link-summary h3').innerText(),'Nora Pérez');
+  await page.screenshot({path:path.join(out,'google-link-mobile.png')});await page.locator('.profile-link-choices details').first().locator('summary').click();
+  assert((await page.locator('.profile-link-result').innerText()).includes('1112345678'));assert(!(await page.locator('.profile-link-result').innerText()).includes('2222222222'));
+  await page.locator('[name=same_person]').check();await page.locator('.profile-link-choices [type=submit]').click();await page.locator('.profile-link-choices').waitFor({state:'detached'});
+  assert.equal(await page.evaluate(()=>__fixtureCalls.filter(c=>c.rpc==='tnt_resolve_profile_link').length),1);
+  console.log('Google linking: one identity confirmation, automatic account priority, visible final values and one save.');
   await visit('/asistencia/?mode=sabados','#attendanceRows');await page.locator('.tnt-attendance-list-fold summary').click();assert.equal(await page.locator('.people-list').isVisible(),false);await page.locator('.tnt-attendance-list-fold summary').click();assert.equal(await page.locator('.people-list').isVisible(),true);await page.screenshot({path:path.join(out,'attendance-mobile.png'),fullPage:true});
   await page.locator('.tnt-attendance-list-fold summary').click();await page.locator('#att-search').fill('Bruno');assert.equal(await page.locator('.people-list').isVisible(),false);await page.locator('.tnt-attendance-list-fold summary').click();assert.equal(await page.locator('.person-row').count(),1);
   console.log('Attendance verified, checking resources.');await visit('/organizacion/?view=files','[data-add-resource]');await page.locator('[data-add-resource]').click();await page.locator('[name=title]').fill('Unipase');await page.locator('[name=url]').fill('www.cchurlingham.com');await page.locator('.tnt-overlay form [type=submit]').click();await page.waitForFunction(()=>__fixtureDB.tnt_library_items.length===1);assert.equal(await page.evaluate(()=>__fixtureDB.tnt_library_items[0].url),'https://www.cchurlingham.com/');await page.locator('.tnt-overlay').waitFor({state:'detached'});

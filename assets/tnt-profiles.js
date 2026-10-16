@@ -10,9 +10,9 @@ const defaults={
  studies:{label:'¿Qué estudiás o a qué te dedicás?',type:'text'},dreams:{label:'¿Cuáles son tus sueños?',type:'textarea'},
  health:{label:'¿Tenés alguna enfermedad, alergia o condición de salud que debamos conocer?',type:'textarea'},
  leadership_strengths:{label:'Habilidades para acompañar jóvenes y adolescentes',type:'leadership',required:true,roles:['Líder','Pastor/a'],default:50},
- efe_group:{label:'¿A qué EFE vas?',type:'efe'},efe_service_role:{label:'Mi lugar en este EFE',type:'select',required:false,roles:['Admin','Pastor/a','Líder','Timoteo','Colaborador'],options:['Participo','Soy líder de este EFE','Soy Timoteo de este EFE']}
+ efe_group:{label:'¿A qué EFE vas?',type:'efe'},efe_service_role:{label:'Mi lugar en este EFE',type:'select',required:true,roles:['Admin','Pastor/a','Líder','Timoteo','Colaborador'],options:['Participo','Soy líder de este EFE','Soy Timoteo de este EFE']}
 };
-function config(fields){const order=Object.keys(defaults);return Object.fromEntries(Object.entries(fields||defaults).sort(([a],[b])=>(order.includes(a)?order.indexOf(a):100)-(order.includes(b)?order.indexOf(b):100)).map(([k,f])=>[k,{visible:true,required:true,...defaults[k],...f}]));}
+function config(fields){const order=Object.keys(defaults);return Object.fromEntries(Object.entries(fields||defaults).sort(([a],[b])=>(order.includes(a)?order.indexOf(a):100)-(order.includes(b)?order.indexOf(b):100)).map(([k,f])=>[k,{visible:true,...defaults[k],...f,required:f.visible!==false}]));}
 function applies(f,role='',roles=[]){return !f.roles?.length||f.roles.includes(role||'Comunidad')||roles.some(r=>f.roles.includes(r));}
 function field(key,f,v='',groups=[],locked=false){
  if(f.visible===false)return '';
