@@ -9,7 +9,7 @@ python3 <<'PY'
 from pathlib import Path
 p = Path('public/buffet/index.html')
 s = p.read_text(encoding='utf-8')
-s = s.replace('src="/assets/tnt-experience.js?v=2"', 'src="/assets/tnt-experience.js?v=20261016r2"')
+s = s.replace('src="/assets/tnt-experience.js?v=2"', 'src="/assets/tnt-experience.js?v=20261017r3"')
 needle = '<script type="module">'
 inject = '<script src="/assets/tnt-buffet-direct.js?v=2"></script>' + needle
 if '/assets/tnt-buffet-direct.js?v=2' not in s:

@@ -87,7 +87,60 @@ function renderShell(){
  document.addEventListener('tnt:profile',()=>{$('[data-tnt-user]',el).innerHTML=avatarHtml();});window.TNTNavigation?.mount();
 
 }
-function toggleAccountMenu(){let m=$('#tnt-account-menu');if(m){m.remove();return}m=document.createElement('section');m.id='tnt-account-menu';m.innerHTML=`<div class="tnt-profile-head">${avatarHtml()}<div><b>${esc(TNT.displayName())}</b><small>${esc(TNT.identity?.email||'')}</small><small>${esc(TNT.account?.ministry_role||'')}${TNT.isAdmin?' · Administrador':''}</small></div></div><div class="tnt-menu-actions">${TNT.isAdmin?'<button data-admin>Configuración de TNT</button>':''}<button data-profile>Mi perfil</button><button data-accounts>Cambiar / agregar cuenta</button><button data-appearance>Apariencia de TNT</button><button data-theme>Modo ${document.documentElement.dataset.tntTheme==='dark'?'claro':'oscuro'}</button><button data-access>Mis accesos y solicitudes</button><button data-phone>Avisos en mi teléfono</button><button data-tutorial>Cómo se usa este espacio</button>${TNT.isAdmin?'<button data-studio>Estudio TNT</button>':''}<button class="wide danger" data-logout>Cerrar sesión</button></div>`;document.body.appendChild(m);$('[data-admin]',m)?.addEventListener('click',()=>location.href='/admin/?tab=settings');$('[data-profile]',m).onclick=TNT.showMyProfile;$('[data-accounts]',m).onclick=()=>{m.remove();TNTAccounts.open();};$('[data-appearance]',m).onclick=()=>{m.remove();TNTAppearance.open();};$('[data-theme]',m).onclick=()=>{TNT.toggleTheme();m.remove()};$('[data-access]',m).onclick=showAccess;$('[data-phone]',m).onclick=()=>{m.remove();TNTNotifications.phone();};$('[data-tutorial]',m).onclick=()=>{m.remove();TNTExperience.startTutorial();};$('[data-studio]',m)?.addEventListener('click',()=>{m.remove();TNTExperience.openSettings();});$('[data-logout]',m).onclick=()=>TNT.logout();setTimeout(()=>document.addEventListener('click',outside,{once:true}),0);function outside(e){if(!m.contains(e.target)&&!e.target.closest('[data-tnt-user]'))m.remove()}}
+function toggleAccountMenu() {
+ const existing = $('#tnt-account-menu');
+ if (existing) { existing.dispatchEvent(new Event('tnt:account-close')); return; }
+ const U = TNTUI, m = document.createElement('section');
+ m.id = 'tnt-account-menu';
+ m.setAttribute('role', 'dialog');
+ m.setAttribute('aria-label', 'Tu cuenta de TNT');
+ const groups = [
+  ['Tu cuenta', [
+   ['profile', 'people', 'Mi perfil', 'Tus datos y tu historia en TNT'],
+   ['accounts', 'undo', 'Cambiar / agregar cuenta', 'Tus cuentas de Google en este dispositivo'],
+   ['access', 'lock', 'Mis accesos y solicitudes', 'Consultá tus permisos']
+  ]],
+  ['Tu experiencia', [
+   ['appearance', 'edit', 'Apariencia de TNT', 'Una identidad para toda la app'],
+   ['theme', document.documentElement.dataset.tntTheme === 'dark' ? 'sun' : 'moon', 'Modo ' + (document.documentElement.dataset.tntTheme === 'dark' ? 'claro' : 'oscuro'), 'Elegí cómo ver tu pantalla'],
+   ['phone', 'bell', 'Avisos en mi teléfono', 'Mensajes y novedades, también al salir'],
+   ['tutorial', 'help', 'Cómo se usa este espacio', 'Volvé a recorrer el tutorial']
+  ]],
+  ...(TNT.isAdmin ? [['Administración', [
+   ['admin', 'settings', 'Configuración de TNT', 'Personas, roles y preguntas'],
+   ['studio', 'edit', 'Estudio TNT', 'Portadas, textos y módulos']
+  ]]] : [])
+ ];
+ const row = item => '<button type="button" data-' + item[0] + ' class="tnt-account-action"><span class="tnt-account-action-icon">' + U.icon(item[1]) + '</span><span><strong>' + esc(item[2]) + '</strong><small>' + esc(item[3]) + '</small></span>' + U.icon('arrow', 'tnt-account-action-arrow') + '</button>';
+ m.innerHTML = '<header class="tnt-account-cover"><span class="tnt-account-eyebrow">TU ESPACIO EN TNT</span><button type="button" class="tnt-account-close" aria-label="Cerrar menú de cuenta">' + U.icon('close') + '</button><div class="tnt-profile-head">' + avatarHtml() + '<div><b>' + esc(TNT.displayName()) + '</b><small>' + esc(TNT.identity?.email || '') + '</small><span class="tnt-account-role">' + esc(TNT.account?.ministry_role || 'Comunidad TNT') + (TNT.isAdmin ? ' · Administrador' : '') + '</span></div></div></header><div class="tnt-menu-actions">' + groups.map(([label, items]) => '<section class="tnt-account-group"><h3>' + esc(label) + '</h3>' + items.map(row).join('') + '</section>').join('') + '<button type="button" class="tnt-account-logout" data-logout>' + U.icon('logout') + '<span>Cerrar sesión</span></button></div>';
+ function close() {
+  m.remove();
+  document.removeEventListener('pointerdown', outside, true);
+  document.removeEventListener('keydown', escape);
+ }
+ function outside(event) { if (!m.contains(event.target) && !event.target.closest('[data-tnt-user]')) close(); }
+ function escape(event) { if (event.key === 'Escape') { close(); $('[data-tnt-user]')?.focus(); } }
+ m.addEventListener('tnt:account-close', close, { once: true });
+ m.querySelector('.tnt-account-close').onclick = close;
+ const actions = {
+  admin: () => location.href = '/admin/?tab=settings',
+  profile: () => TNT.showMyProfile(),
+  accounts: () => TNTAccounts.open(),
+  appearance: () => TNTAppearance.open(),
+  theme: () => TNT.toggleTheme(),
+  access: showAccess,
+  phone: () => TNTNotifications.phone(),
+  tutorial: () => TNTExperience.startTutorial(),
+  studio: () => TNTExperience.openSettings(),
+  logout: () => TNT.logout()
+ };
+ Object.entries(actions).forEach(([key, action]) => {
+  m.querySelector('[data-' + key + ']')?.addEventListener('click', () => { close(); action(); });
+ });
+ document.body.appendChild(m);
+ document.addEventListener('pointerdown', outside, true);
+ document.addEventListener('keydown', escape);
+}
 function sheet(title,body){return TNTUI.modal(title,body)}
 async function showNotifications(){const r=await sb.from('tnt_notifications').select('*').order('created_at',{ascending:false}).limit(40);const rows=(r.data||[]).filter(n=>!n.person_id||n.person_id===TNT.person?.id);const o=sheet('Notificaciones',`<p>Todo lo que requiere tu atención en TNT.</p><div style="display:grid;gap:7px">${rows.length?rows.map(n=>`<button data-note="${n.id}" data-href="${esc(n.href||'')}" style="text-align:left;border:1px solid var(--tnt-line);background:${n.read_at?'var(--tnt-panel2)':'color-mix(in srgb,var(--tnt-accent) 10%,var(--tnt-panel))'};color:var(--tnt-text);border-radius:13px;padding:10px"><b style="display:block;font-size:14px">${esc(n.title)}</b><small style="color:var(--tnt-muted)">${esc(n.body||'') }</small></button>`).join(''):'<div class="tnt-pill good">No tenés notificaciones pendientes.</div>'}</div>`);o.querySelectorAll('[data-note]').forEach(b=>b.onclick=async()=>{await sb.from('tnt_notifications').update({read_at:new Date().toISOString()}).eq('id',b.dataset.note);if(b.dataset.href)location.href=b.dataset.href;else b.remove()})}
 async function showProfile(){

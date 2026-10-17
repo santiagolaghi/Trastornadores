@@ -833,3 +833,78 @@ test('Configuración abre Apariencia directamente desde el engranaje',async()=>{
 test('Una cuenta existente puede confirmar por sí misma una coincidencia pendiente',async()=>{
  const a=await inlinePage('index.html',w=>{const rpc=w.TNT.sb.rpc;w.TNT.sb.rpc=(name,args)=>name==='tnt_continue_profile'?Promise.resolve({data:{linked:false,candidate:{id:'known-profile',full_name:'Nora Pérez'}},error:null}):rpc(name,args);},true);try{await a.w.TNT.ready;await until(()=>a.d.querySelector('.profile-match-review'));assert(a.d.querySelector('.profile-match-review').textContent.includes('¿Sos Nora Pérez?'));a.d.querySelector('[data-not-me]').click();await until(()=>!a.d.querySelector('.profile-match-review'));assert(a.w.localStorage.getItem('tnt:profile-match-skipped:'+a.w.TNT.session.user.id));assert.deepEqual(a.errors,[]);}finally{a.close();}
 });
+
+
+test('Cada encuentro aparece una sola vez en Mi TNT, con o sin coordinación',async()=>{
+ for(const coordinate of [true,false]){
+  const a=await app('organization','',w=>{
+   const db=w.__fixtureDB,id=w.TNT.person.id,event=db.tnt_events[0].id;
+   db.tnt_event_members=db.tnt_event_members.filter(m=>m.person_id!==id);
+   if(coordinate)db.tnt_event_members.push({event_id:event,person_id:id,event_role:'organizer'});
+  });
+  try{
+   const ids=[...a.d.querySelectorAll('.event-card [data-event-open]')].map(b=>b.dataset.eventOpen);
+   assert(ids.length>0);assert.equal(ids.length,new Set(ids).size);
+   assert.equal(a.d.querySelector('.coordination-grid'),null);
+   assert.deepEqual(a.errors,[]);
+  }finally{a.close();}
+ }
+});
+test('Un deslizamiento corto sobre la portada mueve el carrusel sin activar el enlace',async()=>{
+ const a=await app('hub');
+ try{
+  const track=a.d.querySelector('[data-space-track]'),link=track.querySelector('.module-card');
+  const image=link.querySelector('img')||link.querySelector('h3');
+  const pointer=(target,type,x,y)=>{const e=new a.w.Event(type,{bubbles:true,cancelable:true});Object.assign(e,{pointerId:41,isPrimary:true,pointerType:'touch',button:0,clientX:x,clientY:y});target.dispatchEvent(e);return e;};
+  assert.equal(link.getAttribute('draggable'),'false');assert.equal(link.style.touchAction,'pan-y');
+  pointer(image,'pointerdown',250,120);pointer(a.w,'pointermove',207,122);
+  assert(track.classList.contains('is-deck-dragging'));
+  const handoff=new a.w.Event('lostpointercapture',{bubbles:true});Object.assign(handoff,{pointerId:41});image.dispatchEvent(handoff);assert(track.classList.contains('is-deck-dragging'));
+  pointer(a.w,'pointerup',207,122);
+  assert.equal(a.d.querySelector('[data-space-position]').textContent,'2 / 7');
+  const tap=new a.w.MouseEvent('click',{bubbles:true,cancelable:true});link.dispatchEvent(tap);assert(tap.defaultPrevented);
+  const active=track.querySelector('[data-deck-active=true] h3');
+  pointer(active,'pointerdown',250,120);const vertical=pointer(a.w,'pointermove',252,170);pointer(a.w,'pointerup',252,170);
+  assert.equal(vertical.defaultPrevented,false);assert.equal(a.d.querySelector('[data-space-position]').textContent,'2 / 7');
+  assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+test('El menú de cuenta agrupa acciones y permite cerrar con Escape',async()=>{
+ const a=await inlinePage('organizacion/index.html',w=>w.document.getElementById('tnt-shell')?.remove(),true);
+ try{
+  await a.w.TNT.ready;await until(()=>a.d.querySelector('[data-tnt-user]'));
+  a.d.querySelector('[data-tnt-user]').click();
+  const menu=a.d.querySelector('#tnt-account-menu');assert(menu);
+  assert.equal(menu.querySelectorAll('.tnt-account-group').length,3);
+  assert(menu.querySelector('[data-appearance] .tnt-account-action-icon'));
+  assert(menu.querySelector('.tnt-account-cover').textContent.includes('TU ESPACIO EN TNT'));
+  a.d.dispatchEvent(new a.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+  assert.equal(a.d.querySelector('#tnt-account-menu'),null);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+test('Los filtros de chat separan no leídos y grupos sin ocultar conversaciones al volver a Todos',async()=>{
+ const direct='00000000-0000-4000-8000-000000000067';
+ const a=await app('chat','',w=>w.__fixtureDB.tnt_chat_threads.push({id:direct,title:'Chat individual',thread_type:'direct',created_at:new Date().toISOString(),is_archived:false}));
+ try{
+  assert(a.d.querySelector('[data-thread="'+direct+'"]'));
+  a.d.querySelector('[data-chat-filter=groups]').click();assert.equal(a.d.querySelector('[data-thread="'+direct+'"]'),null);
+  a.d.querySelector('[data-chat-filter=unread]').click();assert.equal(a.d.querySelectorAll('[data-thread]').length,1);
+  assert(a.d.querySelector('.thread-unread'));assert.equal(a.d.querySelector('[data-chat-filter=unread]').getAttribute('aria-pressed'),'true');
+  a.d.querySelector('[data-chat-filter=all]').click();assert(a.d.querySelector('[data-thread="'+direct+'"]'));
+  assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+test('El compositor alterna micrófono y envío, y el emoji conserva el mensaje escrito',async()=>{
+ const a=await app('chat','?thread=00000000-0000-4000-8000-000000000060');
+ try{
+  await until(()=>a.d.querySelector('.message-bubble'));
+  const input=a.d.querySelector('#chat-text'),send=a.d.querySelector('#chat-send'),voice=a.d.querySelector('#chat-voice');
+  assert(send.hidden);assert(!voice.hidden);assert(a.d.querySelector('#chat-bubble-color').textContent.includes('Verde'));
+  input.value='Hola equipo ';input.dispatchEvent(new a.w.Event('input',{bubbles:true}));
+  assert(!send.hidden);assert(voice.hidden);
+  a.d.querySelector('#chat-emoji').click();a.d.querySelector('[data-emoji="😊"]').click();
+  await until(()=>input.value.endsWith('😊'));assert.equal(input.value,'Hola equipo 😊');
+  input.value='';input.dispatchEvent(new a.w.Event('input',{bubbles:true}));assert(send.hidden);assert(!voice.hidden);
+  assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});

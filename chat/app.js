@@ -3,9 +3,52 @@
 'use strict';
 const U=TNTUI,sb=TNT.sb,$=s=>document.querySelector(s);
 if(!window.TNTEditor){window.TNTEditor={render:(plain)=>U.esc(plain||''),attach:(input)=>{const api={get:()=>({text:input.value||'',html:U.esc(input.value||'')}),set:(v)=>{input.value=v||''},focus:()=>input.focus(),lock:(v)=>{input.readOnly=!!v}};input.tntEditor=api;api.wrap={querySelector:()=>({hidden:true})};return api;}};}
-const S={threads:[],people:[],accounts:[],members:[],events:[],efeGroups:[],efeMembers:[],groups:[],groupMembers:[],eventMembers:[],tasks:[],assignees:[],overview:[],messages:[],reactions:[],active:null,request:0,drafts:{},reply:null,audience:null,bubbleColor:'peach',pendingMessageId:null,files:[],uploaded:[],stars:[],recording:null,sending:false,oldest:null,hasOlder:false,readAt:{},timer:null};
+const S={threads:[],people:[],accounts:[],members:[],events:[],efeGroups:[],efeMembers:[],groups:[],groupMembers:[],eventMembers:[],tasks:[],assignees:[],overview:[],messages:[],reactions:[],active:null,request:0,drafts:{},reply:null,audience:null,bubbleColor:'lime',pendingMessageId:null,files:[],uploaded:[],stars:[],recording:null,sending:false,oldest:null,hasOlder:false,readAt:{},timer:null};
 const bubbleColors={lime:'Verde',lilac:'Lila',peach:'Durazno',sky:'Celeste',rose:'Rosa',neutral:'Gris'};
 const bubbleClass=color=>Object.hasOwn(bubbleColors,color)?' bubble-'+color:'';
+
+function chatIcon(name) {
+ const paths = {
+  smile: 'M9 9h.01M15 9h.01M8 14a4 4 0 0 0 8 0M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
+  mic: 'M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0V5Zm-3 6v1a6 6 0 0 0 12 0v-1M12 18v4m-4 0h8',
+  menu: 'M12 5h.01M12 12h.01M12 19h.01',
+  group: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8m8 .13a4 4 0 0 1 0 7.75'
+ };
+ return paths[name] ? '<svg class="tnt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + paths[name] + '"/></svg>' : U.icon(name);
+}
+function updateComposer() {
+ const hasContent = !!editor?.get().text.trim() || S.files.length > 0 || S.sending;
+ $('#chat-send').hidden = !hasContent;
+ $('#chat-voice').hidden = hasContent;
+}
+function toggleComposerTools() {
+ const tools = $('.chat-compose-tools');
+ tools.hidden = !tools.hidden;
+ $('#chat-room-tools')?.setAttribute('aria-expanded', String(!tools.hidden));
+}
+function emojiPicker() {
+ if (!S.active || S.sending || S.recording) return;
+ const emojis = ['😀','😊','😂','🥹','😍','🥳','🙌','👏','🙏','💪','👍','👌','❤️','🔥','✨','🎉','🫶','😎','🤔','😅','😢','😁','🤗','🤍','✅','💯','📌','🎶','☕','🎂','🌻','💡'];
+ const o = U.modal('Emojis', '<div class="chat-emoji-grid">' + emojis.map(value => '<button type="button" data-emoji="' + value + '" aria-label="Insertar ' + value + '">' + value + '</button>').join('') + '</div>');
+ o.querySelectorAll('[data-emoji]').forEach(button => button.onclick = async () => {
+  const content = editor.get(), emoji = button.dataset.emoji;
+  await U.closeModal(o);
+  editor.set(content.text + emoji, content.html + U.esc(emoji));
+  editor.focus();
+  resizeInput();
+ });
+}
+function communityRoster() {
+ const ids = S.accounts.filter(a => a.enabled && a.auth_user_id).map(a => a.person_id);
+ const o = U.modal('Equipo TNT', '<div class="chat-community-list">' + ids.map(id => '<button type="button" data-community-person="' + id + '">' + U.avatar(person(id), account(id)) + '<span><b>' + U.esc(name(id)) + '</b><small>' + U.esc(account(id).ministry_role || 'Comunidad TNT') + '</small></span>' + U.icon('arrow') + '</button>').join('') + '</div>');
+ o.querySelectorAll('[data-community-person]').forEach(button => button.onclick = async () => { await U.closeModal(o); showPerson(button.dataset.communityPerson); });
+}
+function conversationMenu() {
+ const o = U.modal('Opciones del chat', '<div class="chat-room-menu"><button type="button" data-room-action="people">' + U.icon('people') + 'Participantes</button><button type="button" data-room-action="search">' + U.icon('search') + 'Buscar mensajes</button><button type="button" data-room-action="starred">★ Mensajes destacados</button><button type="button" data-room-action="tools">' + U.icon('edit') + 'Formato y color de mensajes</button></div>');
+ const actions = { people: showParticipants, search: searchMessages, starred: showStarred, tools: toggleComposerTools };
+ o.querySelectorAll('[data-room-action]').forEach(button => button.onclick = async () => { await U.closeModal(o); actions[button.dataset.roomAction](); });
+}
+
 function updateBubbleButton(){const button=$('#chat-bubble-color');if(!button)return;button.innerHTML=`<i class="bubble-dot bubble-${S.bubbleColor}"></i><span>Burbuja: ${bubbleColors[S.bubbleColor]}</span>`;button.setAttribute('aria-label','Color de burbuja: '+bubbleColors[S.bubbleColor]+'. Cambiar antes de enviar');}
 function chooseBubbleColor(){if(!S.active||S.sending||S.recording)return;const o=U.modal('Color de la burbuja',`<p>Elegí cómo se verá este mensaje para todos en el chat.</p><div class="chat-bubble-palette">${Object.entries(bubbleColors).map(([key,label])=>`<button type="button" data-bubble-color="${key}" class="bubble-${key}" aria-pressed="${S.bubbleColor===key}"><span>${U.esc(label)}</span>${S.bubbleColor===key?'✓':''}</button>`).join('')}</div>`);o.querySelectorAll('[data-bubble-color]').forEach(b=>b.onclick=()=>{S.bubbleColor=b.dataset.bubbleColor;updateBubbleButton();persistDraft();U.closeModal(o);});}
 let editor;
@@ -22,14 +65,40 @@ async function start(){await TNT.ready;if(!TNT.identity||TNT.blocked)return;$('#
 async function loadMeta(){const tables={threads:'tnt_chat_threads',people:'tnt_people',accounts:'tnt_accounts',members:'tnt_chat_members',events:'tnt_events',efeGroups:'tnt_efe_groups',efeMembers:'tnt_efe_memberships',groups:'tnt_groups',groupMembers:'tnt_group_members',eventMembers:'tnt_event_members',tasks:'tnt_tasks',assignees:'tnt_task_assignees'},errors=[];await Promise.all(Object.entries(tables).map(async([key,table])=>{try{let q=sb.from(table).select('*');if(key==='threads')q=q.eq('is_archived',false).order('is_pinned',{ascending:false}).order('updated_at',{ascending:false});const r=await q;if(r.error)throw r.error;S[key]=r.data||[];}catch(e){errors.push(err(e));}}));$('#chat-error').textContent=errors.length?'No pudimos actualizar todas las conversaciones.':'';if(errors.length){const b=document.createElement('button');b.className='tnt-button';b.textContent='Reintentar';b.onclick=loadMeta;$('#chat-error').append(b);}await refreshOverview();$('#new-chat').hidden=!canCreate();renderTeam();renderThreads();if(S.active)renderRoomHead();}
 async function refreshOverview(){const r=await sb.rpc('tnt_chat_overview');if(r.error){if(!S.overview.length)$('#chat-error').textContent='No pudimos consultar los mensajes pendientes.';return;}S.overview=r.data||[];renderThreads();}
 function renderTeam(){const ids=S.accounts.filter(a=>a.enabled&&(a.staff_status==='approved'||a.system_role==='admin')&&a.auth_user_id).map(a=>a.person_id).sort((a,b)=>(b===me())-(a===me())).slice(0,10);$('#chat-team').hidden=ids.length<2;$('#chat-team').innerHTML=ids.map(id=>`<button class="chat-team-person" data-team-person="${id}">${U.avatar(person(id),account(id))}<span>${U.esc(id===me()?'Vos':name(id).split(' ')[0])}</span></button>`).join('');$('#chat-team').querySelectorAll('[data-team-person]').forEach(b=>b.onclick=()=>showPerson(b.dataset.teamPerson));}
-function threadPortrait(t){const ids=roster(t).filter(id=>id!==me()),id=ids.find(id=>account(id).avatar_url);return id?U.avatar(person(id),account(id),'thread-photo'):TNTExperience.logo();}
-function renderThreads(){let bulk=document.getElementById('chat-bulk');if(!bulk){bulk=document.createElement('button');bulk.id='chat-bulk';bulk.className='tnt-button';bulk.textContent='Seleccionar varias';bulk.onclick=selectThreads;document.querySelector('#chat-threads').before(bulk);}bulk.hidden=!S.threads.some(canDeleteThread);const term=($('#chat-search').value||'').trim().toLocaleLowerCase('es');const list=S.threads.filter(t=>threadAllowed(t)&&(t.title+' '+type(t)).toLocaleLowerCase('es').includes(term)).sort((a,b)=>Number(b.is_pinned)-Number(a.is_pinned)||String(summary(b.id).last_created_at||b.created_at).localeCompare(String(summary(a.id).last_created_at||a.created_at)));$('#chat-threads').innerHTML=list.map(t=>{const o=summary(t.id);return `<button class="chat-thread ${S.active===t.id?'is-active':''}" data-thread="${t.id}" aria-current="${S.active===t.id}"><span class="thread-art ${t.thread_type}">${threadPortrait(t)}</span><span><span class="thread-title">${U.esc(t.title)}</span><span class="thread-preview">${U.esc(o.last_body||type(t))}</span></span><span class="thread-meta"><time>${o.last_created_at?U.time(o.last_created_at):''}</time>${Number(o.unread_count)>0?`<span class="thread-unread" aria-label="${Number(o.unread_count)} sin leer">${Number(o.unread_count)>99?'99+':Number(o.unread_count)}</span>`:t.is_pinned?U.icon('pin'):''}</span></button>`;}).join('')||`<div class="tnt-empty">${term?'No hay coincidencias.':'Todavía no hay conversaciones. Abrí el chat desde una tarea o un evento.'}</div>`;$('#chat-threads').querySelectorAll('[data-thread]').forEach(b=>b.onclick=()=>open(b.dataset.thread));}
+function threadPortrait(t){const ids=roster(t).filter(id=>id!==me()),id=ids.find(id=>account(id).avatar_url);return t.thread_type==='direct'&&id?U.avatar(person(id),account(id),'thread-photo'):t.thread_type==='general'?TNTExperience.logo():chatIcon('group');}
+function renderThreads() {
+ let bulk = document.getElementById('chat-bulk');
+ if (!bulk) {
+  bulk = document.createElement('button');
+  bulk.id = 'chat-bulk';
+  bulk.type = 'button';
+  bulk.className = 'tnt-icon-button';
+  bulk.setAttribute('aria-label', 'Seleccionar conversaciones');
+  bulk.title = 'Seleccionar conversaciones';
+  bulk.innerHTML = chatIcon('menu');
+  bulk.onclick = selectThreads;
+  $('.chat-sidebar-actions').append(bulk);
+ }
+ bulk.hidden = !S.threads.some(canDeleteThread);
+ const term = ($('#chat-search').value || '').trim().toLocaleLowerCase('es');
+ const filter = S.filter || 'all';
+ document.querySelectorAll('[data-chat-filter]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.chatFilter === filter)));
+ const list = S.threads.filter(t => threadAllowed(t) && (t.title + ' ' + type(t)).toLocaleLowerCase('es').includes(term) && (filter !== 'unread' || Number(summary(t.id).unread_count) > 0) && (filter !== 'groups' || t.thread_type !== 'direct')).sort((a,b) => Number(b.is_pinned) - Number(a.is_pinned) || String(summary(b.id).last_created_at || b.created_at).localeCompare(String(summary(a.id).last_created_at || a.created_at)));
+ $('#chat-threads').innerHTML = list.map(t => {
+  const o = summary(t.id), unread = Number(o.unread_count) || 0;
+  const latest = S.messages.find(m => m.thread_id === t.id && m.created_at === o.last_created_at);
+  const sent = latest?.person_id === me() ? '<span class="thread-check">' + U.icon('doublecheck') + '</span>' : '';
+  return '<button class="chat-thread ' + (S.active === t.id ? 'is-active' : '') + (unread ? ' has-unread' : '') + '" data-thread="' + t.id + '" aria-current="' + (S.active === t.id) + '"><span class="thread-art ' + t.thread_type + '">' + threadPortrait(t) + '</span><span class="thread-copy"><span class="thread-title">' + U.esc(t.title) + '</span><span class="thread-preview">' + sent + '<span>' + U.esc(o.last_body || type(t)) + '</span></span></span><span class="thread-meta"><time>' + (o.last_created_at ? U.time(o.last_created_at) : '') + '</time>' + (unread > 0 ? '<span class="thread-unread" aria-label="' + unread + ' sin leer">' + (unread > 99 ? '99+' : unread) + '</span>' : t.is_pinned ? U.icon('pin') : '') + '</span></button>';
+ }).join('') || '<div class="tnt-empty">' + (term ? 'No hay coincidencias.' : filter === 'unread' ? 'No tenés chats sin leer.' : filter === 'groups' ? 'Todavía no hay grupos.' : 'Todavía no hay conversaciones.') + '</div>';
+ $('#chat-threads').querySelectorAll('[data-thread]').forEach(button => button.onclick = () => open(button.dataset.thread));
+}
+
 function roomVisible(){return !document.hidden&&($('#chat-app').classList.contains('room-open')||window.innerWidth>720);}
 async function open(id,recordHistory=true){
  if(S.sending)return U.toast('Esperá a que termine el envío.');
  if(S.recording)return U.toast('Terminá o descartá el audio antes de cambiar de conversación.');
  persistDraft();S.request++;S.active=id;document.body.dataset.tntActiveThread=id;S.messages=[];S.reactions=[];S.oldest=null;S.hasOlder=false;
- const d=S.drafts[id]||{};S.reply=d.reply||null;S.audience=d.audience||null;S.bubbleColor=Object.hasOwn(bubbleColors,d.bubbleColor)?d.bubbleColor:'peach';updateBubbleButton();S.pendingMessageId=d.pendingMessageId||null;S.files=d.files||[];S.uploaded=d.uploaded||[];editor.set(d.text||'',d.rich||'');
+ const d=S.drafts[id]||{};S.reply=d.reply||null;S.audience=d.audience||null;S.bubbleColor=Object.hasOwn(bubbleColors,d.bubbleColor)?d.bubbleColor:'lime';updateBubbleButton();S.pendingMessageId=d.pendingMessageId||null;S.files=d.files||[];S.uploaded=d.uploaded||[];editor.set(d.text||'',d.rich||'');
  $('#chat-app').classList.add('room-open');$('#chat-compose-wrap').hidden=false;$('#chat-composer-status').textContent='';
  $('#chat-audience').hidden=!TNT.isAdmin;
  renderDraft();renderRoomHead();renderThreads();$('#chat-messages').innerHTML='<div class="tnt-empty">Cargando mensajes…</div>';
@@ -40,17 +109,36 @@ function isThreadModerator(t){return !!t&&S.members.some(m=>m.thread_id===t.id&&
 function canManageMembers(t){return !!t&&(TNT.isAdmin||(isThreadModerator(t)&&TNT.canAction?.('chat','manage_members','*')));}
 function canDeleteThread(t){return !!t&&(TNT.isAdmin||(isThreadModerator(t)&&TNT.canAction?.('chat','delete_chat','*')));}
 function canManageThread(t){return canManageMembers(t)||canDeleteThread(t);}
-function renderRoomHead(){const t=thread();if(!t)return;const ids=roster(t),joined=S.members.some(m=>m.thread_id===t.id&&m.person_id===me());$('#chat-room-head').innerHTML=`<button class="tnt-icon-button chat-back" id="chat-back" aria-label="Volver a conversaciones">${U.icon('back')}</button><span class="thread-art ${t.thread_type}">${threadPortrait(t)}</span><div class="room-heading"><h2>${U.esc(t.title)}</h2><p>${U.esc(type(t))}</p></div><button class="room-people" id="room-people" aria-label="Ver participantes">${U.avatarStack(ids,S.people,S.accounts,me(),3)}<small>${ids.length} ${ids.length===1?'participante':'participantes'}</small></button>${TNT.isAdmin&&!joined?'<button class="tnt-button chat-join" id="room-join">Entrar</button>':''}${canManageThread(t)?'<button class="tnt-icon-button" id="room-options" aria-label="Editar conversación">'+U.icon('more')+'</button>':''}`;$('#chat-back').onclick=()=>{if(history.state?.tntChatRoom)history.back();else closeRoom();};$('#room-people').onclick=()=>showParticipants();$('#room-options')?.addEventListener('click',threadOptions);$('#room-join')?.addEventListener('click',async()=>{const r=await sb.from('tnt_chat_members').insert({thread_id:t.id,person_id:me(),member_role:'member'});if(r.error)return U.toast(err(r.error),true);await loadMeta();U.toast('Ahora figurás como participante de este chat.');});}
+function renderRoomHead() {
+ const t = thread();
+ if (!t) return;
+ const ids = roster(t), joined = S.members.some(m => m.thread_id === t.id && m.person_id === me());
+ const subtitle = t.thread_type === 'direct' ? 'Conversación privada' : ids.length + (ids.length === 1 ? ' participante' : ' participantes');
+ $('#chat-room-head').innerHTML = '<button type="button" class="tnt-icon-button chat-back" id="chat-back" aria-label="Volver a conversaciones">' + U.icon('back') + '</button><button type="button" class="room-identity" id="room-people" aria-label="Ver participantes"><span class="thread-art ' + t.thread_type + '">' + threadPortrait(t) + '</span><span class="room-heading"><h2>' + U.esc(t.title) + '</h2><span>' + U.esc(subtitle) + '</span></span></button><div class="room-actions"><button type="button" class="tnt-icon-button" id="room-search" aria-label="Buscar en esta conversación">' + U.icon('search') + '</button><button type="button" class="tnt-icon-button chat-tools-trigger" id="chat-room-tools" aria-label="Herramientas del chat" aria-expanded="' + !$('.chat-compose-tools').hidden + '">' + U.icon('edit') + '</button>' + (TNT.isAdmin && !joined ? '<button type="button" class="tnt-button chat-join" id="room-join">Entrar</button>' : '') + '<button type="button" class="tnt-icon-button" id="room-options" aria-label="Opciones de la conversación">' + chatIcon('menu') + '</button></div>';
+ $('#chat-back').onclick = () => { if (history.state?.tntChatRoom) history.back(); else closeRoom(); };
+ $('#room-people').onclick = () => showParticipants();
+ $('#room-search').onclick = searchMessages;
+ $('#chat-room-tools').onclick = toggleComposerTools;
+ $('#room-options').onclick = canManageThread(t) ? threadOptions : conversationMenu;
+ $('#room-join')?.addEventListener('click', async () => {
+  const r = await sb.from('tnt_chat_members').insert({ thread_id:t.id, person_id:me(), member_role:'member' });
+  if (r.error) return U.toast(err(r.error), true);
+  await loadMeta();
+  U.toast('Ahora figurás como participante de este chat.');
+ });
+}
+
 function threadOptions(){
  const t=thread();if(!canManageThread(t))return;
  const canMembers=canManageMembers(t),canDelete=canDeleteThread(t);
- const o=U.modal('Administrar conversación',`
+ const o=U.modal('Administrar conversación',`<div class="chat-room-menu"><button type="button" id="thread-message-tools">${U.icon('edit')} Formato y color de mensajes</button><button type="button" id="thread-starred">★ Mensajes destacados</button></div>
    ${canMembers?`<form class="tnt-form" id="thread-edit"><label>Nombre del chat<input name="title" required minlength="3" maxlength="100" value="${U.esc(t.title)}"></label><button class="tnt-button primary" type="submit">Guardar nombre</button><p role="alert"></p></form>`:''}
    <div class="chat-thread-manage">
      ${canMembers?'<button class="tnt-button" id="manage-members">Elegir participantes</button>':''}
      ${canDelete?'<button class="tnt-button danger" id="archive-thread">Eliminar conversación</button>':''}
    </div>
    <p class="tnt-help">${canDelete?'Eliminar archiva el historial y permite crear una conversación nueva para el mismo contexto.':'Solo podés gestionar los participantes de esta conversación.'}</p>`);
+ o.querySelector('#thread-message-tools').onclick=async()=>{await U.closeModal(o);toggleComposerTools();};o.querySelector('#thread-starred').onclick=async()=>{await U.closeModal(o);showStarred();};
  const edit=o.querySelector('#thread-edit');
  if(edit)edit.onsubmit=async e=>{e.preventDefault();const title=e.target.elements.title.value.trim();if(title.length<3)return;const r=await sb.from('tnt_chat_threads').update({title}).eq('id',t.id).select().single();if(r.error){o.querySelector('[role=alert]').textContent=err(r.error);return;}t.title=title;U.closeModal(o);renderRoomHead();renderThreads();};
  o.querySelector('#manage-members')?.addEventListener('click',()=>manageMembers(t));
@@ -73,18 +161,18 @@ async function loadMessages(first=false,older=false){const id=S.active,seq=++S.r
 async function markRead(id){const last=S.messages.at(-1)?.created_at;if(!last||S.readAt[id]>=last)return;if(TNT.isAdmin&&!S.members.some(m=>m.thread_id===id&&m.person_id===me())){S.readAt[id]=last;return;}const at=new Date().toISOString(),existing=S.members.find(m=>m.thread_id===id&&m.person_id===me());const r=existing?await sb.from('tnt_chat_members').update({last_read_at:at}).eq('thread_id',id).eq('person_id',me()):await sb.from('tnt_chat_members').insert({thread_id:id,person_id:me(),member_role:'member',last_read_at:at});if(r.error)return;S.readAt[id]=last;if(existing)existing.last_read_at=at;else S.members.push({thread_id:id,person_id:me(),last_read_at:at,member_role:'member'});summary(id).unread_count=0;renderThreads();}
 function linkify(body){return String(body||'').split(/(https?:\/\/[^\s<>]+)/g).map(s=>/^https?:\/\//.test(s)?`<a href="${U.esc(U.safeUrl(s))}" target="_blank" rel="noopener noreferrer">${U.esc(s)}</a>`:U.esc(s)).join('');}
 function firstName(id){return String(name(id)).trim().split(/\s+/)[0]||'TNT';}
-function renderMessages(){let day='';const items=S.messages.map((m,index)=>{
- const mine=m.person_id===me(),dk=U.dateKey(m.created_at),previous=S.messages[index-1];
+function renderMessages(){let day='';const ordered=[...S.messages].sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at)||String(a.id).localeCompare(String(b.id)));const items=ordered.map((m,index)=>{
+ const mine=m.person_id===me(),dk=U.dateKey(m.created_at),previous=ordered[index-1];
  const grouped=!!previous&&previous.person_id===m.person_id&&U.dateKey(previous.created_at)===dk;
  const files=messageFiles(m),hasAudio=!m.deleted_at&&files.some(isAudioFile);
- let sep='';if(day!==dk){day=dk;sep=`<div class="chat-day">${U.date(m.created_at,{weekday:'long',day:'numeric',month:'long'})}</div>`;}
+ let sep='';if(day!==dk){day=dk;sep=`<div class="chat-day">${dk===today()?'HOY':dk===U.addDays(today(),-1)?'AYER':U.date(m.created_at,{day:'numeric',month:'long',year:'numeric'})}</div>`;}
  const replied=S.messages.find(x=>x.id===m.reply_to),reactions=S.reactions.filter(r=>r.message_id===m.id),groups=[...new Set(reactions.map(r=>r.reaction))];
  const readers=S.members.filter(x=>x.thread_id===S.active&&x.person_id!==me()&&x.last_read_at>=m.created_at&&(!m.audience_person_ids||m.audience_person_ids.includes(x.person_id)));
  const sender=!mine&&!grouped?`<span class="message-name">${U.esc(firstName(m.person_id))}</span>`:'';
  const reply=m.reply_to&&!m.deleted_at?`<button class="message-reply" data-jump="${m.reply_to}"><b>${replied?U.esc(firstName(replied.person_id)):'Respuesta a un mensaje anterior'}</b><span>${replied?.deleted_at?'Mensaje eliminado':U.esc(replied?.body||replied?.attachment_name||'Ver mensaje')}</span></button>`:'';
  const attachments=!m.deleted_at?files.map((f,i)=>`<div class="message-media" data-media="${m.id}" data-media-index="${i}"></div>${isAudioFile(f)?'':`<button class="message-attachment" data-attachment="${m.id}" data-file-index="${i}">${U.icon('file')}<span>${U.esc(f.name||'Archivo')}</span>${U.icon('download')}</button>`}`).join(''):'';
  const reactionsHtml=!m.deleted_at&&groups.length?`<div class="message-reactions">${groups.map(reaction=>{const rs=reactions.filter(r=>r.reaction===reaction);return `<button class="${rs.some(r=>r.person_id===me())?'chosen':''}" data-reaction-id="${m.id}" data-reaction="${U.esc(reaction)}" aria-label="${U.esc(reaction)} · ${rs.length} reacciones" title="${U.esc(rs.map(r=>firstName(r.person_id)).join(', '))}">${U.esc(reaction)} ${rs.length}</button>`;}).join('')}</div>`:'';
- return sep+`<article class="chat-message ${mine?'is-mine':''} ${grouped?'same-sender':''} ${hasAudio?'has-audio':''}" id="message-${m.id}" data-message-id="${m.id}">${!grouped&&!hasAudio?U.avatar(person(m.person_id),account(m.person_id)):''}<div class="message-stack"><div class="message-bubble${bubbleClass(m.bubble_color)}">${sender}${m.audience_person_ids?.length?`<span class="message-audience" title="Solo destinatarios elegidos">🔒 Solo ${m.audience_person_ids.length} ${m.audience_person_ids.length===1?'persona':'personas'}</span>`:''}${reply}<div class="message-body ${m.deleted_at?'message-deleted':''}">${m.deleted_at?'Mensaje eliminado':TNTEditor.render(m.body,m.body_rich)}</div>${attachments}<div class="message-info">${S.stars.some(x=>x.entity_id===m.id)?'<span aria-label="Destacado">★</span>':''}${m.pinned&&!m.deleted_at?U.icon('pin'):''}<time>${U.time(m.created_at)}${m.edited_at?' · editado':''}</time>${mine&&!readers.length?'<span class="message-sent" aria-label="Enviado">'+U.icon('check')+'</span>':''}${mine&&readers.length?`<button class="message-read" data-readers="${m.id}" aria-label="Ver quién leyó el mensaje">${U.icon('doublecheck')}</button>`:''}${!m.deleted_at?`<button data-message-actions="${m.id}" aria-label="Opciones del mensaje">${U.icon('more')}</button>`:''}</div></div>${reactionsHtml}</div></article>`;
+ return sep+`<article class="chat-message ${mine?'is-mine':''} ${grouped?'same-sender':''} ${hasAudio?'has-audio':''}" id="message-${m.id}" data-message-id="${m.id}">${!grouped&&!hasAudio?U.avatar(person(m.person_id),account(m.person_id)):''}<div class="message-stack"><div class="message-bubble${bubbleClass(m.bubble_color)}">${sender}${m.audience_person_ids?.length?`<span class="message-audience" title="Solo destinatarios elegidos">🔒 Solo ${m.audience_person_ids.length} ${m.audience_person_ids.length===1?'persona':'personas'}</span>`:''}${reply}<div class="message-body ${m.deleted_at?'message-deleted':''}">${m.deleted_at?'Mensaje eliminado':TNTEditor.render(m.body,m.body_rich)}</div>${attachments}<div class="message-info">${S.stars.some(x=>x.entity_id===m.id)?'<span aria-label="Destacado">★</span>':''}${m.pinned&&!m.deleted_at?U.icon('pin'):''}<time>${U.time(m.created_at)}${m.edited_at?' · editado':''}</time>${mine&&!readers.length?'<span class="message-sent" aria-label="Enviado">'+U.icon('doublecheck')+'</span>':''}${mine&&readers.length?`<button class="message-read" data-readers="${m.id}" aria-label="Ver quién leyó el mensaje">${U.icon('doublecheck')}</button>`:''}${!m.deleted_at?`<button data-message-actions="${m.id}" aria-label="Opciones del mensaje">${U.icon('more')}</button>`:''}</div></div>${reactionsHtml}</div></article>`;
  });
 $('#chat-messages').innerHTML=(S.hasOlder?'<button class="tnt-button" id="older-messages">Ver mensajes anteriores</button>':'')+(items.join('')||'<div class="chat-welcome"><h2>Sin mensajes todavía</h2><p>Escribí un mensaje para iniciar la conversación.</p></div>');$('#older-messages')?.addEventListener('click',()=>loadMessages(false,true));$('#chat-messages').querySelectorAll('[data-message-actions]').forEach(b=>b.onclick=()=>messageActions(b.dataset.messageActions));$('#chat-messages').querySelectorAll('[data-reaction-id]').forEach(b=>b.onclick=()=>react(b.dataset.reactionId,b.dataset.reaction));$('#chat-messages').querySelectorAll('[data-attachment]').forEach(b=>b.onclick=()=>attachment(b.dataset.attachment,Number(b.dataset.fileIndex||0)));$('#chat-messages').querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>jump(b.dataset.jump));$('#chat-messages').querySelectorAll('[data-readers]').forEach(b=>b.onclick=()=>showReaders(b.dataset.readers));bindMessageGestures();hydrateAttachments();const pinned=S.messages.filter(m=>m.pinned&&!m.deleted_at);$('#chat-pinned').hidden=!pinned.length;$('#chat-pinned').innerHTML=pinned.length?`<button id="show-pinned">${U.icon('pin')}<span>${pinned.length} ${pinned.length===1?'mensaje fijado':'mensajes fijados'} · ${U.esc(pinned.at(-1).body||pinned.at(-1).attachment_name)}</span></button>`:'';$('#show-pinned')?.addEventListener('click',()=>{const o=U.modal('Mensajes fijados',pinned.map(m=>`<button class="tnt-button" data-pin-jump="${m.id}">${U.esc(m.body||m.attachment_name)}</button>`).join(''));o.querySelectorAll('[data-pin-jump]').forEach(b=>b.onclick=()=>{U.closeModal(o);jump(b.dataset.pinJump);});});}
 function jump(id){const el=document.getElementById('message-'+id);if(!el)return U.toast('Este mensaje es anterior. Cargá los mensajes anteriores para verlo.');el.scrollIntoView({block:'center',behavior:'smooth'});el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),1600);}
@@ -97,7 +185,7 @@ function renderDraft(){
  $('#clear-audience')?.addEventListener('click',()=>{if(S.sending)return;S.audience=null;renderDraft();persistDraft();});
  $('#cancel-reply')?.addEventListener('click',()=>{if(S.sending)return;S.reply=null;renderDraft();persistDraft();});
  $('#chat-draft-context').querySelectorAll('[data-remove-file]').forEach(b=>b.onclick=()=>{if(S.sending)return;const i=Number(b.dataset.removeFile);if(S.files[i].previewUrl)URL.revokeObjectURL(S.files[i].previewUrl);S.files.splice(i,1);S.uploaded.splice(i,1);renderDraft();});
- bindAudioWidgets($('#chat-draft-context'));
+ bindAudioWidgets($('#chat-draft-context'));updateComposer();
 }
 function sameJson(a,b){
  const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
@@ -124,9 +212,9 @@ async function send(e){
   if(!confirmed){const r=await sb.from('tnt_chat_messages').insert(payload).select().single();if(r.error)throw r.error;}
   S.files.forEach(f=>f.previewUrl&&URL.revokeObjectURL(f.previewUrl));S.files=[];S.uploaded=[];S.reply=null;S.audience=null;S.bubbleColor='lime';updateBubbleButton();S.pendingMessageId=null;editor.set('');delete S.drafts[id];persistDraft();$('#chat-file').value='';renderDraft();await loadMessages(false);$('#chat-messages').scrollTop=$('#chat-messages').scrollHeight;$('#chat-composer-status').textContent='';await refreshOverview();
  }catch(e){S.sendError=true;persistDraft();$('#chat-composer-status').textContent='No se envió: '+err(e)+' Tu mensaje sigue acá.';}
- finally{S.sending=false;$('#chat-send').disabled=false;editor.lock(false);}
+ finally{S.sending=false;$('#chat-send').disabled=false;editor.lock(false);updateComposer();}
 }
-function resizeInput(){persistDraft();}
+function resizeInput(){persistDraft();updateComposer();}
 async function react(id,reaction){const existing=S.reactions.find(r=>r.message_id===id&&r.person_id===me()&&r.reaction===reaction);const r=existing?await sb.from('tnt_chat_reactions').delete().eq('message_id',id).eq('person_id',me()).eq('reaction',reaction):await sb.from('tnt_chat_reactions').insert({message_id:id,person_id:me(),reaction});if(r.error)return U.toast(err(r.error),true);await loadMessages(false);}
 function messageActions(id){const m=S.messages.find(x=>x.id===id);if(!m||m.deleted_at)return;const own=m.person_id===me(),manage=own||TNT.isAdmin;const o=U.modal('Mensaje de '+name(m.person_id),`<div class="chat-actions">${['👍','❤️','🙌','👀','✅'].map(r=>`<button data-react="${r}" aria-label="Reaccionar ${r}">${r}</button>`).join('')}</div><div class="tnt-form"><button class="tnt-button" id="star-message">${S.stars.some(x=>x.entity_id===id)?'Quitar de destacados':'★ Destacar para mí'}</button><button class="tnt-button" id="copy-message">Copiar texto</button><button class="tnt-button" id="reply-message">${U.icon('reply')} Responder</button>${manage?`<button class="tnt-button" id="pin-message">${U.icon('pin')} ${m.pinned?'Desfijar':'Fijar mensaje'}</button>`:''}${own&&m.body?'<button class="tnt-button" id="edit-message">Editar mensaje</button>':''}${manage?'<button class="tnt-button" id="delete-message">Eliminar mensaje</button>':''}</div>`);o.querySelectorAll('[data-react]').forEach(b=>b.onclick=()=>{U.closeModal(o);react(id,b.dataset.react);});o.querySelector('#star-message').onclick=async()=>{await toggleStar(m);U.closeModal(o);};o.querySelector('#copy-message').onclick=async()=>{try{await navigator.clipboard.writeText(m.body||'');U.closeModal(o);U.toast('Texto copiado');}catch{U.toast('No pudimos copiar el texto.',true);}};o.querySelector('#reply-message').onclick=()=>{S.reply=m;U.closeModal(o);renderDraft();editor.focus();};o.querySelector('#pin-message')?.addEventListener('click',async()=>{const r=await sb.from('tnt_chat_messages').update({pinned:!m.pinned}).eq('id',id).select().single();if(r.error)return U.toast(err(r.error),true);U.closeModal(o);await loadMessages(false);});o.querySelector('#edit-message')?.addEventListener('click',()=>{editMessage(m);});o.querySelector('#delete-message')?.addEventListener('click',()=>{deleteMessage(m);});}
 function editMessage(m){const o=U.modal('Editar mensaje',`<form class="tnt-form"><textarea aria-label="Mensaje" name="body" maxlength="10000">${U.esc(m.body)}</textarea><button class="tnt-button primary">Guardar cambios</button><p role="alert"></p></form>`),ed=TNTEditor.attach(o.querySelector('textarea'),{html:m.body_rich});o.querySelector('form').onsubmit=async e=>{e.preventDefault();const c=ed.get();if(!c.text.trim())return;const r=await sb.from('tnt_chat_messages').update({body:c.text.trim(),body_rich:c.html,edited_at:new Date().toISOString()}).eq('id',m.id).select().single();if(r.error)return o.querySelector('[role=alert]').textContent=err(r.error);U.closeModal(o);await loadMessages(false);};}
@@ -167,7 +255,13 @@ function newChat(){
 }
 
 function bind(){
- const tools=$('.chat-compose-tools');tools.hidden=true;const more=document.createElement('button');more.type='button';more.className='tnt-icon-button chat-tools-trigger';more.setAttribute('aria-label','Herramientas del chat');more.setAttribute('aria-expanded','false');more.innerHTML=U.icon('more');$('#chat-attach').after(more);more.onclick=()=>{tools.hidden=!tools.hidden;more.setAttribute('aria-expanded',String(!tools.hidden));};
+ $('.chat-compose-tools').hidden=true;
+ $('.chat-compose-tools').append($('#chat-mention'));$('#chat-mention').textContent='@ Mencionar';
+ $('#chat-emoji').innerHTML=chatIcon('smile');$('#chat-emoji').onclick=emojiPicker;
+ $('#chat-voice').innerHTML=chatIcon('mic');$('#chat-attach').innerHTML=U.icon('plus');
+ $('#chat-own-avatar').innerHTML=U.avatar(TNT.person,TNT.account);$('#chat-own-avatar').onclick=()=>TNT.showMyProfile?.();
+ $('#chat-community').innerHTML=chatIcon('group');$('#chat-community').onclick=communityRoster;
+ document.querySelectorAll('[data-chat-filter]').forEach(button=>button.onclick=()=>{S.filter=button.dataset.chatFilter;renderThreads();});
  $('#chat-search').oninput=renderThreads;$('#new-chat').onclick=newChat;$('#chat-composer').onsubmit=send;
  editor=TNTEditor.attach($('#chat-text'));editor.wrap.querySelector('.tnt-editor-tools').hidden=true;
  $('#chat-format').onclick=()=>{const toolbar=editor.wrap.querySelector('.tnt-editor-tools');toolbar.hidden=!toolbar.hidden;};
