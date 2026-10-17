@@ -101,7 +101,7 @@ async function mockAPI(page){
    else assert.equal(await page.evaluate(async()=> (await(await navigator.serviceWorker.ready).getNotifications()).some(n=>n.title==='Prueba de avisos TNT')),true);
    await modal.locator('details.tnt-phone-panel > summary').click();const before=page.url();await modal.locator('[data-update]').click();await modal.locator('[data-reopen]').waitFor({state:'visible'});assert.equal(page.url(),before);assert((await modal.locator('[data-update-status]').innerText()).includes('última versión'));
    await page.screenshot({path:path.join(out,'phone-mobile.png')});await page.evaluate(()=>TNT.setTheme('dark'));await page.screenshot({path:path.join(out,'phone-dark-mobile.png')});
-   assert.equal(await modal.locator('.tnt-phone-panel').first().evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(32, 32, 32)');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+   assert.equal(await modal.locator('.tnt-phone-panel').first().evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(32, 35, 38)');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
    console.log('PWA: direct module entry updates the worker; legacy manifests/icons refresh; offline fallback works; the native Chromium push event reaches the reception UI; updates preserve the open page. OS display:',mockPhoneOS?'mocked':'native');
    assert.deepEqual(errors,[]);return;
   }
@@ -154,12 +154,12 @@ async function mockAPI(page){
   await visit('/perfiles/datos/','[data-view-id]:visible');await page.locator('[data-view-id]:visible').first().click();await page.locator('#detailSheet .tnt-profile-complete').waitFor();await page.screenshot({path:path.join(out,'profile-dialog-mobile.png')});
   const rect=await page.locator('#detailSheet').boundingBox();assert(rect.y>=0&&rect.y+rect.height<=844&&rect.x>=0&&rect.x+rect.width<=390);
   await page.evaluate(()=>TNTUI.toast('Guardado de prueba',true));assert.equal(await page.locator('dialog[open] #tnt-toast').count(),1);await page.screenshot({path:path.join(out,'toast-dialog-mobile.png')});
-  await visit('/perfiles/datos/?me=1&fixture-community=1','#my-profile-view .tnt-profile-complete');assert.equal(await page.locator('[data-tnt-admin]').count(),0);assert.equal(await page.locator('.tnt-profile-dock-me').isVisible(),true);assert.equal(await page.evaluate(()=>TNT.hasAccess('perfiles')),false);assert.equal(await page.evaluate(()=>__fixtureCalls.some(c=>c.table==='tnt_profiles_central')),false);
+  await visit('/perfiles/datos/?me=1&fixture-community=1','#my-profile-view .tnt-profile-complete');assert.equal(await page.locator('[data-tnt-admin]').count(),0);assert.equal(await page.locator('#tnt-main-nav a').filter({hasText:'Mi perfil'}).isVisible(),true);assert.equal(await page.evaluate(()=>TNT.hasAccess('perfiles')),false);assert.equal(await page.evaluate(()=>__fixtureCalls.some(c=>c.table==='tnt_profiles_central')),false);
   await visit('/?fixture-onboarding=1','#tnt-membership');await page.locator('[data-next]').click();await page.locator('[data-next]').click();assert.equal(await page.locator('[data-efe-service-role]').isVisible(),true);assert((await page.locator('[name=efe_service_role]').innerText()).includes('Soy líder de este EFE'));
   console.log('Profiles: one complete editor, no presentation form, EFE role choices, accessible own profile and top-layer notices.');
-  await visit('/?fixture-incomplete=1','#tnt-membership');assert.equal(await page.locator('.module-card').count(),0);
-  await page.locator('[data-next]').click();assert.equal(await page.locator('[name=health]').evaluate(el=>el.required),true);
-  await page.locator('[name=health]').fill('No tengo condiciones de salud');await page.locator('[data-next]').click();await page.locator('[name=consent]').check();await page.locator('#tnt-membership [type=submit]').click();
+  await visit('/?fixture-incomplete=1','.profile-missing');assert.equal(await page.locator('.module-card').count(),0);
+  assert.equal(await page.locator('.profile-missing [name=first_name]').count(),0);assert.equal(await page.locator('[name=health]').evaluate(el=>el.required),true);
+  await page.locator('[name=health]').fill('No tengo condiciones de salud');await page.locator('.profile-missing [type=submit]').click();
   await page.locator('.module-card').first().waitFor();assert.equal(await page.evaluate(()=>TNT.profileComplete),true);
   console.log('Existing account: missing mandatory answer blocks modules, completing it restores entry.');
   await visit('/admin/','[data-tab=roles]');await page.evaluate(async()=>{
@@ -185,7 +185,12 @@ async function mockAPI(page){
   await page.locator('button[data-tnt-theme]').click();await page.screenshot({path:path.join(out,'home-dark-desktop.png'),fullPage:true});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await page.setViewportSize({width:390,height:844});await visit('/perfiles/datos/?me=1','#my-profile-view .tnt-profile-complete');await page.evaluate(()=>TNT.setTheme('dark'));await page.screenshot({path:path.join(out,'own-profile-dark-mobile.png'),fullPage:true});
-  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.equal(await page.locator('.tnt-profile-cover h2').evaluate(el=>getComputedStyle(el).color),'rgb(23, 23, 23)');assert.equal(await page.locator('.tnt-profile-story p').first().evaluate(el=>getComputedStyle(el).color),'rgb(23, 23, 23)');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.equal(await page.locator('.tnt-profile-cover h2').evaluate(el=>getComputedStyle(el).color),'rgb(23, 23, 23)');assert.equal(await page.locator('.tnt-profile-story p').first().evaluate(el=>getComputedStyle(el).color),'rgb(250, 248, 241)');
+  await visit('/','.module-card');assert.equal(await page.locator('[data-space=admin]').count(),0);await page.locator('[data-space-next]').click();assert.equal(await page.locator('[data-space-position]').innerText(),'2 / 7');assert.equal(await page.locator('[data-deck-active=true] h3').innerText(),'Chat TNT');await page.screenshot({path:path.join(out,'deck-mobile.png')});
+  await page.evaluate(()=>TNTAppearance.open());await page.locator('.appearance-option [value=studio]').check();assert.equal(await page.evaluate(()=>document.documentElement.dataset.tntStyle),'studio');await page.screenshot({path:path.join(out,'appearance-mobile.png')});await page.locator('.appearance-form [type=submit]').click();await page.locator('.appearance-form').waitFor({state:'detached'});assert.equal(await page.evaluate(()=>TNTExperience.config.appearance.style),'studio');await page.screenshot({path:path.join(out,'studio-home-mobile.png')});
+  await visit('/chat/?thread='+pid(60),'.chat-message');assert.equal(await page.locator('.chat-message.is-mine > .tnt-person-avatar').count(),1);assert.equal(await page.locator('#tnt-main-nav').isVisible(),true);const composer=await page.locator('#chat-composer').boundingBox(),nav=await page.locator('#tnt-main-nav').boundingBox();assert(composer.y+composer.height<nav.y);await page.screenshot({path:path.join(out,'chat-mobile.png')});
+  await page.locator('#chat-attach').click();await page.locator('.chat-attachment-sheet').waitFor();await page.screenshot({path:path.join(out,'chat-attachments-mobile.png')});await page.locator('.chat-attachment-sheet .tnt-close').click();
+  console.log('Shared navigation, animated deck, saved full styles, own chat photo and composer clearance verified.');
   console.log('Page errors',errors);assert.deepEqual(errors,[]);
  }catch(error){console.error('Browser flow failed:',error.message);throw error;}finally{await page.unrouteAll({behavior:'ignoreErrors'});await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

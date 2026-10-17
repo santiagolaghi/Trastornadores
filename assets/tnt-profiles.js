@@ -9,7 +9,7 @@ const defaults={
  interests:{label:'¿Qué te gusta hacer?',type:'multiselect',options:['Música','Dibujar','Cantar','Bailar','Deportes','Leer','Tecnología','Crear contenido','Todavía estoy descubriéndolo']},
  studies:{label:'¿Qué estudiás o a qué te dedicás?',type:'text'},dreams:{label:'¿Cuáles son tus sueños?',type:'textarea'},
  health:{label:'¿Tenés alguna enfermedad, alergia o condición de salud que debamos conocer?',type:'textarea'},
- leadership_strengths:{label:'Habilidades para acompañar jóvenes y adolescentes',type:'leadership',required:true,roles:['Líder','Pastor/a'],default:50},
+ leadership_strengths:{label:'Habilidades para acompañar jóvenes y adolescentes',type:'leadership',required:true,roles:['Admin','Líder','Pastor/a','Timoteo','Colaborador'],default:50},
  efe_group:{label:'¿A qué EFE vas?',type:'efe'},efe_service_role:{label:'Mi lugar en este EFE',type:'select',required:true,roles:['Admin','Pastor/a','Líder','Timoteo','Colaborador'],options:['Participo','Soy líder de este EFE','Soy Timoteo de este EFE']}
 };
 function config(fields){const order=Object.keys(defaults);return Object.fromEntries(Object.entries(fields||defaults).sort(([a],[b])=>(order.includes(a)?order.indexOf(a):100)-(order.includes(b)?order.indexOf(b):100)).map(([k,f])=>[k,{visible:true,...defaults[k],...f,required:f.visible!==false}]));}
@@ -75,7 +75,7 @@ function bind(form,fields,values={},groups=[]){
  form.querySelectorAll('.profile-leadership input[type=range]').forEach(input=>input.oninput=()=>{input.nextElementSibling.textContent=input.value+'%';input.style.setProperty('--profile-score',input.value+'%');});
  const efe=form.querySelector('[name="efe_group"]');let manual=!!values.efe_group;
  const update=()=>{if(!efe||manual)return;const code=suggest(form.querySelector('[name="birthday"]')?.value||values.birthday,form.querySelector('[name="sex"]')?.value||values.sex);if(code&&groups.some(g=>g.code===code)){efe.value=code;const hint=form.querySelector('[data-efe-hint]');if(hint)hint.textContent='Sugerido por tu edad y sexo. Podés cambiarlo.';U.enhanceSelects(form);}};
- const service=form.querySelector('[name=efe_service_role]');const syncService=()=>{if(!service||service.closest('[data-efe-service-role]'))return;const show=!!efe?.value&&efe.value!=='none';service.closest('.profile-field').hidden=!show;service.disabled=!show;};
+ const service=form.querySelector('[name=efe_service_role]');const syncService=()=>{if(!service||service.closest('[data-efe-service-role]'))return;const group=efe?.value??values.efe_group;const show=!!group&&group!=='none';service.closest('.profile-field').hidden=!show;service.disabled=!show;};
  efe?.addEventListener('change',()=>{manual=true;syncService();});syncService();form.querySelector('[name="birthday"]')?.addEventListener('change',update);form.querySelector('[name="sex"]')?.addEventListener('change',update);update();U.enhanceSelects(form);
 }
 root.TNTProfiles={defaults,baseKeys,config,field,render,collect,validate,suggest,bind,applies};

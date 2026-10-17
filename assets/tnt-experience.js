@@ -1,10 +1,8 @@
-/* TNT experience loader. The base stays byte-identical; the guard replaces only the realtime subscription strategy. */
+/* Shared application layer; classic scripts are kept in dependency order. */
 (() => {
-  const templates='/assets/tnt-template-builder.js?v=20261013',base='/assets/tnt-experience-base.js?v=20261013',profileView='/assets/tnt-profile-view.js?v=20261013',profiles='/assets/tnt-profile-editor.js?v=20261013',links='/assets/tnt-profile-link.js?v=20261016',guard='/assets/tnt-live-guard.js?v=12',isBuffet=location.pathname.startsWith('/buffet'),buffetStock=isBuffet?'/assets/tnt-buffet-stock.js?v=1':'',buffetPermissions=isBuffet?'/assets/tnt-buffet-permissions.js?v=1':'',buffetPolish=isBuffet?'/assets/tnt-buffet-polish.js?v=1':'',buffetOps=isBuffet?'/assets/tnt-buffet-ops.js?v=2':'';
-  if(document.readyState==='loading'){
-    document.write('<script src="'+base+'"><\/script><script src="'+templates+'"><\/script><script src="'+profileView+'"><\/script><script src="'+profiles+'"><\/script><script src="'+links+'"><\/script><script src="'+guard+'"><\/script>'+(buffetStock?'<script src="'+buffetStock+'"><\/script><script src="'+buffetPermissions+'"><\/script><script src="'+buffetPolish+'"><\/script><script src="'+buffetOps+'"><\/script>':''));
-    return;
-  }
-  const load=src=>new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.onload=resolve;s.onerror=reject;document.head.append(s);});
-  load(base).then(()=>load(templates)).then(()=>load(profileView)).then(()=>load(profiles)).then(()=>load(links)).then(()=>load(guard)).then(()=>buffetStock&&load(buffetStock)).then(()=>buffetPermissions&&load(buffetPermissions)).then(()=>buffetPolish&&load(buffetPolish)).then(()=>buffetOps&&load(buffetOps)).catch(e=>console.error('TNT experience loader',e));
+ const files=['tnt-experience-base.js?v=20261016r2','tnt-template-builder.js?v=20261013','tnt-profile-view.js?v=20261013','tnt-profile-editor.js?v=20261013','tnt-profile-link.js?v=20261016','tnt-navigation.js?v=20261016r2','tnt-appearance.js?v=20261016r2','tnt-accounts.js?v=20261016r2','tnt-module-deck.js?v=20261016r2','tnt-onboarding.js?v=20261016r2','tnt-live-guard.js?v=20261016r2'].map(f=>'/assets/'+f);
+ if(location.pathname.startsWith('/buffet'))files.push('/assets/tnt-buffet-stock.js?v=1','/assets/tnt-buffet-permissions.js?v=1','/assets/tnt-buffet-polish.js?v=1','/assets/tnt-buffet-ops.js?v=2');
+ if(document.readyState==='loading'){document.write(files.map(src=>'<script src="'+src+'"><\/script>').join(''));return;}
+ const load=src=>new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.onload=resolve;s.onerror=reject;document.head.append(s);});
+ files.reduce((p,src)=>p.then(()=>load(src)),Promise.resolve()).catch(e=>console.error('TNT shared layer',e));
 })();
