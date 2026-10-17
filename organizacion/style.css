@@ -223,8 +223,28 @@ dialog.modal{position:fixed;inset:0;padding:0;max-width:min(960px,calc(100vw - 2
 .event-day-row label span{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .event-day-row input{height:42px}
 .event-day-remove{width:38px;height:42px;border:1px solid color-mix(in srgb,var(--tnt-bad) 24%,var(--line));border-radius:11px;background:color-mix(in srgb,var(--tnt-bad) 7%,var(--panel));color:var(--tnt-bad);font-size:20px}
+.event-edit-dialog .tnt-sheet{display:flex;flex-direction:column;height:min(900px,calc(100dvh - 40px));overflow:hidden!important}
+.event-edit-dialog .tnt-sheet-head{flex:none}
+.event-edit-dialog .event-edit-form{display:flex;flex-direction:column;gap:0;flex:1;min-height:0}
+.event-edit-content{display:grid;gap:18px;overflow-y:auto;min-height:0;overscroll-behavior:contain;padding:0 5px 18px 0}
+.event-edit-footer{flex:none;display:grid;gap:10px;padding-top:14px;border-top:1px solid var(--line);background:var(--panel)}
+.event-edit-footer [role=alert]{margin:0;color:var(--tnt-bad);font-size:13px}
+.event-edit-footer [role=alert]:empty{display:none}
+.event-edit-footer button{width:100%}
+.event-edit-dialog .profile-consent>span{display:grid;gap:5px}
+.event-edit-dialog .profile-consent small{display:block;font-size:12px;font-weight:400;line-height:1.5}
+.event-logistics{border-top:1px solid var(--line);margin-top:28px;padding-top:8px}
+.schedule-unscheduled{margin-top:24px}
+.tnt-program-time.is-untimed b,.projection-list article>b.is-untimed{font:750 14px/1.4 var(--tnt-font);letter-spacing:0;overflow-wrap:normal}
 #toast.toast{position:fixed;z-index:11000;bottom:calc(22px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);max-width:calc(100vw - 30px);pointer-events:none}
 @media(max-width:620px){
+.event-edit-dialog .tnt-sheet{height:calc(100dvh - 32px)}
+ .event-edit-dialog .event-day-row{grid-template-columns:30px minmax(0,1fr) 38px;align-items:center}
+ .event-edit-dialog .event-day-index{grid-column:1;grid-row:1/3}
+ .event-edit-dialog .event-day-row label{grid-column:2;min-width:0}
+ .event-edit-dialog .event-day-row label:nth-of-type(1){grid-row:1}
+ .event-edit-dialog .event-day-row label:nth-of-type(2){grid-column:2;grid-row:2}
+ .event-edit-dialog .event-day-remove{grid-column:3;grid-row:1/3;min-width:38px!important;width:38px!important;min-height:42px!important;padding:0!important}
  .event-day-row{grid-template-columns:32px minmax(0,1fr) 38px}
  .event-day-row label:nth-of-type(2){grid-column:2/4}
  .event-days-head{align-items:flex-start;flex-direction:column}

@@ -1,5 +1,12 @@
 # TNT regression checks
 
+## Guardado de eventos y actividades sin horario, 17 de octubre de 2026
+
+- La suite completa de DOM, permisos, caché y push pasa con 172 pruebas.
+- `event-config-save.sql` comprueba el RPC real con identidades sintéticas y rollback: tres días, edición persistida, eliminación de días vacíos, protección de días con actividades sin hora y rechazo a personas sin permiso.
+- `browser-flows.cjs` verifica el botón Guardar siempre visible en celular y escritorio, un error seguido de reintento con el formulario conservado, los días al volver a editar y la separación entre logística y programa. `TNT_TEST_EVENT_ONLY=1` ejecuta solo este recorrido.
+- El cronograma completo, el rápido y la proyección incluyen actividades sin hora. Las áreas de logística y sus subtareas permanecen en el evento.
+
 ## Avisos, perfiles y programa del 16 de octubre de 2026
 
 - Las regresiones de interfaz, permisos, caché y push se ejecutan con `node --test tests/regression.cjs tests/permissions-and-cache.cjs tests/phone-client.cjs tests/pwa-worker.cjs tests/push-worker.cjs` (152 pruebas). La configuración conserva todas las preguntas visibles como obligatorias y respeta sus roles; también se comprueba que un administrador pueda responder una pregunta exclusiva de su rol.

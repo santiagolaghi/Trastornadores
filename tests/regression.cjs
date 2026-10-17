@@ -619,6 +619,44 @@ test('El cronograma conserva las actividades sin horario y abre su ficha para ed
  const a=await app('organization','?view=schedule',w=>{const id=w.__fixtureDB.tnt_tasks[0].id;w.__fixtureDB.tnt_tasks[0].planned_start=null;w.__fixtureDB.tnt_schedule_items=w.__fixtureDB.tnt_schedule_items.filter(i=>i.task_id!==id);});
  try{assert.equal(a.d.querySelectorAll('.timeline .agenda-card').length,3);assert.equal(a.d.querySelectorAll('.schedule-unscheduled [data-task-open]').length,1);a.d.querySelector('.schedule-unscheduled [data-task-open]').click();await until(()=>a.d.querySelector('#editTask'));assert(a.d.querySelector('#modal').textContent.includes('Checklist'));assert.deepEqual(a.errors,[]);}finally{a.close();}
 });
+function campProgramFixture(w){
+ const db=w.__fixtureDB,event=db.tnt_events[1];
+ db.tnt_schedule_days.push({id:'camp-day',event_id:event.id,date:event.start_date,label:'Viernes',sort_order:0});
+ db.tnt_tasks.push({id:'camp-pending',event_id:event.id,title:'Juego sin horario',task_type:'simple',planned_start:null,sort_order:0},
+  {id:'camp-in-day',event_id:event.id,title:'Reflexión del viernes',task_type:'complex',planned_start:null,sort_order:1},
+  {id:'camp-logistics',event_id:event.id,title:'Cosas para llevar',task_type:'logistics',planned_start:event.start_date+'T12:00:00Z',sort_order:2},
+  {id:'camp-logistics-child',event_id:event.id,parent_task_id:'camp-logistics',title:'Comprar vasos',task_type:'simple',sort_order:0});
+ db.tnt_schedule_items.push({id:'camp-untimed-row',day_id:'camp-day',task_id:'camp-in-day',title:'Reflexión del viernes',starts_at:null,sort_order:0},
+  {id:'camp-old-logistics-row',day_id:'camp-day',task_id:'camp-logistics',title:'Cosas para llevar',starts_at:'09:00:00',sort_order:1},
+  {id:'camp-old-logistics-child',day_id:'camp-day',task_id:'camp-logistics-child',title:'Comprar vasos',starts_at:'10:00:00',sort_order:2});
+}
+test('Campamento incluye actividades sin hora una vez y conserva logística fuera de las tres vistas del programa',async()=>{
+ const a=await app('organization','?view=schedule&event=00000000-0000-4000-8000-000000000021',campProgramFixture);
+ try{
+  assert.equal(a.d.querySelectorAll('.timeline .agenda-card').length,1);assert(a.d.querySelector('.agenda-time').textContent.includes('Sin horario'));
+  assert.equal(a.d.querySelectorAll('.schedule-unscheduled [data-task-open=camp-pending]').length,1);assert(!a.d.querySelector('[data-schedule-swipe]').textContent.includes('Cosas para llevar'));assert(!a.d.querySelector('[data-schedule-swipe]').textContent.includes('Comprar vasos'));
+  a.d.querySelector('[data-build-schedule]').click();const quick=a.d.querySelector('.tnt-program');assert.equal(quick.querySelectorAll('.tnt-program-row').length,2);assert.equal([...quick.querySelectorAll('h3')].filter(h=>h.textContent==='Juego sin horario').length,1);assert(!quick.textContent.includes('Cosas para llevar'));assert(!quick.textContent.includes('Comprar vasos'));
+  await a.w.eval('closeModal()');a.w.eval('projectEvent("00000000-0000-4000-8000-000000000021")');const projection=a.d.querySelector('.org-projection');assert.equal(projection.querySelectorAll('article').length,2);assert(projection.textContent.includes('Juego sin horario'));assert(!projection.textContent.includes('Cosas para llevar'));projection.querySelector('#projection-close').click();
+  a.d.querySelector('[data-event-logistics]').click();assert.equal(a.d.querySelectorAll('#event-logistics [data-task-open=camp-logistics]').length,1);assert(!a.d.querySelector('.event-logistics').textContent.includes('Juego sin horario'));a.d.querySelector('#event-logistics [data-task-open]').click();await until(()=>a.d.querySelector('#editTask'));assert(a.d.querySelector('#modal').textContent.includes('Cosas para llevar'));assert(a.d.querySelector('[data-task-open=camp-logistics-child]'));assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+test('Un evento sin días también muestra las actividades pendientes en su cronograma',async()=>{
+ const a=await app('organization','?view=schedule&event=00000000-0000-4000-8000-000000000021',w=>{campProgramFixture(w);w.__fixtureDB.tnt_schedule_days=w.__fixtureDB.tnt_schedule_days.filter(d=>d.id!=='camp-day');});
+ try{assert(a.d.querySelector('.schedule-unscheduled').textContent.includes('Juego sin horario'));assert(a.d.querySelector('.schedule-unscheduled').textContent.includes('Reflexión del viernes'));assert(!a.d.querySelector('.schedule-unscheduled').textContent.includes('Cosas para llevar'));assert.deepEqual(a.errors,[]);}finally{a.close();}
+});
+test('Guardar evento conserva el formulario ante error y guarda los tres días al reintentar',async()=>{
+ const a=await app('organization','?view=schedule&event=00000000-0000-4000-8000-000000000021',campProgramFixture);
+ try{
+  a.d.querySelector('#editEventDays').click();const form=a.d.querySelector('.event-edit-form'),event=a.w.__fixtureDB.tnt_events[1];
+  a.d.querySelector('#addEventDay').click();a.d.querySelector('#addEventDay').click();const rows=[...form.querySelectorAll('.event-day-row')];
+  rows.forEach((row,i)=>{row.querySelector('[name=day_label]').value=['Viernes','Sábado','Domingo'][i];row.querySelector('[name=day_date]').value=a.w.TNTUI.addDays(event.start_date,i);});form.elements.name.value='Campamento actualizado';
+  a.w.__fixtureFailures['rpc:tnt_update_event_config']='No se pudo guardar';form.querySelector('[type=submit]').click();await until(()=>form.querySelector('[role=alert]').textContent.includes('No se pudo guardar'));assert(!form.querySelector('[type=submit]').disabled);assert.equal(form.querySelectorAll('.event-day-row').length,3);assert.equal(form.elements.name.value,'Campamento actualizado');
+  delete a.w.__fixtureFailures['rpc:tnt_update_event_config'];const rpc=a.w.TNT.sb.rpc;let lost=true;a.w.TNT.sb.rpc=async(name,args)=>{if(name==='tnt_update_event_config'&&lost){lost=false;throw Error('Sin conexión');}return rpc(name,args);};
+  form.querySelector('[type=submit]').click();await until(()=>form.querySelector('[role=alert]').textContent.includes('Sin conexión'));assert(!form.querySelector('[type=submit]').disabled);assert(form.isConnected);
+  form.querySelector('[type=submit]').click();await until(()=>!form.isConnected);await until(()=>a.d.querySelector('#modal .sheetHead h2')?.textContent==='Campamento actualizado');assert.equal(a.w.__fixtureDB.tnt_schedule_days.filter(d=>d.event_id===event.id).length,3);
+  await a.w.eval('loadAll()');a.w.eval('render()');a.d.querySelector('#editEventDays').click();assert.deepEqual([...a.d.querySelectorAll('[name=day_label]')].map(x=>x.value),['Viernes','Sábado','Domingo']);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
 test('Crear un sábado abre su cronograma vacío y Atrás vuelve a la lista',async()=>{
  const a=await app('organization','?view=saturdays',w=>{const rpc=w.TNT.sb.rpc;w.TNT.sb.rpc=async(name,args)=>{if(name!=='tnt_create_saturday')return rpc(name,args);const id='sat-created';w.__fixtureDB.tnt_events.push({id,name:args.p_name,kind:'saturday',start_date:args.p_date,end_date:args.p_date,status:'planning'});w.__fixtureDB.tnt_schedule_days.push({id:'new-day',event_id:id,date:args.p_date,label:'Sábado',sort_order:0});return{data:id,error:null};};});
  try{a.d.querySelector('[data-new-encounter]').click();a.d.querySelector('[data-create-kind=saturday]').click();await until(()=>a.d.querySelector('#satForm'));const f=a.d.querySelector('#satForm');f.elements.date.value=a.w.TNTUI.addDays(a.w.TNTUI.dateKey(),7);f.elements.name.value='Nuevo sábado';f.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>a.d.querySelector('.schedule-top h2')?.textContent==='Nuevo sábado');await sleep(50);assert.equal(a.d.querySelector('#modal dialog'),null);assert(a.d.querySelector('.schedule-empty [data-add-schedule-activity]'));a.w.history.back();await until(()=>a.d.querySelector('.encounter-card'));assert.deepEqual(a.errors,[]);}finally{a.close();}
