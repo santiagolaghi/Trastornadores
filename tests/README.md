@@ -1,5 +1,11 @@
 # TNT regression checks
 
+## Equipos y destacados por actividad, 18 de octubre de 2026
+
+- 177 pruebas de DOM, permisos, caché y push. Se agregan categorías, acceso directo a Equipo, errores de envío conservando el borrador, destacados por actividad y controles según permisos.
+- `activity-highlights.sql` verifica los dos RPC reales, metadatos opcionales, colores válidos, independencia entre ocurrencias y permisos del equipo. Toda la transacción se revierte.
+- `TNT_TEST_HIGHLIGHT_ONLY=1` ejecuta solo el recorrido de categorías, equipo y destacados en `browser-flows.cjs`; el recorrido completo también lo incluye.
+
 ## Guardado de eventos y actividades sin horario, 17 de octubre de 2026
 
 - La suite completa de DOM, permisos, caché y push pasa con 172 pruebas.
