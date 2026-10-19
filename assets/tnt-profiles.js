@@ -49,7 +49,7 @@ function collect(form,fields){
   if(f.visible===false||!form.querySelector(`[name="${k}"]`)||form.querySelector(`[name="${k}"]`).disabled)continue;
   if(f.type==='multiselect')out[k]=[...new Set([...fd.getAll(k),...String(fd.get(k+'_other')||'').split(',').map(x=>x.trim()).filter(Boolean)])];
   else if(f.type==='leadership'){if(form.querySelector(`[name="${k}_confirmed"]`)?.checked)out[k]=Object.fromEntries([...form.querySelectorAll(`[name="${k}"][data-area]`)].map(el=>[el.dataset.area,Number(el.value)]));}
-  else out[k]=String(fd.get(k)||'').trim();
+  else out[k]=['first_name','last_name'].includes(k)?TNTUI.personName(fd.get(k)):String(fd.get(k)||'').trim();
  }
  return out;
 }

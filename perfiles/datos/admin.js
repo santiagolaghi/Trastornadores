@@ -424,18 +424,7 @@
     clearSearchBtn.hidden = !searchInput.value.trim();
     syncQuickFilters();
     renderActiveFilters();
-    const grouped = new Map();
-    for (const record of records) {
-      if (!record.fecha_nacimiento) continue;
-      const key = normalize(record.nombre + ' ' + record.apellido).replace(/[^a-z0-9]/g, '') + ':' + record.fecha_nacimiento;
-      const matches = grouped.get(key) || [];
-      matches.push(record);
-      grouped.set(key, matches);
-    }
-    const duplicates = [...grouped.values()].filter(group => group.length > 1);
-    const panel = $('profileDuplicates');
-    panel.hidden = profileState !== 'active' || !duplicates.length;
-    panel.innerHTML = duplicates.map(group => `<div><p><strong>${escapeHtml(group[0].nombre)} ${escapeHtml(group[0].apellido)}</strong> · ${group.length} registros coincidentes. Revisá las fichas para elegir cuál conservar.</p><div class="profile-duplicate-actions">${group.map((record,index) => `<button type="button" data-view-id="${escapeHtml(record.id)}">Revisar registro ${index+1} · ${escapeHtml(formatDate(record.creado_en,true))}</button>`).join('')}</div></div>`).join('');
+    const duplicatePanel = $('profileDuplicates'); duplicatePanel.hidden = true; duplicatePanel.replaceChildren();
     renderBulkControls(filtered);
   }
 
@@ -601,7 +590,7 @@
 
   function renderBulkControls(filtered){
     $('profileBulkActions')?.remove();if(!canArchive())return;const available=new Set(filtered.map(r=>String(r.id)));for(const id of selectedProfiles)if(!records.some(r=>String(r.id)===id))selectedProfiles.delete(id);
-    const bar=document.createElement('div');bar.id='profileBulkActions';bar.className='tnt-profile-bulk';bar.innerHTML=`<label><input type="checkbox" data-profile-all ${filtered.length&&filtered.every(r=>selectedProfiles.has(String(r.id)))?'checked':''}> Seleccionar todos</label><b>${selectedProfiles.size?selectedProfiles.size+' seleccionados':''}</b>${selectedProfiles.size?`${profileState==='active'?'<button data-profile-bulk="archive">Archivar</button>':''}${profileState==='trash'?'<button data-profile-bulk="restore_deleted">Restaurar</button>':profileState==='archived'?'<button data-profile-bulk="activate">Restaurar</button>':''}${profileState!=='trash'?'<button data-profile-bulk="delete">Eliminar</button>':''}<button data-profile-clear>Cancelar selección</button>`:''}`;cardsList.before(bar);
+    const bar=document.createElement('div');bar.id='profileBulkActions';bar.className='tnt-profile-bulk'+(selectedProfiles.size?' has-selection':'');bar.setAttribute('aria-label','Acciones de perfiles seleccionados');bar.innerHTML=`<label><input type="checkbox" data-profile-all ${filtered.length&&filtered.every(r=>selectedProfiles.has(String(r.id)))?'checked':''}> Seleccionar todos</label><b>${selectedProfiles.size?selectedProfiles.size+(selectedProfiles.size===1?' seleccionado':' seleccionados'):''}</b>${selectedProfiles.size?`${profileState==='active'?'<button data-profile-bulk="archive">Archivar</button>':''}${profileState==='trash'?'<button data-profile-bulk="restore_deleted">Restaurar</button>':profileState==='archived'?'<button data-profile-bulk="activate">Restaurar</button>':''}${profileState!=='trash'?'<button data-profile-bulk="delete">Eliminar</button>':''}<button data-profile-clear>Cancelar selección</button>`:''}`;cardsList.before(bar);
     bar.querySelector('[data-profile-all]').onchange=e=>{for(const record of filtered){if(e.target.checked)selectedProfiles.add(String(record.id));else selectedProfiles.delete(String(record.id));}renderList();};bar.querySelector('[data-profile-clear]')?.addEventListener('click',()=>{selectedProfiles.clear();renderList();});bar.querySelectorAll('[data-profile-bulk]').forEach(b=>b.onclick=()=>bulkProfiles([...selectedProfiles],b.dataset.profileBulk));
     for(const [list,selector] of [[cardsList,'.person-card'],[rowsBody,'tr']])list.querySelectorAll(selector).forEach((node,i)=>{const record=filtered[i];if(!record)return;node.dataset.tntRecord='';const input=document.createElement('input');input.type='checkbox';input.className='tnt-profile-select';input.checked=selectedProfiles.has(String(record.id));input.setAttribute('aria-label','Seleccionar '+record.nombre+' '+record.apellido);input.onchange=()=>{if(input.checked)selectedProfiles.add(String(record.id));else selectedProfiles.delete(String(record.id));renderList();};input.onclick=e=>e.stopPropagation();if(selector==='tr')node.querySelector('td').prepend(input);else node.prepend(input);});
   }
@@ -730,7 +719,7 @@
       const {data,error}=profiles;profileAccounts=photos.error?[]:photos.data||[];
       if (error) throw error;
 
-      records = Array.isArray(data) ? data.filter(p => !p.data_notes?.linked_to && (profileState === 'trash' ? Boolean(p.data_notes?.deleted_at) : !p.data_notes?.deleted_at && !deletedProfiles.has(String(p.id)))) : [];
+      records = Array.isArray(data) ? data.map(record=>({...record,nombre:TNTUI.personName(record.nombre),apellido:TNTUI.personName(record.apellido)})).filter(p => !p.data_notes?.linked_to && (profileState === 'trash' ? Boolean(p.data_notes?.deleted_at) : !p.data_notes?.deleted_at && !deletedProfiles.has(String(p.id)))) : [];
       renderStats();
       renderList();
 

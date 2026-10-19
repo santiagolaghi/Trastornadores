@@ -6,7 +6,7 @@
   function content(ctx, personId, person = {}, account = {}) {
     const T = window.TNT, ui = U(), v = ctx.values || {}, own = personId === T.person?.id;
     if (own) { person = T.person; account = { ...T.account, avatar_url: T.avatar() }; }
-    const name = [v.first_name, v.last_name].filter(Boolean).join(' ') || person.full_name || 'Perfil TNT';
+    const name = ui.personName([v.first_name, v.last_name].filter(Boolean).join(' ') || person.full_name || 'Perfil TNT');
     const role = v._ministry_role || account.ministry_role || 'Comunidad TNT';
     const fields = Object.fromEntries(Object.entries(TNTProfiles.config(ctx.fields)).filter(([, f]) => f.visible !== false && TNTProfiles.applies(f, role, v._profile_roles || [])));
     const age = v.birthday ? (() => { const b = new Date(v.birthday + 'T12:00:00'), now = new Date(); return now.getFullYear() - b.getFullYear() - (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate()) ? 1 : 0); })() : null;
@@ -17,9 +17,9 @@
     const instagram = String(v.instagram || '').replace(/^@/, '');
     const ig = instagram && !/no tengo|no uso/i.test(instagram) ? 'https://www.instagram.com/' + encodeURIComponent(instagram) + '/' : '';
     const canEdit = own || T.isAdmin || T.canAction?.('perfiles', 'edit', '*');
-    return `<article class="tnt-profile-complete" data-tnt-record>
-      <header class="tnt-profile-cover"><span class="tnt-profile-cover-tag">${own ? 'MI PERFIL' : 'PERSONAS TNT'}</span><div class="tnt-profile-identity">${ui.avatar({ ...person, id: personId, full_name: name }, account, 'portrait')}<div><h2>${ui.esc(name)}</h2><div class="tnt-profile-badges"><span>${ui.esc(role)}</span>${age !== null ? `<span>${age} años</span>` : ''}${fields.sex && v.sex ? `<span>${ui.esc({ M: 'Varón', F: 'Mujer', U: 'Sin especificar' }[v.sex] || v.sex)}</span>` : ''}</div></div></div></header>
-      <div class="tnt-profile-body"><div class="tnt-profile-contact-actions">${phone ? `<a class="tnt-button" href="https://wa.me/${digits}" target="_blank" rel="noopener">WhatsApp ${ui.icon('up')}</a><button type="button" class="tnt-button" data-profile-copy="${ui.esc(v.phone)}">Copiar teléfono</button>` : ''}${ig ? `<a class="tnt-button" href="${ig}" target="_blank" rel="noopener">Instagram ${ui.icon('up')}</a>` : ''}${canEdit ? `<button type="button" class="tnt-button primary" data-profile-edit="${personId}">${ui.icon('edit')}Editar perfil</button>` : ''}</div>
+    return `<article class="tnt-profile-complete" data-tnt-record data-profile-person="${personId}" data-profile-role="${ui.esc(role)}">
+      <header class="tnt-profile-cover"><span class="tnt-profile-cover-tag">${own ? 'MI PERFIL' : 'PERSONAS TNT'}</span><div class="tnt-profile-identity">${ui.avatar({ ...person, id: personId, full_name: name }, account, 'portrait')}<div><h2>${ui.esc(name)}</h2><div class="tnt-profile-badges"><span data-profile-role-label>${ui.esc(role)}</span>${age !== null ? `<span>${age} años</span>` : ''}${fields.sex && v.sex ? `<span>${ui.esc({ M: 'Varón', F: 'Mujer', U: 'Sin especificar' }[v.sex] || v.sex)}</span>` : ''}</div></div></div></header>
+      <div class="tnt-profile-body"><div class="tnt-profile-contact-actions">${phone ? `<a class="tnt-button" href="https://wa.me/${digits}" target="_blank" rel="noopener">WhatsApp ${ui.icon('up')}</a><button type="button" class="tnt-button" data-profile-copy="${ui.esc(v.phone)}">Copiar teléfono</button>` : ''}${ig ? `<a class="tnt-button" href="${ig}" target="_blank" rel="noopener">Instagram ${ui.icon('up')}</a>` : ''}${canEdit ? `<button type="button" class="tnt-button primary" data-profile-edit="${personId}">${ui.icon('edit')}Editar perfil</button>` : ''}${T.isAdmin ? `<button type="button" class="tnt-button" data-profile-role-edit="${personId}">${ui.icon('people')}Cambiar rol</button>` : ''}</div>
       <section class="tnt-profile-facts">${item('birthday', ui.date(v.birthday, { day: '2-digit', month: '2-digit', year: 'numeric' }))}${item('phone')}${item('instagram')}${(own || T.isAdmin) ? item('dni') : ''}</section>
       <div class="tnt-profile-stories">${textCard('dreams', 'up', 'lilac')}${textCard('studies', 'book', 'blue')}</div>
       ${fields.interests ? `<section class="tnt-profile-interests"><div class="tnt-profile-section-title">${ui.icon('check')}<h3>${ui.esc(fields.interests.label)}</h3></div><div class="tnt-profile-interest-tags">${(Array.isArray(v.interests) ? v.interests : []).map((interest, i) => `<span style="--interest-tone:${i % 3}">${ui.esc(interest)}</span>`).join('') || '<p>Todavía sin completar</p>'}</div></section>` : ''}
@@ -28,8 +28,28 @@
       ${fields.health && (own || T.isAdmin) ? `<section class="tnt-profile-health"><div class="tnt-profile-section-title">${ui.icon('alert')}<h3>${ui.esc(fields.health.label)}</h3></div><p>${ui.esc(v.health || 'Todavía sin completar')}</p></section>` : ''}
       </div></article>`;
   }
+  function editRole(personId, currentRole) {
+    if (!TNT.isAdmin) return;
+    const roles = ['', 'Pastor/a', 'Líder', 'Timoteo', 'Colaborador'];
+    const dialog = U().modal('Cambiar rol', `<form class="tnt-form" data-role-form><label>Rol en TNT<select name="role">${roles.map(role => `<option value="${U().esc(role)}" ${role === currentRole ? 'selected' : ''}>${U().esc(role || 'Comunidad TNT')}</option>`).join('')}</select></label><p role="status" aria-live="polite"></p><button class="tnt-button primary" type="submit">Guardar rol</button></form>`);
+    const form = dialog.querySelector('form');
+    form.onsubmit = async event => {
+      event.preventDefault(); if (form.dataset.saving) return; form.dataset.saving = 'true';
+      const button = form.querySelector('[type=submit]'), status = form.querySelector('[role=status]'); button.disabled = true; status.textContent = 'Guardando…';
+      try {
+        const role = form.elements.role.value || null;
+        const r = await TNT.sb.rpc('tnt_review_staff', { p_person: personId, p_role: role }); if (r.error) throw r.error;
+        document.querySelectorAll('[data-profile-person]').forEach(article => { if (article.dataset.profilePerson !== personId) return; article.dataset.profileRole = role || ''; article.querySelector('[data-profile-role-label]').textContent = role || 'Comunidad TNT'; });
+        await U().closeModal(dialog);
+        document.dispatchEvent(new CustomEvent('tnt:data', { detail: { tables: ['tnt_accounts'] } }));
+        U().toast('Rol actualizado.');
+      } catch (error) { status.textContent = error.message || 'No pudimos guardar el rol.'; }
+      finally { delete form.dataset.saving; button.disabled = false; }
+    };
+  }
   function bind(host) {
-    host.querySelectorAll('[data-profile-edit]').forEach(button => button.onclick = async () => { const dialog = button.closest('dialog'); if (dialog) await U().closeModal(dialog); return TNTProfileEditor.open(button.dataset.profileEdit); });
+    host.querySelectorAll('[data-profile-role-edit]').forEach(button => button.onclick = () => editRole(button.dataset.profileRoleEdit, button.closest('[data-profile-person]').dataset.profileRole));
+    host.querySelectorAll('[data-profile-edit]').forEach(button => button.onclick = () => TNTProfileEditor.open(button.dataset.profileEdit));
     host.querySelectorAll('[data-profile-copy]').forEach(button => button.onclick = async () => { try { await navigator.clipboard.writeText(button.dataset.profileCopy); U().toast('Teléfono copiado.'); } catch { U().toast('No pudimos copiar el teléfono.', true); } });
   }
   async function open(personId = TNT.person.id, options = {}) {
@@ -48,6 +68,16 @@
     } catch (error) { if (dialog.isConnected) { const node = host.querySelector('.tnt-profile-loading'); node.textContent = error.message || 'No pudimos cargar este perfil.'; node.setAttribute('role', 'alert'); } }
     return dialog;
   }
+  async function refresh(personId) {
+    const articles = [...document.querySelectorAll('[data-profile-person]')].filter(node => node.dataset.profilePerson === personId);
+    if (!articles.length) return;
+    const own = personId === TNT.person.id, result = own ? { data: TNT.profileContext } : await TNT.sb.rpc('tnt_profile_detail', { p_person: personId });
+    if (result.error) throw result.error;
+    const account = own ? { data: TNT.account } : await TNT.sb.from('tnt_accounts').select('person_id,avatar_url,ministry_role,nickname').eq('person_id',personId).maybeSingle();
+    if (account.error) throw account.error;
+    for (const article of articles) { if (!article.isConnected) continue; const template = document.createElement('template'); template.innerHTML = content(result.data,personId,{},account.data || {}); const next = template.content.firstElementChild; article.replaceWith(next); bind(next); }
+  }
+  document.addEventListener('tnt:profile',event=>{if(event.detail?.personId)refresh(event.detail.personId).catch(()=>{});});
   function renderOwn(host) { host.innerHTML = content(TNT.profileContext, TNT.person.id); bind(host); }
-  window.TNTProfileView = { open, content, bind, renderOwn };
+  window.TNTProfileView = { open, content, bind, renderOwn, refresh };
 })();

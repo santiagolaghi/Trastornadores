@@ -1,6 +1,7 @@
 (function (root) {
   'use strict';
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const personName = value => String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('es').replace(/(^|[\s’\x27-])\p{L}/gu, part => part.toLocaleUpperCase('es'));
   const paths = {
     home:'M3 10.5 12 3l9 7.5M5 9v12h5v-7h4v7h5V9',
     calendar:'M4 5h16v16H4zM8 3v4m8-4v4M4 10h16m-12 4h2m4 0h2m-8 4h2',
@@ -63,7 +64,7 @@
     const organizers=[...new Set(members.filter(m=>m.event_id===event.id&&m.event_role==='organizer').map(m=>m.person_id))];
     const assigned=[...new Set(responsibleIds)].filter(id=>!organizers.includes(id));
     const identity=id=>({person:people.find(p=>p.id===id)||{id,full_name:'Persona TNT'},account:accounts.find(a=>a.person_id===id)||{}});
-    return `<div class="tnt-event-team">${organizers.map(id=>{const {person,account}=identity(id);return `<div class="tnt-event-coordinator" data-coordinator="${esc(id)}">${avatar(person,account,'coordinator')}<span><small>COORDINA</small><b>${esc(account.nickname||person.full_name)}</b></span></div>`;}).join('')}${assigned.length?`<div class="tnt-event-responsibles"><small>ENCARGADOS</small>${assigned.map(id=>{const {person,account}=identity(id);return `<span>${avatar(person,account)}<b>${esc(account.nickname||person.full_name)}</b></span>`;}).join('')}</div>`:''}</div>`;
+    return `<div class="tnt-event-team">${organizers.map(id=>{const {person,account}=identity(id);return `<div class="tnt-event-coordinator" data-coordinator="${esc(id)}">${avatar(person,account,'coordinator')}<span><small>COORDINA</small><b>${esc(personName(account.nickname||person.full_name))}</b></span></div>`;}).join('')}${assigned.length?`<div class="tnt-event-responsibles"><small>ENCARGADOS</small>${assigned.map(id=>{const {person,account}=identity(id);return `<span>${avatar(person,account)}<b>${esc(personName(account.nickname||person.full_name))}</b></span>`;}).join('')}</div>`:''}</div>`;
   }
   function dateKey(value=new Date()) {
     const p=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(value));
@@ -93,49 +94,37 @@
   }
   // A programmatic overlay close consumes its own history entry. Parent dialogs
   // and module navigation must not interpret that popstate as a second Back.
-  function backOverlay() {
-    return new Promise(resolve=>{
-      const consume=e=>{e.stopImmediatePropagation();root.removeEventListener('popstate',consume,true);resolve();};
-      root.addEventListener('popstate',consume,true);root.history.back();
-    });
-  }
-  function modal(title, body, wide=false, {stack=false}={}) {
-    const old=stack?null:[...root.document.querySelectorAll('.tnt-overlay')].at(-1),replacing=!!old;old?._tntDisposeBack?.();old?.remove();
-    const previous=root.document.activeElement, dialog=root.document.createElement('dialog');
-    dialog.className='tnt-overlay';dialog.setAttribute('aria-label',title);
+  const pendingOverlayBack=[];
+  function backOverlay(){return new Promise(resolve=>{pendingOverlayBack.push(resolve);root.history.back();});}
+  const overlayNodes=[];
+  const topOverlay=()=>overlayNodes.filter(node=>node.isConnected&&node._tntLayerActive).at(-1)||null;
+  function revealOverlay(node){if(!node?.isConnected)return;node.style.removeProperty('display');node.removeAttribute('inert');node.removeAttribute('aria-hidden');node._tntOnRestore?.();}
+  function modal(title, body, wide=false, options={}) {
+    const top=topOverlay(),old=top?.matches('.tnt-overlay')&&(options.replace||options.stack===false||top.getAttribute('aria-label')===title)?top:null;
+    const dialog=root.document.createElement('dialog');dialog.className='tnt-overlay';dialog.setAttribute('aria-label',title);
     dialog.innerHTML=`<section class="tnt-sheet ${wide?'wide':''}"><header class="tnt-sheet-head"><h2>${esc(title)}</h2><button class="tnt-close" type="button" aria-label="Cerrar">${icon('close')}</button></header>${body}</section>`;
-    root.document.body.append(dialog);
-    if(stack){
-      trackOverlay(dialog);
-      const close=()=>dialog._tntClose();
-      dialog.querySelector('.tnt-close').onclick=close;
-      dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
-      dialog.addEventListener('click',e=>{if(e.target===dialog)close();});
-      if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');
-      return dialog;
-    }
-    if(!replacing&&root.history?.pushState)root.history.pushState({...root.history.state,tntSharedOverlay:true},'');
-    const onBack=e=>{if(e.state?.tntSharedOverlay)return;root.removeEventListener('popstate',onBack);if(dialog.isConnected){dialog.remove();previous?.focus?.();}};root.addEventListener('popstate',onBack);dialog._tntDisposeBack=()=>root.removeEventListener('popstate',onBack);
-    const close=()=>{if(!dialog.isConnected)return;dialog.dispatchEvent(new root.Event('close'));dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.({preventScroll:true});if(root.history?.state?.tntSharedOverlay)return backOverlay();};
-    dialog._tntClose=close;
-    dialog.querySelector('.tnt-close').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
-    dialog.addEventListener('click',e=>{if(e.target===dialog)close();});
-    if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');
-    return dialog;
+    root.document.body.append(dialog);trackOverlay(dialog,()=>dialog.remove(),{replace:old});
+    const close=()=>dialog._tntClose();dialog.querySelector('.tnt-close').onclick=close;
+    dialog.addEventListener('cancel',event=>{event.preventDefault();close();});dialog.addEventListener('click',event=>{if(event.target===dialog)close();});
+    if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');return dialog;
   }
-  function closeModal(dialog) { if(dialog?._tntClose)return Promise.resolve(dialog._tntClose());dialog?.remove();return Promise.resolve(); }
-  function trackOverlay(node, dismiss=()=>node.remove()) {
+  function closeModal(dialog){if(dialog?._tntClose)return Promise.resolve(dialog._tntClose());dialog?.remove();return Promise.resolve();}
+  function trackOverlay(node,dismiss=()=>node.remove(),{replace=null}={}){
     if(node._tntLayerActive)return;
-    const id='layer-'+Date.now()+'-'+Math.random().toString(36).slice(2),previous=root.document.activeElement;
-    const stack=[...(root.history.state?.tntLayerStack||[]),id];
-    root.history.pushState({...root.history.state,tntLayerStack:stack},'');node._tntLayerActive=true;
-    const finish=()=>{node._tntLayerActive=false;root.removeEventListener('popstate',onBack);root.document.removeEventListener('keydown',onKey);node.dispatchEvent(new root.Event('close'));dismiss();previous?.focus?.({preventScroll:true});};
-    const onBack=e=>{if(!e.state?.tntLayerStack?.includes(id))finish();};
-    const close=()=>{if(!node._tntLayerActive)return;finish();if(root.history.state?.tntLayerStack?.at(-1)===id)return backOverlay();};
-    const onKey=e=>{if(e.key==='Escape'&&root.history.state?.tntLayerStack?.at(-1)===id){e.preventDefault();e.stopImmediatePropagation();close();}};
-    root.addEventListener('popstate',onBack);root.document.addEventListener('keydown',onKey);
-    node._tntClose=close;
+    const previous=root.document.activeElement,replacing=replace?._tntLayerActive;
+    const id=replacing?replace._tntLayerId:'layer-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+    if(replacing){replace._tntDisposeBack();replace.remove();}
+    const parent=topOverlay();if(parent){parent.style.setProperty('display','none','important');parent.setAttribute('inert','');parent.setAttribute('aria-hidden','true');}
+    if(!replacing)root.history.pushState({...root.history.state,tntLayerStack:[...(root.history.state?.tntLayerStack||[]),id]},'');
+    node._tntLayerId=id;node._tntLayerActive=true;overlayNodes.push(node);
+    const dispose=()=>{node._tntLayerActive=false;root.document.removeEventListener('keydown',onKey);const index=overlayNodes.indexOf(node);if(index>=0)overlayNodes.splice(index,1);};
+    const finish=()=>{if(!node._tntLayerActive)return;dispose();node.dispatchEvent(new root.Event('close'));dismiss();revealOverlay(topOverlay());if(previous?.isConnected)previous.focus?.({preventScroll:true});};
+    const close=()=>{if(!node._tntLayerActive)return;const own= root.history.state?.tntLayerStack?.at(-1)===id;finish();if(own)return backOverlay();};
+    const onKey=event=>{if(event.key==='Escape'&&topOverlay()===node){event.preventDefault();event.stopImmediatePropagation();close();}};
+    node._tntFinish=finish;node._tntDisposeBack=dispose;node._tntClose=close;root.document.addEventListener('keydown',onKey);
   }
+  root.addEventListener?.('popstate',event=>{if(pendingOverlayBack.length){event.stopImmediatePropagation();pendingOverlayBack.shift()();return;}const ids=event.state?.tntLayerStack||[];let top=topOverlay();if(!top||ids.includes(top._tntLayerId))return;event.stopImmediatePropagation();while((top=topOverlay())&&!ids.includes(top._tntLayerId))top._tntFinish();},true);
+  function clearOverlays(predicate=()=>true){for(const node of [...overlayNodes].reverse())if(predicate(node)){node._tntDisposeBack();node.dispatchEvent(new root.Event('close'));node.remove();}const ids=new Set(overlayNodes.map(n=>n._tntLayerId));root.history.replaceState({...root.history.state,tntLayerStack:(root.history.state?.tntLayerStack||[]).filter(id=>ids.has(id))},'');revealOverlay(topOverlay());}
   function ask(message, text=false) {
     return new Promise(resolve=>{
       let result=text?null:false,closing=false;
@@ -177,9 +166,8 @@
         const dialog=root.document.createElement('dialog');dialog.className='tnt-select-dialog';dialog.setAttribute('aria-label',label);
         dialog.innerHTML=`<div class="tnt-select-sheet"><header><h2>${esc(label)}</h2><button type="button" class="tnt-select-close" aria-label="Cerrar">${icon('close')}</button></header>${options.length>8?'<input type="search" class="tnt-select-search" placeholder="Buscar opción…" aria-label="Buscar opción">':''}<div class="tnt-select-list" role="listbox">${groups.map(group=>`${group.label?`<div class="tnt-select-group" role="presentation">${esc(group.label)}</div>`:''}${group.items.map(({option,index})=>`<button type="button" role="option" data-option="${index}" data-search="${esc(`${group.label} ${option.textContent.trim()}`)}" aria-selected="${option.selected}" ${option.disabled?'disabled':''}><span>${esc(option.textContent.trim())}</span>${option.selected?icon('check'):''}</button>`).join('')}`).join('')}</div></div>`;
         root.document.body.append(dialog);
-        if(root.history?.pushState)root.history.pushState({...root.history.state,tntSelectOverlay:true},'');
-        const onBack=()=>{dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.({preventScroll:true});};root.addEventListener('popstate',onBack);
-        let closing=false;const close=async()=>{if(closing)return;closing=true;dialog.remove();root.removeEventListener('popstate',onBack);previous?.focus?.({preventScroll:true});if(root.history?.state?.tntSelectOverlay)await backOverlay();};
+        trackOverlay(dialog);
+        let closing=false;const close=async()=>{if(closing)return;closing=true;await closeModal(dialog);};
         dialog.querySelector('.tnt-select-close').onclick=close;
         dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
         dialog.addEventListener('click',e=>{if(e.target===dialog)close();});
@@ -207,7 +195,7 @@
     const details=scope.matches?.('[data-tnt-collapse]')?[scope]:[...scope.querySelectorAll?.('[data-tnt-collapse]')||[]];
     for(const d of details){if(d.dataset.tntFoldBound)continue;d.dataset.tntFoldBound='true';const key=(root.TNT?.module||'home')+':'+d.dataset.tntCollapse;if(!foldState.has(key)){try{const saved=root.sessionStorage.getItem('tnt-fold:'+root.TNT?.person?.id+':'+key);if(saved!==null)foldState.set(key,saved==='true');}catch{}}if(foldState.has(key))d.open=foldState.get(key);d.addEventListener('toggle',()=>{foldState.set(key,d.open);try{root.sessionStorage.setItem('tnt-fold:'+root.TNT?.person?.id+':'+key,String(d.open));}catch{}});}
   }
-  const api={esc,icon,safeUrl,resourceUrl,photoUrl,initials,avatar,avatarStack,eventTeam,dateKey,addDays,date,time,completed,modal,closeModal,trackOverlay,confirm,prompt,toast,enhanceSelects,backOverlay,accessInfo,snapshotView,restoreView,enhanceLists};
+  const api={esc,personName,icon,safeUrl,resourceUrl,photoUrl,initials,avatar,avatarStack,eventTeam,dateKey,addDays,date,time,completed,modal,closeModal,trackOverlay,topOverlay,clearOverlays,confirm,prompt,toast,enhanceSelects,backOverlay,accessInfo,snapshotView,restoreView,enhanceLists};
   root.TNTUI=api;
   if(root.document){const init=()=>{enhanceSelects();enhanceLists();if(root.MutationObserver){new root.MutationObserver(records=>{for(const record of records){if(record.target?.parentElement?.classList.contains('tnt-list-fold'))enhanceLists(record.target);for(const node of record.addedNodes)if(node.nodeType===1){enhanceSelects(node);enhanceLists(node);}}}).observe(root.document.body,{childList:true,subtree:true});}root.document.addEventListener('invalid',e=>{for(let el=e.target.parentElement;el;el=el.parentElement)if(el.tagName==='DETAILS')el.open=true;},true);};if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init,{once:true});else init();}
   root.document?.addEventListener('error',e=>{if(e.target?.matches?.('.tnt-person-avatar img')){const avatar=e.target.parentElement;avatar.classList.remove('has-photo');avatar.classList.add('without-photo');e.target.remove();}},true);

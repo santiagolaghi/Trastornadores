@@ -46,7 +46,7 @@ TNT.canAction=(mod,action,scope='*')=>{
  const manageActions=new Set(['manage','create_saturday','edit_event','manage_people','templates','create_chat','manage_members','delete_chat','history','reports','delete','delete_activity','delete_event']);
  return editActions.has(action)?TNT.hasAccess(mod,scope,'edit'):manageActions.has(action)?TNT.hasAccess(mod,scope,'manage'):false;
 };
-TNT.displayName=function(){return TNT.identity?.display_name||TNT.account?.nickname||TNT.person?.full_name||TNT.identity?.email||'TNT'};
+TNT.displayName=function(){return TNTUI.personName(TNT.identity?.display_name||TNT.account?.nickname||TNT.person?.full_name)||TNT.identity?.email||'TNT'};
 TNT.avatar=function(){return TNT.account?.avatar_url||TNT.identity?.avatar_url||''};
 TNT.logout=async function(){window.TNTAccounts?.forget();window.TNTPush?.forget();try{const sub=await window.TNTPush?.current();if(sub)await sb.rpc('tnt_push_unsubscribe',{p_endpoint:sub.endpoint});}catch{}await sb?.auth?.signOut?.({scope:'local'});localStorage.removeItem('tnt-central-user');location.replace('/?v=14')};
 function avatarHtml(cls='tnt-avatar'){return TNTUI.avatar(TNT.person,{...TNT.account,avatar_url:TNT.avatar()},cls);}

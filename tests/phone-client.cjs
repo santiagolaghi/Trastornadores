@@ -6,7 +6,7 @@ function device({permission='granted',failure=null,legacyVersion=false}={}){
  const calls=[],events={},shown=[];let sub=null;
  const create=()=>({endpoint:'https://push.example.invalid/device',options:{},toJSON(){return{endpoint:this.endpoint,keys:{auth:'test',p256dh:'test'}}},async unsubscribe(){sub=null}});
  w.Notification={permission,async requestPermission(){calls.push('permission');return this.permission='granted'}};w.PushManager=function(){};
- const reg={active:{state:'activated',postMessage(message,ports){ports[0].reply({version:'20261018'})}},async update(){calls.push('update')},pushManager:{async getSubscription(){return sub},async subscribe(){calls.push('subscribe');return sub=create()}},async showNotification(...args){shown.push(args)}};
+ const reg={active:{state:'activated',postMessage(message,ports){ports[0].reply({version:'20261018r2'})}},async update(){calls.push('update')},pushManager:{async getSubscription(){return sub},async subscribe(){calls.push('subscribe');return sub=create()}},async showNotification(...args){shown.push(args)}};
  w.MessageChannel=class{constructor(){this.port1={close(){}};this.port2={reply:data=>this.port1.onmessage({data})}}};
  Object.defineProperty(w.navigator,'serviceWorker',{value:{async register(url,options){calls.push({register:url,options});return reg},addEventListener(type,fn){events[type]=fn}}});
  w.TNT={person:{id:'person-one'},account:{auth_user_id:'user-one'},sb:{async rpc(name,args){calls.push({rpc:name,args});return{error:failure,data:name==='tnt_push_test'?{id:'test-one',status:'pending'}:name==='tnt_push_test_status'?{id:args.p_id,status:'sent'}:null}}}};

@@ -65,7 +65,7 @@ async function loadBase(){
    checked(sb.from('tnt_events').select('*').eq('kind','saturday').order('start_date'))
  ,
   checked(sb.from('tnt_accounts').select('person_id,avatar_url,nickname'))]);
- S.accounts=accounts;S.people=people;S.groups=groups;S.members=members;S.saturdayMembers=saturdayMembers;S.events=events;
+ S.accounts=accounts;S.people=people.map(p=>({...p,full_name:U.personName(p.full_name)}));S.groups=groups;S.members=members;S.saturdayMembers=saturdayMembers;S.events=events;
  if(!S.mode||!['efe','sabados'].includes(S.mode)||!modeAllowed(S.mode))S.mode=modeAllowed('efe')?'efe':modeAllowed('sabados')?'sabados':'';
  if(!S.mode){renderNoAccess();return}
  if(S.mode==='efe'){
@@ -254,26 +254,27 @@ function renderDeck(){
  if(!p){const host=document.createElement('div');host.className='deck-screen';host.innerHTML='<div class="deck-finish"><div>✓</div><h2>Lista terminada</h2><p>Revisá el estado de guardado antes de salir.</p><div data-deck-sync role="status" aria-live="polite"></div><button id="deckDone">Ver resumen</button></div>';document.body.append(host);host.querySelector('#deckDone').onclick=()=>{host.remove();S.deck=null;render()};paintDeckSync();return}
  const old=document.querySelector('.deck-screen');old?.remove();
  const host=document.createElement('div');host.className='deck-screen '+S.mode;const st=status(p.id),pct=Math.round(d.index/d.queue.length*100);
- host.innerHTML=`<header class="deck-head"><button id="deckClose" aria-label="Salir del modo swipe">${U.icon('close')}</button><div><b>${S.mode==='efe'?E(group()?.name):'Sábado TNT'}</b><small>${d.index+1} de ${d.queue.length}</small></div><button aria-label="Deshacer última asistencia" id="deckUndo" ${!d.history.length?'disabled':''}>${U.icon('undo')}</button></header><div class="deck-bar"><i style="width:${pct}%"></i></div><main class="deck-stage"><article class="swipe-card" id="swipeCard"><div><div class="big-avatar">${U.avatar(p,S.accounts.find(a=>a.person_id===p.id)||{},'portrait')}</div><span class="deck-person-kicker">CADA PERSONA CUENTA</span><h2>${E(p.full_name)}</h2><div class="person-tags"><span>${age(p)??'—'} años</span>${S.mode==='efe'?'<span>'+E(membership(p.id)?.leader_name||'Sin responsable')+'</span>':''}${st!=='pending'?'<span>Antes: '+E(labels[st])+'</span>':''}</div></div><footer><span>← faltó</span><b>${E(p.phone||'Sin teléfono')}</b><span>vino →</span></footer></article></main><div class="deck-sync" data-deck-sync role="status" aria-live="polite"></div><div class="deck-buttons"><button class="deck-no" data-deck-answer="absent">← Faltó</button><button class="deck-yes" data-deck-answer="present">Vino →</button></div>`;
+ host.innerHTML=`<header class="deck-head"><button id="deckClose" aria-label="Salir del modo swipe">${U.icon('close')}</button><div><b>${S.mode==='efe'?E(group()?.name):'Sábado TNT'}</b><small>${d.index+1} de ${d.queue.length}</small></div><button aria-label="Deshacer última asistencia" id="deckUndo" ${!d.history.length?'disabled':''}>${U.icon('undo')}</button></header><div class="deck-bar"><i style="width:${pct}%"></i></div><main class="deck-stage"><article class="swipe-card" id="swipeCard"><span class="deck-swipe-stamp yes" aria-hidden="true">VINO</span><span class="deck-swipe-stamp no" aria-hidden="true">FALTÓ</span><div><div class="big-avatar">${U.avatar(p,S.accounts.find(a=>a.person_id===p.id)||{},'portrait')}</div><span class="deck-person-kicker">CADA PERSONA CUENTA</span><h2>${E(p.full_name)}</h2><div class="person-tags"><span>${age(p)??'—'} años</span>${S.mode==='efe'?'<span>'+E(membership(p.id)?.leader_name||'Sin responsable')+'</span>':''}${st!=='pending'?'<span>Antes: '+E(labels[st])+'</span>':''}</div></div><footer><span>← faltó</span><b>${E(p.phone||'Sin teléfono')}</b><span>vino →</span></footer></article></main><div class="deck-sync" data-deck-sync role="status" aria-live="polite"></div><div class="deck-buttons"><button class="deck-no" data-deck-answer="absent">← Faltó</button><button class="deck-yes" data-deck-answer="present">Vino →</button></div>`;
  host.dataset.deckId=d.id;
  document.body.append(host);paintDeckSync();
  for(const next of d.queue.slice(d.index,d.index+3)){const a=S.accounts.find(a=>a.person_id===next.id)||{};const url=U.photoUrl(a.avatar_url||next.avatar_url,512);if(url&&!d.preloaded.has(url)){d.preloaded.add(url);const img=new Image();img.referrerPolicy='no-referrer';img.src=url;}}
  host.querySelector('#deckClose').onclick=()=>{host.remove();S.deck=null;render()};
  host.querySelector('#deckUndo').onclick=()=>{if(!host.isConnected)return;const h=d.history.pop();if(!h)return;queueMark(h.id,h.prev);d.index=Math.max(0,d.index-1);host.remove();renderDeck()};
  host.querySelectorAll('[data-deck-answer]').forEach(b=>b.onclick=()=>answerDeck(p,b.dataset.deckAnswer,host));
- bindSwipe(host.querySelector('#swipeCard'),p,host);
+ const card=host.querySelector('#swipeCard');if(!matchMedia('(prefers-reduced-motion: reduce)').matches)card.animate?.([{opacity:.2,transform:'translateY(24px) scale(.96)'},{opacity:1,transform:'none'}],{duration:220,easing:'cubic-bezier(.2,.8,.2,1)'});
+ bindSwipe(card,p,host);
 }
 
-function answerDeck(p,value,host){
+async function answerDeck(p,value,host){
  const d=S.deck;if(!d||!host.isConnected||host.dataset.answered||d.queue[d.index]?.id!==p.id||!can('attendance'))return;
- host.dataset.answered='true';const prev=status(p.id);queueMark(p.id,value);d.history.push({id:p.id,prev});d.index++;host.remove();renderDeck();
+ host.dataset.answered='true';const prev=status(p.id);queueMark(p.id,value);d.history.push({id:p.id,prev});d.index++;const card=host.querySelector('#swipeCard');host.querySelectorAll('[data-deck-answer]').forEach(b=>b.disabled=true);card.dataset.dir=value==='present'?'yes':'no';if(!matchMedia('(prefers-reduced-motion: reduce)').matches){const direction=value==='present'?1:-1;try{await card.animate?.([{transform:card.style.transform||'none',opacity:1},{transform:'translateX('+direction*Math.max(420,innerWidth)+'px) rotate('+direction*22+'deg)',opacity:0}],{duration:240,easing:'cubic-bezier(.3,.02,.7,.5)',fill:'forwards'})?.finished;}catch{}}if(S.deck!==d||!host.isConnected)return;host.remove();renderDeck();
 }
 function bindSwipe(card,p,host){
  let sx=0,sy=0,x=0,drag=false,raf=0;card.style.touchAction='pan-y';
  card.onpointerdown=e=>{if(e.pointerType==='mouse'&&e.button!==0)return;drag=true;x=0;sx=e.clientX;sy=e.clientY;card.setPointerCapture?.(e.pointerId);};
  card.onpointermove=e=>{if(!drag)return;x=e.clientX-sx;if(Math.abs(e.clientY-sy)>Math.abs(x)+12){cancel();return;}cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>{card.style.transform='translate3d('+x+'px,0,0) rotate('+x/38+'deg)';card.dataset.dir=x>0?'yes':'no';});};
  function cancel(){drag=false;cancelAnimationFrame(raf);card.style.transform='';delete card.dataset.dir;x=0;}
- card.onpointerup=()=>{if(!drag)return;const direction=x;cancel();if(Math.abs(direction)>38)answerDeck(p,direction>0?'present':'absent',host);};
+ card.onpointerup=()=>{if(!drag)return;const direction=x;drag=false;cancelAnimationFrame(raf);if(Math.abs(direction)>38)answerDeck(p,direction>0?'present':'absent',host);else cancel();};
  card.onpointercancel=cancel;
 }
 

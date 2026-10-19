@@ -35,7 +35,7 @@ const toast=(message,error=false)=>U.toast(message,error);
 const errMsg=e=>e?.message||String(e||'Error');
 const pBy=id=>S.people.find(p=>p.id===id); const aByPid=id=>S.accounts.find(a=>a.person_id===id);
 const staffPeople=()=>S.people.filter(p=>p.active!==false&&aByPid(p.id)?.enabled!==false&&aByPid(p.id)?.staff_status==='approved');
-const displayName=id=>{let p=pBy(id),a=aByPid(id);return a?.nickname||p?.full_name||'Persona'};
+const displayName=id=>{let p=pBy(id),a=aByPid(id);return U.personName(a?.nickname||p?.full_name||'Persona')};
 const avatarHtml=id=>TNTUI.avatar(pBy(id)||{},aByPid(id)||{});
 const currentPersonId=()=>S.person?.id||null;
 const isAdmin=()=>S.account?.system_role==='admin'; const isPastor=()=>S.account?.staff_status==='approved'&&S.account?.ministry_role==='Pastor/a';
@@ -68,10 +68,13 @@ function featureStyle(record){const tone=FEATURE_COLORS[record?.feature_color]||
 function featuredBadge(record){return record?.is_featured?'<span class="activity-featured-badge">★ Destacada</span>':'';}
 function featureFields(task){return `<fieldset class="activity-feature-editor"><legend>Destacado de esta actividad</legend><label class="activity-feature-switch"><input type="checkbox" name="is_featured" ${task?.is_featured?'checked':''}><span>Destacar en color<small>Solo esta actividad de este día.</small></span></label><div class="feature-colors" data-feature-colors ${task?.is_featured?'':'hidden'}>${Object.entries(FEATURE_COLORS).map(([value,[label,color]])=>`<label style="--swatch:${color}"><input type="radio" name="feature_color" value="${value}" ${(task?.feature_color||'lime')===value?'checked':''}><span>${label}</span></label>`).join('')}</div></fieldset>`;}
 function bindFeatureFields(form){const input=form.elements.is_featured;input?.addEventListener('change',()=>{form.querySelector('[data-feature-colors]').hidden=!input.checked;});}
-function featureButton(task,eventId){return task&&canEditActivity(eventId)?`<button type="button" class="activity-feature-toggle" data-feature-task="${task.id}" aria-pressed="${!!task.is_featured}" aria-label="${task.is_featured?'Quitar destacado de':'Destacar'} ${esc(task.title)}">${task.is_featured?'★':'☆'}</button>`:'';}
+function featureButton(task,eventId){return task&&canEditActivity(eventId)?`<button type="button" class="activity-feature-toggle" data-feature-task="${task.id}" aria-pressed="${!!task.is_featured}" title="La estrella destaca en color solo esta actividad de este día" aria-label="${task.is_featured?'Quitar color destacado de':'Destacar en color'} ${esc(task.title)}">${task.is_featured?'★':'☆'}</button>`:'';}
+function syncActivityPresentation(task){
+ document.querySelectorAll('[data-feature-task]').forEach(button=>{if(button.dataset.featureTask!==task.id)return;button.disabled=false;button.textContent=task.is_featured?'★':'☆';button.setAttribute('aria-pressed',String(!!task.is_featured));button.setAttribute('aria-label',(task.is_featured?'Quitar color destacado de ':'Destacar en color ')+task.title);const card=button.closest('.activity-card,.agenda-card');if(!card)return;card.classList.toggle('is-featured',!!task.is_featured);if(task.is_featured)card.style.setProperty('--feature-tone',(FEATURE_COLORS[task.feature_color]||FEATURE_COLORS.lime)[1]);else card.style.removeProperty('--feature-tone');card.querySelector('.activity-featured-badge')?.remove();if(task.is_featured)card.querySelector('.activity-tags')?.insertAdjacentHTML('beforeend',featuredBadge(task));});
+}
 function bindActivityActions(root=document){
  $$('[data-task-team]',root).forEach(b=>b.onclick=event=>{event.stopPropagation();taskDetailModal(b.dataset.taskTeam,'team');});
- $$('[data-feature-task]',root).forEach(b=>b.onclick=async event=>{event.stopPropagation();const task=taskBy(b.dataset.featureTask);if(!task||!canEditActivity(task.event_id))return;b.disabled=true;try{const r=await sb.rpc('tnt_save_task',{p_id:task.id,p_event:task.event_id,p_values:{...task,is_featured:!task.is_featured},p_people:taskPeople(task.id)});if(r.error)throw r.error;task.is_featured=!task.is_featured;await loadAll();render();}catch(error){toast(errMsg(error),true);b.disabled=false;}});
+ $$('[data-feature-task]',root).forEach(b=>b.onclick=async event=>{event.stopPropagation();const task=taskBy(b.dataset.featureTask);if(!task||!canEditActivity(task.event_id))return;b.disabled=true;try{const r=await sb.rpc('tnt_save_task',{p_id:task.id,p_event:task.event_id,p_values:{...task,is_featured:!task.is_featured},p_people:taskPeople(task.id)});if(r.error)throw r.error;task.is_featured=!task.is_featured;syncActivityPresentation(task);await loadAll();render();syncActivityPresentation(taskBy(task.id)||task);toast(task.is_featured?'Actividad destacada en color.':'Destacado quitado.');}catch(error){toast(errMsg(error),true);b.disabled=false;}});
 }
 const hasEventProgram=id=>programTasks(id).length>0||eventDays(id).some(d=>programDayItems(d.id).length>0);
 const itemPeople=id=>{const item=S.items.find(i=>i.id===id);return item?.task_id?taskPeople(item.task_id):S.responsibles.filter(r=>r.item_id===id).map(r=>r.person_id);};
@@ -82,9 +85,18 @@ const assignChip=(s)=>['accepted','declined'].includes(s)?`<span class="status $
 const runChip=(s)=>`<span class="chip run ${esc(s)}">${esc(RUN_LABEL[s]||s)}</span>`;
 
 function loading(){document.getElementById('app').innerHTML='<div class="skeleton"><div><div class="spinner"></div>Cargando TNT Organización…</div></div>'}
-function clearOrgModal(){const m=$('#modal');if(m)m.innerHTML='';}
-function modal(html,wide=false){const alreadyOpen=!!$('#modal dialog');clearOrgModal();if(!alreadyOpen&&history.state?.tntOrgView)history.pushState({...history.state,tntOrgOverlay:'modal'},'');const host=$('#modal');host.innerHTML=`<dialog class="modal" aria-label="Detalles de organización"><section class="sheet ${wide?'wide':''}">${html}</section></dialog>`;const d=host.querySelector('dialog');if(d.showModal)d.showModal();else d.setAttribute('open','');d.addEventListener('cancel',e=>{e.preventDefault();closeModal();});d.addEventListener('click',e=>{if(e.target===d)closeModal();});$$('[data-close]',host).forEach(b=>b.onclick=closeModal);}
-function closeModal(){const wasOpen=!!$('#modal dialog');clearOrgModal();if(wasOpen&&history.state?.tntOrgOverlay==='modal')return U.backOverlay();}
+function clearOrgModal(){U.clearOverlays(node=>node.classList.contains('modal'));$('#modal')?.replaceChildren();}
+function modal(html,wide=false){
+ const host=$('#modal'),old=host.querySelector('dialog'),fragment=document.createElement('template');fragment.innerHTML=html;const title=fragment.content.querySelector('.sheetHead h2')?.textContent||'';
+ const replace=old&&old.querySelector('.sheetHead h2')?.textContent===title?old:null;
+ if(old&&!replace){let archive=document.getElementById('org-dialog-history');if(!archive){archive=document.createElement('div');archive.id='org-dialog-history';document.body.append(archive);}if(archive.moveBefore)archive.moveBefore(old,null);else archive.append(old);}
+ const dialog=document.createElement('dialog');dialog.className='modal';dialog.setAttribute('aria-label','Detalles de organización');dialog.innerHTML=`<section class="sheet ${wide?'wide':''}">${html}</section>`;host.append(dialog);
+ dialog._tntOnRestore=()=>{if(dialog.parentElement!==host){if(host.moveBefore)host.moveBefore(dialog,null);else host.append(dialog);}};
+ U.trackOverlay(dialog,()=>dialog.remove(),{replace});if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');
+ const close=()=>U.closeModal(dialog);dialog.addEventListener('cancel',event=>{event.preventDefault();close();});dialog.addEventListener('click',event=>{if(event.target===dialog)close();});$$('[data-close]',dialog).forEach(button=>button.onclick=close);
+}
+function closeModal(){return U.closeModal($('#modal dialog'));}
+
 function navigateView(view){if(!view||view===S.view)return;S.view=view;if(history.state?.tntOrgView)history.pushState({...history.state,tntOrgView:view,tntOrgOverlay:null},'');render();if(!['team','templates'].includes(view))window.scrollTo?.(0,0);}
 function initOrgHistory(){history.replaceState({...history.state,tntOrgView:S.view,tntOrgOverlay:null},'',location.href);window.addEventListener('popstate',event=>{if(document.querySelector('dialog.tnt-select-dialog,dialog.tnt-overlay,dialog.org-projection'))return;if($('#modal dialog')){if(event.state?.tntOrgOverlay==='modal')return;clearOrgModal();return}const view=event.state?.tntOrgView;if(view&&view!==S.view){S.view=view;render();}});}
 function sheetHead(title,sub=''){return `<div class="sheetHead"><div><h2>${esc(title)}</h2>${sub?`<p>${esc(sub)}</p>`:''}</div><button class="close" data-close>×</button></div>`}
@@ -106,7 +118,7 @@ async function loadAll(){
  await Promise.all(Object.entries(tables).map(async([key,table])=>{try{let q=sb.from(table).select('*');if(key==='notifications'&&window.TNTNotifications){data[key]=await TNTNotifications.load();return;}if(key==='notifications')q=q.order('created_at',{ascending:false}).limit(100);const r=await q;if(r.error)throw r.error;data[key]=(r.data||[]).filter(row=>!row.archived_at);}catch(e){errors.push(key);console.warn('Organización: '+key,e);}}));
  if(version!==orgLoadVersion)return;
  Object.assign(S,data);S.errors=errors;pruneOrgState();
- S.people.sort((a,b)=>a.full_name.localeCompare(b.full_name));S.events.sort((a,b)=>a.start_date.localeCompare(b.start_date));S.account=S.accounts.find(a=>a.person_id===TNT.person.id)||TNT.account;S.person=S.people.find(p=>p.id===TNT.person.id)||TNT.person;
+ S.people=S.people.map(p=>({...p,full_name:U.personName(p.full_name)}));S.people.sort((a,b)=>a.full_name.localeCompare(b.full_name));S.events.sort((a,b)=>a.start_date.localeCompare(b.start_date));S.account=S.accounts.find(a=>a.person_id===TNT.person.id)||TNT.account;S.person=S.people.find(p=>p.id===TNT.person.id)||TNT.person;
  if(!eventBy(S.selectedEvent))S.selectedEvent=S.events.find(e=>e.end_date>=today()&&e.status!=='cancelled')?.id||S.events.find(e=>e.status!=='cancelled')?.id||null;
  if(!eventDays(S.selectedEvent).some(d=>d.id===S.selectedDay))S.selectedDay=eventDays(S.selectedEvent)[0]?.id||null;
 }
@@ -392,7 +404,7 @@ function activityChooserModal(eventId){
  $$('[data-activity-suggestion]').forEach(b=>b.onclick=()=>taskEditModal(null,eventId,null,items.find(i=>i.id===b.dataset.activitySuggestion)));
 }
 
-function taskSuggestionModal(eventId){const e=eventBy(eventId),items=activitySuggestions(eventId);const o=U.modal('Sugerencias para '+e.name,`<p>Son ideas, no tareas creadas. Elegí una, adaptá instrucciones y responsables, y recién entonces guardala.</p><div class="list">${items.map(i=>`<button type="button" class="rowCard" data-suggest="${i.id}"><div class="ico">${esc(i.icon||'✓')}</div><div><b>${esc(i.title)}</b><div class="tiny">${esc(i.templateName)} · ${esc(i.description||'Agregá instrucciones antes de usarla')}</div></div></button>`).join('')||'<p>Sin sugerencias para este tipo. Podés crear una tarea desde cero.</p>'}</div>`);o.querySelectorAll('[data-suggest]').forEach(b=>b.onclick=async()=>{await U.closeModal(o);taskEditModal(null,eventId,null,items.find(i=>i.id===b.dataset.suggest));});}
+function taskSuggestionModal(eventId){const e=eventBy(eventId),items=activitySuggestions(eventId);const o=U.modal('Sugerencias para '+e.name,`<p>Son ideas, no tareas creadas. Elegí una, adaptá instrucciones y responsables, y recién entonces guardala.</p><div class="list">${items.map(i=>`<button type="button" class="rowCard" data-suggest="${i.id}"><div class="ico">${esc(i.icon||'✓')}</div><div><b>${esc(i.title)}</b><div class="tiny">${esc(i.templateName)} · ${esc(i.description||'Agregá instrucciones antes de usarla')}</div></div></button>`).join('')||'<p>Sin sugerencias para este tipo. Podés crear una tarea desde cero.</p>'}</div>`);o.querySelectorAll('[data-suggest]').forEach(b=>b.onclick=async()=>{taskEditModal(null,eventId,null,items.find(i=>i.id===b.dataset.suggest));});}
 function addChecklistModal(taskId,order){modal(`${sheetHead('Agregar punto')}<form class="form" id="checkForm"><div class="field"><label>Texto</label><input name="text" required></div><button class="btn primary">Agregar</button></form>`);$('#checkForm').onsubmit=async ev=>{ev.preventDefault();let text=new FormData(ev.target).get('text');let {error}=await sb.from('tnt_task_checklist').insert({task_id:taskId,text,sort_order:order});if(error)return toast(errMsg(error));taskDetailModal(taskId)}}
 function linkType(url){try{let h=new URL(url).hostname;if(h.includes('youtu'))return'youtube';if(h.includes('pinterest'))return'pinterest';if(h.includes('instagram'))return'instagram';if(h.includes('drive.google'))return'drive';if(h.includes('canva'))return'canva'}catch{}return'link'}
 function addLinkModal(taskId,order){modal(`${sheetHead('Agregar referencia')}<form class="form" id="linkForm"><div class="field"><label>URL</label><input name="url" type="url" required></div><div class="field"><label>Etiqueta</label><input name="label" placeholder="Referencia"></div><button class="btn primary">Agregar</button></form>`);$('#linkForm').onsubmit=async ev=>{ev.preventDefault();let f=new FormData(ev.target),url=f.get('url');let {error}=await sb.from('tnt_task_links').insert({task_id:taskId,url,label:f.get('label')||null,link_type:linkType(url),sort_order:order});if(error)return toast(errMsg(error));taskDetailModal(taskId)}}
@@ -480,7 +492,7 @@ function encounterCreateModal(){
  const canSat=isAdmin()||TNT.canAction?.('organizacion','create_saturday','*'),canEvent=isAdmin()||TNT.canAction?.('organizacion','create_event','*');
  if(canSat&&!canEvent)return saturdayCreateModal();if(canEvent&&!canSat)return eventCreateModal();if(!canSat&&!canEvent)return;
  const o=U.modal('Nuevo encuentro',`<p>Elegí qué vas a organizar.</p><div class="tnt-encounter-kinds"><button class="tnt-button" data-create-kind="saturday">${U.icon('calendar')}<span><b>Sábado TNT</b><small>Un encuentro y su programa.</small></span></button><button class="tnt-button" data-create-kind="event">${U.icon('people')}<span><b>Evento o campamento</b><small>Una o varias fechas para compartir.</small></span></button></div>`);
- o.querySelectorAll('[data-create-kind]').forEach(b=>b.onclick=async()=>{await U.closeModal(o);if(b.dataset.createKind==='saturday')saturdayCreateModal();else eventCreateModal();});
+ o.querySelectorAll('[data-create-kind]').forEach(b=>b.onclick=async()=>{if(b.dataset.createKind==='saturday')saturdayCreateModal();else eventCreateModal();});
 }
 function bindNew(){
  $$('[data-new-encounter]').forEach(b=>b.onclick=encounterCreateModal);
@@ -593,7 +605,7 @@ function pruneOrgState(){
  S.notifications=S.notifications.filter(n=>{if(n.event_id&&!events.has(n.event_id)||n.task_id&&!tasks.has(n.task_id))return false;const href=U.safeUrl(n.href);if(!href)return true;const q=new URL(href,location.origin).searchParams;return(!q.has('task')||tasks.has(q.get('task')))&&(!q.has('event')||events.has(q.get('event')));});
 }
 function openEncounter(id){const e=eventBy(id);if(!e)return;if(e.kind==='saturday'&&e.status!=='cancelled')openSchedule(id);else eventDetailModal(id);}
-function openSchedule(id){const e=eventBy(id);if(!e||e.status==='cancelled')return;clearOrgModal();S.selectedEvent=id;S.selectedDay=eventDays(id)[0]?.id||null;S.cronTab='schedule';if(S.view!=='schedule')navigateView('schedule');else render();}
+function openSchedule(id){const e=eventBy(id);if(!e||e.status==='cancelled')return;U.clearOverlays();S.selectedEvent=id;S.selectedDay=eventDays(id)[0]?.id||null;S.cronTab='schedule';if(S.view!=='schedule')navigateView('schedule');else render();}
 function openQuickSchedule(){const next=S.events.filter(e=>e.kind==='saturday'&&e.status!=='cancelled'&&e.end_date>=today()).sort((a,b)=>a.start_date.localeCompare(b.start_date))[0];if(next)quickScheduleModal(S.selectedEvent&&eventBy(S.selectedEvent)?.status!=='cancelled'?S.selectedEvent:next.id);else navigateView('saturdays');}
 function stepSaturday(step){const events=S.events.filter(e=>e.kind==='saturday'&&e.status!=='cancelled').sort((a,b)=>a.start_date.localeCompare(b.start_date)),index=events.findIndex(e=>e.id===S.selectedEvent),next=events[index+step];if(index<0||!next)return false;openSchedule(next.id);return true;}
 let suppressScheduleClickUntil=0;
