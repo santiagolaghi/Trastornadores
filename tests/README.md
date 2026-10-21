@@ -1,5 +1,15 @@
 # TNT regression checks
 
+## Correcciones de instalación, destinatarios y cronograma del 21 de octubre de 2026
+
+- El botón de inicio abre el popup del cronograma del próximo sábado. Las tarjetas y filas de Perfiles alternan selección; casillas, enlaces y botones conservan su función. Las tarjetas también responden a Enter/Espacio y muestran el estado seleccionado.
+- La instalación tiene una guía accesible antes de iniciar sesión, pasos actuales de Safari, ayuda para navegadores internos y un enlace canónico copiable. iPad también se detecta con su agente de escritorio. En iOS sin instalar se ofrece la guía en lugar de activar avisos que aún no están disponibles.
+- Los mensajes extensos se despliegan con «Leer mensaje completo». La conversación tiene desplazamiento propio, conserva la expansión y el borrador ante respuestas nuevas, y contiene textos/enlaces largos. El editor también tiene altura limitada y desplazamiento.
+- Los mensajes de actividad se envían solo a sus participantes vigentes. Coordinar el encuentro, administrar la app o haber comentado antes no agrega al destinatario. La comprobación se aplica al crear el aviso, a la bandeja, a las lecturas directas bajo RLS y al worker que vuelve a verificar antes de enviar. Los avisos personales de asignación/retiro y los chats generales/de evento conservan su audiencia correspondiente.
+- La migración `activity_notification_audience` se aplicó en Supabase (`20261021205419`). La revisión real encontró cero avisos de actividad visibles para destinatarios ajenos y 28 visibles para participantes. No se modificaron actividades, personas ni horarios; no se enviaron mensajes de prueba a usuarios. El analizador de seguridad conserva las mismas advertencias previas.
+- 218 pruebas automatizadas aprobadas. La revisión Chromium completa usa HTML de producción, SDK oficial y respuestas sintéticas: popup, selección por toque/teclado y botones, 45 mensajes con textos y enlaces largos a 320/390/768/1280 px, expansión/borrador, editor extenso y guía de iPhone pública. Terminó sin errores de página. No equivale a instalar ni probar notificaciones en un iPhone físico ni a un ingreso Google real.
+- También pasó una comprobación de RLS en la base real: lectura bajo el contexto de autenticación del destinatario, cero filas para un aviso ajeno y una fila para un participante vigente. La transacción se revirtió y no envió mensajes ni modificó registros.
+
 ## Organización y avisos específicos, segunda revisión del 21 de octubre de 2026
 
 - El inicio del staff enlaza al próximo sábado disponible. El programa reúne coordinación y actividades propias; las advertencias de horario/responsables faltantes solo aparecen para coordinación con permiso de asignar.

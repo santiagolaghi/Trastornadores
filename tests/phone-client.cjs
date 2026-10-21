@@ -11,6 +11,7 @@ function device({permission='granted',failure=null,legacyVersion=false}={}){
  Object.defineProperty(w.navigator,'serviceWorker',{value:{async register(url,options){calls.push({register:url,options});return reg},addEventListener(type,fn){events[type]=fn}}});
  w.TNT={person:{id:'person-one'},account:{auth_user_id:'user-one'},sb:{async rpc(name,args){calls.push({rpc:name,args});return{error:failure,data:name==='tnt_push_test'?{id:'test-one',status:'pending'}:name==='tnt_push_test_status'?{id:args.p_id,status:'sent'}:null}}}};
  w.fetch=async(url,options)=>{calls.push({fetch:url,options});return{ok:true,json:async()=>({id:'/',icons:[{}]})}};
+  w.TNTUI={esc:value=>String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'),modal(title,html){const dialog=w.document.createElement('section');dialog.innerHTML='<h2>'+title+'</h2>'+html;w.document.body.append(dialog);return dialog;}};
  if(legacyVersion)w.localStorage.setItem('tnt-assets-version','20261012');
  w.eval(fs.readFileSync(path.join(__dirname,'../assets/tnt-push.js'),'utf8'));
  return{w,calls,shown,events,expire(){sub=null},close:()=>w.close()};
@@ -43,5 +44,8 @@ test('No pide avisos antes de completar el perfil ni reactiva una desactivación
  await d.w.TNTPush.enableTNT();assert.equal(d.w.localStorage.getItem('tnt-phone-paused:user-one'),null);
 }finally{d.close()}});
 test('iPhone sin instalar recibe la guía de pantalla de inicio, no una solicitud imposible',async()=>{const d=device({permission:'default'});try{
- Object.defineProperty(d.w.navigator,'userAgent',{value:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)'});const panel=enter(d);assert(panel.textContent.includes('pantalla de inicio'));panel.querySelector('[data-phone-invite-enable]').click();assert(panel.querySelector('[role=status]').textContent.includes('Safari'));assert.equal(d.calls.includes('permission'),false);
+ Object.defineProperty(d.w.navigator,'userAgent',{value:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)'});const panel=enter(d);assert(panel.textContent.includes('pantalla de inicio'));panel.querySelector('[data-phone-invite-enable]').click();const guide=d.w.document.querySelector('.tnt-install-guide');assert(guide.textContent.includes('Safari'));assert(guide.textContent.includes('Editar acciones'));assert(guide.textContent.includes('Abrir como app web'));assert.equal(d.calls.includes('permission'),false);assert.equal(guide.querySelector('input').value,'https://tnt-test.example/');await assert.rejects(d.w.TNTPush.enableTNT(),/pantalla de inicio/);
+}finally{d.close()}});
+test('La guía detecta navegadores internos y iPad; copiar sin portapapeles deja seleccionado el enlace limpio',async()=>{const d=device();try{
+ Object.defineProperties(d.w.navigator,{userAgent:{value:'Mozilla/5.0 (iPad) Instagram'},platform:{value:'MacIntel'},maxTouchPoints:{value:5}});const dialog=d.w.TNTPush.openInstall();assert(dialog.textContent.includes('dentro de otra app'));assert.equal(d.w.TNTPush.installState().ios,true);dialog.querySelector('[data-copy-install]').click();await tick();assert.equal(dialog.querySelector('input').selectionStart,0);assert.equal(dialog.querySelector('input').selectionEnd,dialog.querySelector('input').value.length);assert(dialog.querySelector('[data-install-status]').textContent.includes('Copiar'));assert.equal(d.calls.includes('permission'),false);
 }finally{d.close()}});
