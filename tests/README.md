@@ -1,5 +1,20 @@
 # TNT regression checks
 
+## Organización y avisos específicos, segunda revisión del 21 de octubre de 2026
+
+- El inicio del staff enlaza al próximo sábado disponible. El programa reúne coordinación y actividades propias; las advertencias de horario/responsables faltantes solo aparecen para coordinación con permiso de asignar.
+- Se mueven tarjetas flexibles entre las que tienen horario. El cliente y el servidor rechazan invertir dos horas; guardar el orden conserva `starts_at`, `planned_start` y las duraciones, incluidos los valores nulos. También se rechazan listas incompletas, repetidas o con una versión anterior.
+- Las indicaciones se fijan arriba y cada consulta conserva sus respuestas debajo. Los envíos fallidos y las actualizaciones del equipo conservan el borrador. Los avisos enlazan a la consulta exacta y muestran el autor, su foto, actividad, encuentro y fecha.
+- La cola push conserva la foto y el identificador de mensaje/consulta. El servidor vuelve a revisar acceso y existencia del mensaje antes de enviar. El service worker utiliza el retrato como icono principal y mantiene la insignia de TNT. La presentación final depende de las capacidades del sistema operativo.
+- Se detectan cruces con responsables y duración conocida; dos actividades consecutivas no cuentan como superposición. La logística se agrupa antes/durante/después. El historial del encuentro registra cambios concretos y solo se puede consultar con permiso de Organización.
+- 212 pruebas automatizadas aprobadas: DOM, permisos, caché, teléfono, workers y PostgreSQL aislado. `organization-database.cjs` usa PGlite; ejecuta la migración, el RPC anterior de guardado, el guard de coordinación, políticas RLS y triggers reales con proveedores de identidad/perfil/permisos sintéticos. Requiere `@electric-sql/pglite` además de las dependencias de DOM. No equivale a aplicar ni comprobar la migración en Supabase de producción.
+- El recorrido completo de `browser-flows.cjs` pasó con el SDK oficial 2.117.1 y respuestas HTTP sintéticas, sin errores de JavaScript. El caso nuevo también se ejecuta con `TNT_TEST_ORGANIZATION_ONLY=1`; comprueba celular/escritorio y anchos 320/390/768/1280. No se probaron una sesión Google real ni la recepción en un teléfono físico.
+- Orden de publicación: aplicar `20261021170000_organization_conversations_and_program.sql` en el proyecto Supabase `oeodnnomgiddkblnlzay`; comprobar allí los permisos/RPC y desplegar `camp-notifications`; después publicar el frontend `20261021r2` en Vercel. El frontend depende de `tnt_save_activity` y `tnt_reorder_program`, por lo que esta rama queda pendiente de esa conexión y no debe adelantarse en producción.
+
+```sh
+node --test tests/regression.cjs tests/permissions-and-cache.cjs tests/phone-client.cjs tests/pwa-worker.cjs tests/push-worker.cjs tests/organization-database.cjs
+```
+
 ## Pendientes de TNT Work 3.0, 21 de octubre de 2026
 
 - “Lo que viene” ocupa todo el ancho disponible y distribuye las tarjetas sin columnas vacías. Los coordinadores se resumen con nombres y avatares, sin repetir el encuentro. Se comprueban 320, 390, 768 y 1280 píxeles, tema oscuro y ausencia de desbordamiento horizontal.

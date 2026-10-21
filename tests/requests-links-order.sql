@@ -59,7 +59,7 @@ select set_config('request.jwt.claims','{}',true);
 do $$declare event uuid:=gen_random_uuid();day uuid:=gen_random_uuid();task uuid;item uuid;title text;clock time;duration integer;position integer:=0;begin
  insert into public.tnt_events(id,name,kind,start_date,end_date) values(event,'Programa temporal','event','2031-10-18','2031-10-18');
  insert into public.tnt_schedule_days(id,event_id,label,date) values(day,event,'Programa','2031-10-18');
- for title,clock,duration in select * from (values('Reflexión','19:20'::time,5),('Ofrenda','19:25'::time,5),('Canciones','19:30'::time,15),('Adoración','19:12'::time,8)) x(t,c,d) loop
+ for title,clock,duration in select * from (values('Reflexión','19:20'::time,5),('Ofrenda','19:25'::time,5),('Canciones',null::time,15),('Adoración','19:12'::time,8)) x(t,c,d) loop
   task:=gen_random_uuid();item:=gen_random_uuid();perform set_config('tnt.oct16.item'||position,item::text,true);
   insert into public.tnt_tasks(id,event_id,title,planned_start,duration_minutes,sort_order) values(task,event,title,('2031-10-18'::date+clock) at time zone 'America/Argentina/Buenos_Aires',duration,position);
   insert into public.tnt_schedule_items(id,day_id,task_id,title,starts_at,duration_minutes,sort_order) values(item,day,task,title,clock,duration,position);position:=position+1;
@@ -72,10 +72,12 @@ do $$declare day uuid:=current_setting('tnt.oct16.day')::uuid;before jsonb;ids u
  select jsonb_agg(jsonb_build_object('id',id,'starts_at',starts_at,'duration_minutes',duration_minutes,'sort_order',sort_order,'task_id',task_id)) into before from public.tnt_schedule_items where day_id=day;
  ids:=array[current_setting('tnt.oct16.item3')::uuid,current_setting('tnt.oct16.item2')::uuid,current_setting('tnt.oct16.item0')::uuid,current_setting('tnt.oct16.item1')::uuid];
  result:=public.tnt_reorder_schedule(day,ids,before);
- if (select starts_at from public.tnt_schedule_items where id=ids[2])<>'19:20'::time or (select starts_at from public.tnt_schedule_items where id=ids[3])<>'19:35'::time then raise exception 'Reorder did not recalculate durations';end if;
- if not exists(select 1 from public.tnt_tasks t join public.tnt_schedule_items i on i.task_id=t.id where i.id=ids[3] and t.planned_start='2031-10-18 22:35+00'::timestamptz) then raise exception 'Task and schedule disagree or wrong timezone';end if;
+ if (select starts_at from public.tnt_schedule_items where id=ids[2]) is not null or (select starts_at from public.tnt_schedule_items where id=ids[3])<>'19:20'::time then raise exception 'Reorder rewrote an existing time';end if;
+ if not exists(select 1 from public.tnt_tasks t join public.tnt_schedule_items i on i.task_id=t.id where i.id=ids[3] and t.planned_start='2031-10-18 22:20+00'::timestamptz) then raise exception 'Task timestamp changed during reorder';end if;
  begin perform public.tnt_reorder_schedule(day,ids,before);raise exception 'Stale snapshot accepted';exception when raise_exception then if sqlerrm not like 'Otra persona cambió%' then raise;end if;end;
  begin perform public.tnt_reorder_schedule(day,array[ids[1],ids[1],ids[3],ids[4]],before);raise exception 'Duplicate ids accepted';exception when raise_exception then if sqlerrm not like 'La lista cambió%' then raise;end if;end;
+ select jsonb_agg(jsonb_build_object('id',id,'starts_at',starts_at,'duration_minutes',duration_minutes,'sort_order',sort_order,'task_id',task_id)) into before from public.tnt_schedule_items where day_id=day;
+ begin perform public.tnt_reorder_program(day,array[ids[4],ids[2],ids[3],ids[1]],before);raise exception 'Inverted times accepted';exception when raise_exception then if sqlerrm not like 'No podés ubicar%' then raise;end if;end;
  perform set_config('tnt.oct16.before',before::text,true);
 end $$;
 select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('tnt.oct16.guest'),'role','authenticated')::text,true);

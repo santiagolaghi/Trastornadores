@@ -7,6 +7,7 @@ const ICON = APP_ORIGIN + "/icons/dynamite-app-192.png?v=20261014";
 const BADGE = APP_ORIGIN + "/icons/notification-badge.png?v=20261014";
 const escapeHtml = (s: string) => String(s || "").replace(/[&<>\"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c] || c));
 const fullUrl = (href: string) => href?.startsWith("http") ? href : APP_ORIGIN + (href || "/campamento/");
+const portraitUrl = (value: unknown) => { try { const url = new URL(String(value || "")); return url.protocol === "https:" ? url.href : ICON; } catch { return ICON; } };
 
 Deno.serve(async (req: Request) => {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -146,6 +147,11 @@ Deno.serve(async (req: Request) => {
             || Boolean(message.data.audience_person_ids && !message.data.audience_person_ids.includes(row.person_id));
         }
       }
+      if (payload.comment_id) {
+        const comment=await sb.from("tnt_task_comments").select("id,task_id").eq("id",payload.comment_id).maybeSingle();
+        if (comment.error) throw comment.error;
+        skip ||= !comment.data || comment.data.task_id!==payload.task_id;
+      }
       if (skip) {
         const saved=await sb.from("tnt_push_outbox").update({status:"skipped",last_error:"Aviso atendido o teléfono desactivado"}).eq("id",row.id);
         if (saved.error) throw saved.error;
@@ -155,7 +161,9 @@ Deno.serve(async (req: Request) => {
       const url = fullUrl(payload.url || "/");
       if (new URL(url).origin !== APP_ORIGIN) throw new Error("Notification target is not part of TNT");
       try {
-        await webpush.sendNotification(subscription.data.subscription,JSON.stringify({...payload,url,icon:ICON,badge:BADGE}),{TTL:12*60*60,urgency:"normal"});
+        const icon = portraitUrl(payload.sender_avatar || payload.icon);
+        const urgency = payload.message_id || payload.comment_id ? "high" : "normal";
+        await webpush.sendNotification(subscription.data.subscription,JSON.stringify({...payload,url,icon,badge:BADGE}),{TTL:12*60*60,urgency});
       } catch (error: any) {
         if ([404,410].includes(Number(error?.statusCode))) {
           await sb.from("tnt_push_subscriptions").delete().eq("person_id",row.person_id).eq("endpoint",row.endpoint);
