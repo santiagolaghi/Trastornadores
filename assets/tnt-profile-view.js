@@ -39,7 +39,8 @@
       try {
         const role = form.elements.role.value || null;
         const r = await TNT.sb.rpc('tnt_review_staff', { p_person: personId, p_role: role }); if (r.error) throw r.error;
-        document.querySelectorAll('[data-profile-person]').forEach(article => { if (article.dataset.profilePerson !== personId) return; article.dataset.profileRole = role || ''; article.querySelector('[data-profile-role-label]').textContent = role || 'Comunidad TNT'; });
+        if(personId===TNT.person.id)await TNT.refreshIdentity();
+        await refresh(personId);
         await U().closeModal(dialog);
         document.dispatchEvent(new CustomEvent('tnt:data', { detail: { tables: ['tnt_accounts'] } }));
         U().toast('Rol actualizado.');
@@ -57,7 +58,7 @@
     const host = dialog.querySelector('.tnt-sheet');
     try {
       const own = personId === TNT.person.id;
-      const result = own ? { data: TNT.profileContext } : await TNT.sb.rpc('tnt_profile_detail', { p_person: personId });
+      const result = await TNT.sb.rpc(own?'tnt_profile_context':'tnt_profile_detail',own?{}:{p_person:personId});
       if (result.error) throw result.error;
       let account = options.account || {};
       if (!own && !options.account) { const r = await TNT.sb.from('tnt_accounts').select('person_id,avatar_url,ministry_role,nickname').eq('person_id', personId).maybeSingle(); if (!r.error) account = r.data || {}; }
@@ -71,13 +72,14 @@
   async function refresh(personId) {
     const articles = [...document.querySelectorAll('[data-profile-person]')].filter(node => node.dataset.profilePerson === personId);
     if (!articles.length) return;
-    const own = personId === TNT.person.id, result = own ? { data: TNT.profileContext } : await TNT.sb.rpc('tnt_profile_detail', { p_person: personId });
+    const own = personId === TNT.person.id, result = await TNT.sb.rpc(own?'tnt_profile_context':'tnt_profile_detail',own?{}:{p_person:personId});
     if (result.error) throw result.error;
     const account = own ? { data: TNT.account } : await TNT.sb.from('tnt_accounts').select('person_id,avatar_url,ministry_role,nickname').eq('person_id',personId).maybeSingle();
     if (account.error) throw account.error;
     for (const article of articles) { if (!article.isConnected) continue; const template = document.createElement('template'); template.innerHTML = content(result.data,personId,{},account.data || {}); const next = template.content.firstElementChild; article.replaceWith(next); bind(next); }
   }
   document.addEventListener('tnt:profile',event=>{if(event.detail?.personId)refresh(event.detail.personId).catch(()=>{});});
+  let refreshTimer;document.addEventListener('tnt:data',event=>{if(!(event.detail?.tables||[]).some(t=>['tnt_accounts','tnt_profile_answers'].includes(t)))return;clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>{for(const id of new Set([...document.querySelectorAll('[data-profile-person]')].map(n=>n.dataset.profilePerson)))refresh(id).catch(()=>{});},80);});
   function renderOwn(host) { host.innerHTML = content(TNT.profileContext, TNT.person.id); bind(host); }
   window.TNTProfileView = { open, content, bind, renderOwn, refresh };
 })();

@@ -10,7 +10,7 @@
   const ctx=result.data,fields={...ctx.fields},values=ctx.values;
   if(!own&&!T.isAdmin){delete fields.health;delete fields.dni;}
   const account=own?T.account:{};
-  const role=account.ministry_role||values._ministry_role||'';
+  const role=values._ministry_role||account.ministry_role||'';
   const o=U().modal('Editar perfil',`<form class="tnt-form tnt-complete-editor" novalidate>${P.render(fields,values,ctx.groups,{role})}<p class="tnt-help">Tus intereses, habilidades y datos del EFE se guardan acá. Los cambios de identidad quedan a revisión del administrador.</p><p role="status" aria-live="polite"></p><button class="tnt-button primary" type="submit">Guardar perfil</button></form>`,true);
   const form=o.querySelector('form');P.bind(form,fields,values,ctx.groups);
   form.onsubmit=async e=>{
