@@ -114,3 +114,49 @@ body.perfiles-admin:has(#profileBulkActions.has-selection) .mobile-bottom-action
 body .tnt-hero-controls{top:auto!important}body .hub-greeting .hub-search{position:relative!important;inset:auto!important;transform:none!important;margin-top:16px!important}body .tnt-hero-art{align-self:start!important}
 @media(max-width:760px){body .hub-greeting>div:first-child{grid-row:1!important}body .hub-greeting .tnt-hero-art{grid-row:2!important}body .hub-greeting .hub-search{grid-row:3!important}}
 @media(max-width:760px){body .hub-greeting .tnt-hero-art{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:18px!important;height:auto!important;min-height:0!important;padding:14px 6px 0!important}body .hub-greeting .tnt-hero-sticker{height:auto!important;min-height:190px!important;flex:none}body .hub-greeting .tnt-hero-art .tnt-hero-controls{position:relative!important;inset:auto!important;transform:none!important;align-self:flex-end;margin:0 0 0 auto!important}body .hub-greeting .tnt-hero-art .tnt-hero-spark{bottom:60px!important}}
+
+/* Work 3.0: the next encounters use the whole page, with compact team summaries. */
+body .hub>.hub-upnext{width:100%;min-width:0;margin:30px 0 0;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important}
+.hub-upnext-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}
+body .hub-upnext-heading h2{font:750 25px/1.2 var(--tnt-font);margin:0!important}
+.hub-upnext-heading .tnt-button{font-size:12px;box-shadow:none;min-height:40px}
+.hub-upnext-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:18px;align-items:start}
+body .hub-upnext .hub-event{width:100%;min-width:0;margin:0;border:1.5px solid var(--tnt-line);border-radius:18px;background:var(--tnt-panel);color:var(--tnt-text);padding:18px!important;gap:12px!important;grid-template-columns:48px minmax(0,1fr) 18px!important;text-decoration:none;transition:border-color .15s,transform .15s}
+body .hub-upnext .hub-event:hover{border-color:var(--tnt-text);transform:translateY(-2px)}
+body .hub-upnext .event-date{border-radius:12px;padding:9px 3px!important}
+body .hub-upnext .event-date,body .hub-upnext .event-date b,body .hub-upnext .event-date span{color:#202020!important}
+body .hub-upnext .hub-event-copy h3{font:750 18px/1.25 var(--tnt-font)!important;overflow-wrap:anywhere;margin:6px 0!important}
+.hub-event-copy>small{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--tnt-muted)}
+body .hub-event-people{display:flex;align-items:center;gap:12px;grid-column:1/-1;padding-top:14px;border-top:1px solid var(--tnt-line);min-width:0}
+body .hub-event-people .tnt-avatar-stack{display:flex;flex:none;padding-left:0;align-items:center}
+body .hub-event-people .tnt-person-avatar,body .hub-event-people .tnt-avatar-more{width:30px!important;height:30px!important;font-size:10px;flex:none;border:2px solid var(--tnt-panel);margin:0 0 0 -9px}
+body .hub-event-people .tnt-person-avatar:first-child{margin-left:0}
+body .hub-event-people .tnt-avatar-more{display:grid;place-items:center;background:var(--tnt-panel2);border-radius:50%}
+.hub-team-copy{display:grid;gap:3px;min-width:0}.hub-team-copy>span{font-size:12px;line-height:1.4;overflow-wrap:anywhere}.hub-team-copy>small{font-size:10px;line-height:1.4;color:var(--tnt-muted)}
+.hub-team-empty{font-size:12px;color:var(--tnt-muted)}
+@media(max-width:900px){body .hub-side{grid-template-columns:minmax(0,1fr)!important}}
+@media(max-width:600px){.hub-upnext-grid{grid-template-columns:minmax(0,1fr)}body .hub>.hub-upnext{margin-top:24px}.hub-upnext-heading{gap:10px}body .hub-upnext-heading h2{font-size:23px}}
+
+/* Emoji choices remain part of the same unsaved template draft. */
+.tnt-template-icon-preview{font-size:24px;line-height:1.2;flex:none;min-width:30px;text-align:center}
+.tnt-template-emoji{padding:12px;border:1px solid var(--tnt-line);border-radius:12px;background:var(--tnt-panel2)}
+.tnt-template-emoji>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;font-size:13px;font-weight:650}
+.tnt-template-emoji>summary span{font-size:23px}.tnt-template-emoji-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(42px,1fr));gap:6px;margin:12px 0}
+.tnt-template-emoji-grid button{min-width:0;min-height:44px;padding:5px;font-size:23px;line-height:1;background:var(--tnt-panel);color:var(--tnt-text);border:1.5px solid var(--tnt-line);border-radius:10px;box-shadow:none}
+.tnt-template-emoji-grid button[aria-pressed=true]{border-color:var(--tnt-text);background:var(--tnt-lime);color:#202020}
+.tnt-template-emoji label{font-size:12px}.tnt-template-emoji input{max-width:180px;font-size:22px!important;margin-top:5px}
+.task-editor .responsibility-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.task-editor .responsibility-options label{min-width:0}.task-editor .responsibility-options span{white-space:normal!important;font-size:12px}
+.task-editor [data-assignee-picker][hidden],.task-editor [data-task-time-controls][hidden]{display:none!important}
+.task-flexible-time{margin:0 0 6px}.task-editor [data-task-time-controls]{margin-top:12px}
+.task-save-error:empty{display:none}.task-save-error{padding:12px;border:1px solid currentColor;border-radius:10px;color:var(--tnt-text);font-size:13px;line-height:1.5;background:var(--tnt-panel2)}
+@media(max-width:600px){.tnt-template-block>summary{gap:8px}.tnt-template-icon-preview{font-size:21px;min-width:24px}.tnt-template-order{font-size:11px}.tnt-template-block summary>div b{overflow-wrap:anywhere}.task-editor .responsibility-options{grid-template-columns:1fr}}
+
+/* Show the invitation on entry; the system dialog is requested only after a tap. */
+.tnt-phone-invite{position:fixed;left:16px;right:16px;bottom:calc(94px + env(safe-area-inset-bottom));max-width:780px;margin-inline:auto;z-index:65;display:flex;align-items:center;gap:14px;padding:18px;background:var(--tnt-panel,#fff);color:var(--tnt-text,#202020);border:1.5px solid var(--tnt-edge,#202020);border-radius:18px;box-shadow:0 8px 35px #0002;font-family:var(--tnt-font,sans-serif)}
+.tnt-phone-invite>img{flex:none;border-radius:12px}.tnt-phone-invite-copy{flex:1;min-width:0}
+body .tnt-phone-invite h2{font:750 15px/1.3 var(--tnt-font,sans-serif)!important;margin:0 0 6px!important;letter-spacing:normal!important}
+.tnt-phone-invite p{font-size:12px!important;line-height:1.5!important;margin:0!important;color:var(--tnt-muted,#555)}
+.tnt-phone-invite [data-phone-invite-status]:not([hidden]){margin-top:8px!important;color:var(--tnt-text,#202020)}
+.tnt-phone-invite-actions{display:flex;flex-direction:column;gap:5px;flex:none}.tnt-phone-invite-actions .tnt-button{min-height:40px;font-size:12px;padding:9px 12px;box-shadow:none;white-space:normal}
+@media(max-width:600px){.tnt-phone-invite{align-items:flex-start;gap:10px;padding:14px;flex-wrap:wrap;left:12px;right:12px}.tnt-phone-invite>img{width:34px;height:34px}.tnt-phone-invite-copy{flex-basis:calc(100% - 48px)}.tnt-phone-invite-actions{width:100%;flex-direction:row;justify-content:flex-end}.tnt-phone-invite-actions .tnt-button:first-child{flex:1}}

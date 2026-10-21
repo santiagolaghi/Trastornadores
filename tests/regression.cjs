@@ -1,5 +1,47 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');const {JSDOM,VirtualConsole}=require('jsdom');const root=path.resolve(__dirname,'..');
 
+test('Lo que viene ocupa una sección propia y resume coordinadores sin duplicar encuentros',async()=>{
+ const a=await app('hub','',w=>{const db=w.__fixtureDB;db.tnt_event_members.push(...db.tnt_people.slice(1,4).map(p=>({event_id:db.tnt_events[0].id,person_id:p.id,event_role:'organizer'})));});try{
+  const section=a.d.querySelector('.hub>.hub-upnext');assert(section);assert.equal(a.d.querySelector('.hub-side .hub-upnext'),null);assert.equal(section.querySelectorAll('.hub-event').length,2);assert.equal(section.querySelectorAll('.tnt-event-coordinator').length,0);
+  const first=section.querySelector('.hub-event');assert(first.textContent.includes('Nora · Bruno · Mara · Lucas'));assert(first.querySelector('.tnt-avatar-stack'));assert.equal(first.querySelectorAll('.tnt-person-avatar').length,4);assert(first.querySelector('.tnt-avatar-more').textContent.includes('+1'));assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+test('Los emojis de Plantillas sobreviven al orden, a un error y al guardado sin cambiar el nombre',async()=>{
+ const a=await app('organization','?view=templates');try{
+  a.d.querySelector('[data-action=new-template]').click();a.d.querySelector('[data-template-preset=service]').click();let form=a.d.querySelector('.tnt-template-builder');form.elements.name.value='Programa con emojis';
+  const row=form.querySelector('[data-template-item]');row.querySelector('[data-template-emoji="🙏"]').click();assert.equal(row.querySelector('[data-template-icon-preview]').textContent,'🙏');assert.equal(row.querySelector('[data-item-field=title]').value,'Bienvenida');
+  row.querySelector('[data-template-move][data-direction="1"]').click();const moved=[...form.querySelectorAll('[data-template-item]')].find(r=>r.querySelector('[data-item-field=title]').value==='Bienvenida');assert.equal(moved.querySelector('[data-item-field=icon]').value,'🙏');
+  a.w.__fixtureFailures['rpc:tnt_save_org_template']='Guardado interrumpido';form.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>form.querySelector('[role=status]').textContent==='Guardado interrumpido');assert.equal(moved.querySelector('[data-item-field=icon]').value,'🙏');
+  delete a.w.__fixtureFailures['rpc:tnt_save_org_template'];form.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>a.w.__fixtureDB.tnt_template_items.length===3);const stored=a.w.__fixtureDB.tnt_template_items.find(i=>i.title==='Bienvenida');assert.equal(stored.icon,'🙏');assert.equal(stored.sort_order,1);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+test('Una actividad nueva puede guardarse sin horario ni responsable y sigue en el cronograma',async()=>{
+ const a=await app('organization','?view=schedule&event=00000000-0000-4000-8000-000000000020');try{
+  const event=a.w.__fixtureDB.tnt_events[0].id;a.w.eval('taskEditModal(null,"'+event+'")');const form=a.d.querySelector('#taskForm');assert.equal(form.elements.assignee_mode.value,'none');assert(form.elements.flexible_time.checked);assert(form.elements.start.disabled);
+  form.elements.title.value='Ministración sin horario';form.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>a.w.__fixtureCalls.some(c=>c.rpc==='tnt_save_task'));const call=a.w.__fixtureCalls.find(c=>c.rpc==='tnt_save_task');assert.equal(call.args.p_values.planned_start,null);assert.equal(call.args.p_values.assignee_mode,'single');assert.equal(call.args.p_people.length,0);await until(()=>a.d.querySelector('.schedule-unscheduled')?.textContent.includes('Ministración sin horario'));assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+test('Quitar horario y responsables conserva la actividad y el borrador si falla el guardado',async()=>{
+ const a=await app('organization','?view=schedule');try{
+  a.w.eval('taskEditModal(__fixtureDB.tnt_tasks[0],__fixtureDB.tnt_tasks[0].event_id)');const form=a.d.querySelector('#taskForm');const start=form.elements.start.value;assert(start);form.elements.flexible_time.click();form.querySelector('[name=assignee_mode][value=none]').click();assert.equal(form.querySelectorAll('[name=assignee]:checked').length,0);assert(form.querySelector('[data-assignee-picker]').hidden);
+  a.w.__fixtureFailures['rpc:tnt_save_task']='Reintentá';form.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>a.d.querySelector('#tnt-toast')?.textContent==='Reintentá');assert(form.isConnected);assert(form.elements.flexible_time.checked);assert.equal(a.w.__fixtureCalls.find(c=>c.rpc==='tnt_save_task').args.p_values.planned_start,null);
+  form.elements.flexible_time.click();assert.equal(form.elements.start.value,start);assert.equal(form.elements.start.disabled,false);form.querySelector('[name=assignee_mode][value=multiple]').click();assert.equal(form.querySelector('[data-assignee-picker]').hidden,false);assert([...form.querySelectorAll('[name=assignee]')].every(x=>!x.disabled));assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+test('Guardar y agregar otra no permite dos guardados simultáneos de la misma actividad',async()=>{
+ const a=await app('organization','?view=schedule');try{
+  a.w.eval('taskEditModal(null,__fixtureDB.tnt_events[0].id)');const form=a.d.querySelector('#taskForm'),rpc=a.w.TNT.sb.rpc;let saves=0,release;
+  a.w.TNT.sb.rpc=(name,args)=>name==='tnt_save_task'?(saves++,new Promise(resolve=>release=()=>rpc(name,args).then(resolve))):rpc(name,args);
+  form.elements.title.value='Actividad única';form.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));form.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));assert.equal(saves,1);assert([...form.querySelectorAll('[type=submit]')].every(b=>b.disabled));release();await until(()=>!form.isConnected);assert.equal(a.w.__fixtureDB.tnt_tasks.filter(t=>t.title==='Actividad única').length,1);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+test('Editar sin permiso de asignar conserva responsables y bloquea la opción Sin responsable',async()=>{
+ const a=await app('organization','?view=schedule',w=>{w.TNT.isAdmin=false;w.__fixtureDB.tnt_accounts[0].system_role='user';w.TNT.canAction=(module,action)=>['view','edit_activity'].includes(action);});try{
+  a.w.eval('taskEditModal(__fixtureDB.tnt_tasks[0],__fixtureDB.tnt_tasks[0].event_id)');const form=a.d.querySelector('#taskForm');assert(form.querySelector('[name=assignee_mode][value=none]').disabled);
+  form.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>a.w.__fixtureCalls.some(c=>c.rpc==='tnt_save_task'));assert.equal(a.w.__fixtureCalls.find(c=>c.rpc==='tnt_save_task').args.p_people.length,3);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
 test('Vincular usa Google automáticamente, completa vacíos y conserva la revisión si falla',async()=>{
  const a=await app('hub');try{
   const calls=[],fields=a.w.TNTProfiles.config(),original=a.w.TNT.sb.rpc;let fail=true,done=0;

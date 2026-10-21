@@ -23,8 +23,11 @@ function access(id){if(id==='asistencia'){const efe=EFE_SCOPES.some(scope=>TNT.h
 function stat(m){if(m.id==='organizacion'){const count=mine().length+coordinated().length;return count?`<b>${count}</b> ${count===1?'responsabilidad tuya':'responsabilidades tuyas'}`:'Tu equipo y tus encuentros';}if(m.id==='campamento'){const count=upcoming().filter(e=>['camp','campamento'].includes(e.kind)).length;return count?`<b>${count}</b> ${count===1?'evento próximo':'eventos próximos'}`:'Todo para el campamento';}if(m.id==='glosario'){const count=state.files.filter(f=>f.module==='glosario').length;return count?`<b>${count}</b> recursos compartidos`:'Tu biblioteca';}return U.esc(access(m.id));}
 function eventCard(e) {
  const taskIds=new Set(state.tasks.filter(t=>t.event_id===e.id).map(t=>t.id));
- const ids=state.assignees.filter(a=>taskIds.has(a.task_id)&&a.assignment_status!=='declined').map(a=>a.person_id);
- return `<a class="hub-event" href="/organizacion/?view=schedule&event=${encodeURIComponent(e.id)}"><div class="event-date"><b>${U.date(e.start_date,{day:'numeric'})}</b><span>${U.date(e.start_date,{month:'short'})}</span></div><div class="hub-event-copy"><h3>${U.esc(e.name)}</h3><p>${U.esc(e.location||'Encuentro TNT')}</p></div><span class="hub-event-arrow">${U.icon('arrow')}</span><div class="hub-event-people">${U.eventTeam(e,state.members,state.people,state.accounts,ids)}</div></a>`;
+ const assigned=[...new Set(state.assignees.filter(a=>taskIds.has(a.task_id)&&a.assignment_status!=='declined').map(a=>a.person_id))];
+ const coordinators=[...new Set(state.members.filter(m=>m.event_id===e.id&&m.event_role==='organizer').map(m=>m.person_id))];
+ const ids=[...new Set([...coordinators,...assigned])],names=coordinators.map(id=>U.personName(state.accounts.find(a=>a.person_id===id)?.nickname||state.people.find(p=>p.id===id)?.full_name||'Persona TNT'));
+ const team=ids.length?`<div class="hub-event-people">${U.avatarStack(ids,state.people,state.accounts,TNT.person.id,4)}<div class="hub-team-copy">${names.length?`<small>${names.length===1?'Coordina':'Coordinan'}</small><span>${names.map(U.esc).join(' · ')}</span>`:'<small>Equipo de la actividad</small>'}<small>${ids.length} ${ids.length===1?'persona en el equipo':'personas en el equipo'}</small></div></div>`:'<div class="hub-event-people hub-team-empty">Equipo por definir</div>';
+ return `<a class="hub-event" href="/organizacion/?view=schedule&event=${encodeURIComponent(e.id)}"><div class="event-date"><b>${U.date(e.start_date,{day:'numeric'})}</b><span>${U.date(e.start_date,{month:'short'})}</span></div><div class="hub-event-copy"><small>${e.kind==='saturday'?'Sábado TNT':['camp','campamento'].includes(e.kind)?'Campamento':'Encuentro'}</small><h3>${U.esc(e.name)}</h3><p>${U.esc(e.location||'Encuentro TNT')}</p></div><span class="hub-event-arrow">${U.icon('arrow')}</span>${team}</a>`;
 }
 function summary(mineCount,notesCount){return `<section class="hub-summary"><div class="hub-eyebrow">TU SEMANA EN TNT</div><h2>Un equipo.<br>Muchas cosas buenas.</h2><div class="summary-counts"><div><b>${mineCount+coordinated().length}</b><span>Responsabilidades</span></div><div><b>${notesCount}</b><span>Sin leer</span></div></div></section>`;}
 function render(){
@@ -106,6 +109,16 @@ function decorateHome(staff){
  app.querySelector('.community-grid>.community-news')?.remove();
  app.querySelectorAll('.module-stack').forEach((el,index)=>{const a=el.querySelector('a'),id=el.dataset.space;if(!id)return;const cfg=E.module(id);if(cfg.title)el.querySelector('h3').textContent=cfg.title;if(cfg.description)el.querySelector('.module-bottom p').textContent=cfg.description;if(/^#[\da-f]{6}$/i.test(cfg.accent||''))el.style.setProperty('--module-color',cfg.accent);const cover=E.image(cfg.cover||modules.find(m=>m.id===id)?.cover||(id==='admin'?'/assets/covers/equipo.jpg':''));if(cover){const img=document.createElement('img');img.className='tnt-space-cover';img.alt='';img.src=cover;img.loading='lazy';img.decoding='async';img.addEventListener('error',()=>{img.remove();el.classList.remove('has-cover');},{once:true});a.prepend(img);el.classList.add('has-cover');}el.style.setProperty('--card-order',String(index));a.insertAdjacentHTML('afterbegin','<span class="tnt-space-number">'+String(index+1).padStart(2,'0')+'</span>');});
  setupSpaces();
+ // Upcoming events are a full-width section, not a narrow sidebar of people.
+ const upnext=staff&&app.querySelector('.hub-upnext'),layout=app.querySelector('.hub-layout');
+ if(upnext&&layout){
+   const heading=upnext.querySelector('h2'),head=document.createElement('div'),grid=document.createElement('div');
+   head.className='hub-upnext-heading';heading.id='hub-upnext-title';upnext.setAttribute('aria-labelledby',heading.id);
+   head.append(heading);const calendar=upnext.querySelector('a.tnt-button');if(calendar)head.append(calendar);
+   grid.className='hub-upnext-grid';upnext.querySelectorAll('.hub-event').forEach(card=>grid.append(card));
+   if(!grid.children.length){const empty=upnext.querySelector('p');if(empty)grid.append(empty);}
+   upnext.replaceChildren(head,grid);layout.after(upnext);
+ }
  window.TNTNavigation?.mount();
  document.getElementById('publish-news')?.addEventListener('click',async()=>{if(!window.TNTProfileSettings)return;const r=await TNT.sb.from('tnt_settings').select('*').eq('key','community_news');if(r.error)return U.toast(r.error.message,true);const o=U.modal('Publicar en la portada','<div id="tnt-home-news-editor"></div>',{wide:true});TNTProfileSettings.mountNews(o.querySelector('#tnt-home-news-editor'),r.data||[]);});
  app.querySelectorAll('[data-delete-home-news]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await TNTProfileSettings.removeNews(b.dataset.deleteHomeNews);}catch(error){U.toast(error.message,true);b.disabled=false;}});

@@ -329,23 +329,23 @@ function taskEditModal(task=null,eventId=S.selectedEvent,parentId=null,suggestio
  let e=eventBy(eventId),manager=task?canEditActivity(eventId):canCreateActivity(eventId),canAssign=canAssignPeople(eventId);if(!manager){toast('No tenés permiso para '+(task?'editar':'crear')+' actividades.');return;}
  let selected=task?taskPeople(task.id):[];const draft=task||suggestion||{};
  let pool=[...new Set([...staffPeople().map(p=>p.id),...selected])];
- const initialMode=draft.assignee_mode||(selected.length>1?'multiple':'single');
+ const initialMode=selected.length?(draft.assignee_mode||(selected.length>1?'multiple':'single')):'none';
  const saturday=e?.kind==='saturday';
  const startValue=task?.planned_start?(saturday?U.time(task.planned_start):U.dateKey(task.planned_start)+'T'+U.time(task.planned_start)):'';
  modal(`${sheetHead(task?'Editar actividad':'Nueva actividad',e?.name||'')}
  <form class="form task-editor" id="taskForm">
    <div class="formRow"><div class="field"><label>Nombre</label><input name="title" value="${esc(draft.title||'')}" required></div><div class="field"><label>Tipo</label><select name="type"><option value="simple" ${draft.task_type==='simple'?'selected':''}>Básica · bienvenida, ministración…</option><option value="complex" ${draft.task_type==='complex'?'selected':''}>Dinámica / con instrucciones</option><option value="logistics" ${draft.task_type==='logistics'?'selected':''}>Área de trabajo / logística</option></select></div></div>
    <div class="formRow three" data-task-detail><div class="field"><label>Prioridad</label><select name="priority">${Object.entries(PRIORITY_LABEL).map(([value,label])=>`<option value="${value}" ${task?.priority===value?'selected':''}>${label}</option>`).join('')}</select></div><div class="field"><label>Fecha límite</label><input type="datetime-local" name="due" value="${task?.due_at?U.dateKey(task.due_at)+'T'+U.time(task.due_at):''}"></div><div class="field"><label>Presupuesto estimado</label><input type="number" name="budget" min="0" step="1" value="${esc(draft.budget_estimated||'')}"></div></div>
-   <div class="formRow"><div class="field"><label>Horario de la actividad</label>${saturday?`<div class="fixed-date-field"><span>${fmtDate(e.start_date)}</span><input type="time" name="start" value="${startValue}"></div><small>La fecha la toma automáticamente del sábado.</small>`:`<input type="datetime-local" name="start" value="${startValue}"><small>Debe quedar dentro de las fechas del evento.</small>`}</div><div class="field"><label>Duración (minutos)</label><input type="number" name="duration" min="1" max="1440" value="${esc(draft.duration_minutes||'')}"></div></div>
+   <div class="formRow"><div class="field"><label class="checkRow task-flexible-time"><input type="checkbox" name="flexible_time" ${startValue?'':'checked'}><span>Sin horario fijo</span></label><small>La actividad sigue en el cronograma. Podés definir o ajustar el horario después.</small><div data-task-time-controls ${startValue?'':'hidden'}><label>Horario de la actividad</label>${saturday?`<div class="fixed-date-field"><span>${fmtDate(e.start_date)}</span><input type="time" name="start" value="${startValue}"></div><small>La fecha la toma automáticamente del sábado.</small>`:`<input type="datetime-local" name="start" value="${startValue}"><small>Debe quedar dentro de las fechas del evento.</small>`}</div></div><div class="field"><label>Duración (minutos)</label><input type="number" name="duration" min="1" max="1440" value="${esc(draft.duration_minutes||'')}"></div></div>
    <div class="field" data-task-detail><label>Descripción / planificación</label><textarea name="description">${esc(draft.description||'')}</textarea></div>
    <div class="field" data-task-detail><label>Materiales necesarios</label><textarea name="materials">${esc(draft.materials||'')}</textarea></div>
-   <fieldset class="responsibility-box"><legend>¿Cuántas personas necesita?</legend><div class="responsibility-options"><label><input type="radio" name="assignee_mode" value="single" ${initialMode==='single'?'checked':''}><span>Una persona</span></label><label><input type="radio" name="assignee_mode" value="multiple" ${initialMode==='multiple'?'checked':''}><span>Varias personas</span></label></div><small id="responsibilityHint">Si elegís una persona, cuando ya haya una asignada las demás quedan bloqueadas.</small></fieldset>
-   <div class="field"><label>¿Quién se encarga?</label><div class="checkList assignee-list">${pool.map(pid=>{let w=workloadFor(pid),av=e?.start_date?S.availability.find(a=>a.person_id===pid&&a.date===e.start_date):null;return `<label class="checkRow responsible-picker"><input type="checkbox" name="assignee" value="${pid}" ${selected.includes(pid)?'checked':''}>${avatarHtml(pid)}<span>${esc(displayName(pid))}${av?.status==='unavailable'?'<div class="dangerText tiny">No disponible ese día</div>':av?.status==='maybe'?'<div class="tiny">Disponibilidad dudosa</div>':''}</span><small>${w} asign. este mes</small></label>`}).join('')}</div></div>
+   <fieldset class="responsibility-box"><legend>Responsables (opcional)</legend><div class="responsibility-options"><label><input type="radio" name="assignee_mode" value="none" ${initialMode==='none'?'checked':''}><span>Sin responsable asignado</span></label><label><input type="radio" name="assignee_mode" value="single" ${initialMode==='single'?'checked':''}><span>Una persona</span></label><label><input type="radio" name="assignee_mode" value="multiple" ${initialMode==='multiple'?'checked':''}><span>Varias personas</span></label></div><small id="responsibilityHint">Podés guardar la actividad sin asignársela a nadie.</small></fieldset>
+   <div class="field" data-assignee-picker ${initialMode==='none'?'hidden':''}><label>¿Quién se encarga?</label><div class="checkList assignee-list">${pool.map(pid=>{let w=workloadFor(pid),av=e?.start_date?S.availability.find(a=>a.person_id===pid&&a.date===e.start_date):null;return `<label class="checkRow responsible-picker"><input type="checkbox" name="assignee" value="${pid}" ${selected.includes(pid)?'checked':''}>${avatarHtml(pid)}<span>${esc(displayName(pid))}${av?.status==='unavailable'?'<div class="dangerText tiny">No disponible ese día</div>':av?.status==='maybe'?'<div class="tiny">Disponibilidad dudosa</div>':''}</span><small>${w} asign. este mes</small></label>`}).join('')}</div></div>
    <div class="field" data-task-detail><label>Enlace de referencia</label><input type="url" name="reference" value="${esc(draft.reference_url||'')}" placeholder="https://"></div>
    <div class="field" data-task-detail><label>Archivo para compartir</label><input class="org-file-native" id="taskShareFile" type="file" name="file"><label class="org-file-picker" for="taskShareFile"><span class="org-file-icon">📎</span><span class="org-file-copy"><b>Elegir archivo</b><small id="taskShareFileName">PDF, imagen, documento o video</small></span><span class="org-file-arrow">›</span></label></div>
-   ${featureFields(task)}<button class="btn primary" type="submit">Guardar actividad</button>
+   ${featureFields(task)}<p class="task-save-error" data-task-save-error role="alert"></p><button class="btn primary" type="submit">Guardar actividad</button>
  </form>`,true);
- let savedTaskId=task?.id||null,savedReference='',savedAttachment=false,savedChecklist=false;
+ let savedTaskId=task?.id||null,savedReference='',savedAttachment=false,savedChecklist=false,savingTask=false;
  const taskForm=$('#taskForm');bindFeatureFields(taskForm);
  const shareFile=taskForm.querySelector('#taskShareFile'),shareFileName=taskForm.querySelector('#taskShareFileName');
  shareFile?.addEventListener('change',()=>{shareFileName.textContent=shareFile.files?.[0]?.name||'PDF, imagen, documento o video';});
@@ -363,31 +363,37 @@ function taskEditModal(task=null,eventId=S.selectedEvent,parentId=null,suggestio
  }
  function syncAssignees(){
    if(!canAssign)return;
-   const single=taskForm.elements.assignee_mode.value==='single',boxes=[...taskForm.querySelectorAll('input[name="assignee"]')],checked=boxes.filter(x=>x.checked);
+   const mode=taskForm.elements.assignee_mode.value,none=mode==='none',single=mode==='single',boxes=[...taskForm.querySelectorAll('input[name="assignee"]')],checked=boxes.filter(x=>x.checked);
+   taskForm.querySelector('[data-assignee-picker]').hidden=none;
+   if(none)boxes.forEach(x=>x.checked=false);
    if(single&&checked.length>1){checked.slice(1).forEach(x=>x.checked=false);}
    const active=boxes.find(x=>x.checked);
-   boxes.forEach(x=>{x.disabled=single&&!!active&&!x.checked;x.closest('.checkRow')?.classList.toggle('is-disabled',x.disabled);});
-   $('#responsibilityHint').textContent=single?(active?'Ya hay una persona asignada. Desmarcala para elegir otra.':'Elegí una sola persona responsable.'):'Podés elegir todas las personas que realmente necesite la actividad.';
+   boxes.forEach(x=>{x.disabled=none||single&&!!active&&!x.checked;x.closest('.checkRow')?.classList.toggle('is-disabled',x.disabled);});
+   $('#responsibilityHint').textContent=none?'No se asigna a nadie. Podés sumar responsables más adelante.':single?(active?'Ya hay una persona asignada. Desmarcala para elegir otra.':'Podés elegir una persona o guardar sin asignar todavía.'):'Podés elegir todas las personas que realmente necesite la actividad.';
  }
+ function syncTime(){const flexible=taskForm.elements.flexible_time.checked;taskForm.querySelector('[data-task-time-controls]').hidden=flexible;taskForm.elements.start.disabled=flexible;}
+ taskForm.elements.flexible_time.onchange=syncTime;
  taskForm.elements.type.onchange=adjust;
  taskForm.querySelectorAll('input[name="assignee_mode"]').forEach(x=>x.onchange=syncAssignees);
  taskForm.querySelectorAll('input[name="assignee"]').forEach(x=>x.onchange=syncAssignees);
- adjust();syncAssignees();
+ adjust();syncAssignees();syncTime();
  if(!task){const submit=taskForm.querySelector('[type=submit]');const next=document.createElement('button');next.type='submit';next.name='add_next';next.className='btn';next.textContent='Guardar y agregar otra';submit.after(next);}
  taskForm.onsubmit=async ev=>{
-   ev.preventDefault();let fd=new FormData(ev.target);
-   const startRaw=String(fd.get('start')||'');
+   ev.preventDefault();if(savingTask)return;let fd=new FormData(ev.target);
+   const startRaw=fd.has('flexible_time')?'':String(fd.get('start')||'');
    const plannedStart=startRaw?(saturday?new Date(e.start_date+'T'+startRaw+':00-03:00').toISOString():new Date(startRaw+'-03:00').toISOString()):null;
    const payload={event_id:eventId,parent_task_id:parentId||task?.parent_task_id||null,title:fd.get('title'),task_type:fd.get('type'),priority:fd.get('priority'),description:fd.get('description')||null,materials:fd.get('materials')||null,due_at:fd.get('due')?new Date(fd.get('due')+'-03:00').toISOString():null,planned_start:plannedStart,duration_minutes:Number(fd.get('duration'))||null,budget_estimated:Number(fd.get('budget'))||null,assignee_mode:fd.get('assignee_mode')||'single',created_by:task?.created_by||currentPersonId(),sort_order:task?.sort_order??S.tasks.filter(t=>t.event_id===eventId).length,is_featured:fd.has('is_featured'),feature_color:fd.get('feature_color')||'lime'};
+   // No new database mode is needed: zero people is a valid, unassigned activity.
+   if(payload.assignee_mode==='none')payload.assignee_mode='single';
    if(payload.task_type==='simple'){Object.assign(payload,{priority:'medium',description:null,materials:null,due_at:null,budget_estimated:null});}else if(payload.task_type!=='logistics')payload.budget_estimated=null;
-   const btn=ev.target.querySelector('[type=submit]');btn.disabled=true;
+   const buttons=[...ev.target.querySelectorAll('[type=submit]')],saveError=ev.target.querySelector('[data-task-save-error]');savingTask=true;buttons.forEach(button=>button.disabled=true);saveError.textContent='';
    try{
      const r=await sb.rpc('tnt_save_task',{p_id:savedTaskId,p_event:eventId,p_values:payload,p_people:fd.getAll('assignee')});if(r.error)throw r.error;savedTaskId=r.data;
      const reference=String(fd.get('reference')||'').trim();if(reference&&reference!==savedReference&&payload.task_type!=='simple'){const l=await sb.from('tnt_task_links').insert({task_id:r.data,url:reference,label:'Referencia',link_type:linkType(reference),sort_order:0});if(l.error)throw l.error;savedReference=reference;}
      const file=fd.get('file');if(file?.size&&!savedAttachment&&payload.task_type!=='simple'){const safe=file.name.replace(/[^a-zA-Z0-9._-]+/g,'_'),storagePath=`${r.data}/${currentPersonId()}/${Date.now()}-${safe}`,up=await sb.storage.from('tnt-files').upload(storagePath,file,{upsert:false});if(up.error)throw up.error;const meta=await sb.from('tnt_task_files').insert({task_id:r.data,storage_path:storagePath,file_name:file.name,mime_type:file.type,size_bytes:file.size,uploaded_by:currentPersonId()});if(meta.error){await sb.storage.from('tnt-files').remove([storagePath]);throw meta.error;}savedAttachment=true;}
      if(suggestion?.checklist?.length&&!savedChecklist&&payload.task_type!=='simple'){const rows=suggestion.checklist.map((text,sort_order)=>({task_id:r.data,text,sort_order}));const check=await sb.from('tnt_task_checklist').insert(rows);if(check.error)throw check.error;savedChecklist=true;}
      const another=ev.submitter?.name==='add_next';await closeModal();await loadAll();render();toast('Actividad guardada');if(another)taskEditModal(null,eventId);else taskDetailModal(r.data);
-   }catch(error){toast(errMsg(error));btn.disabled=false;}
+   }catch(error){saveError.textContent=errMsg(error);toast(errMsg(error));savingTask=false;buttons.forEach(button=>button.disabled=false);}
  };
 }
 

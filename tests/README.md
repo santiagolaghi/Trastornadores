@@ -1,5 +1,16 @@
 # TNT regression checks
 
+## Pendientes de TNT Work 3.0, 21 de octubre de 2026
+
+- “Lo que viene” ocupa todo el ancho disponible y distribuye las tarjetas sin columnas vacías. Los coordinadores se resumen con nombres y avatares, sin repetir el encuentro. Se comprueban 320, 390, 768 y 1280 píxeles, tema oscuro y ausencia de desbordamiento horizontal.
+- Plantillas ofrece emojis por actividad y un campo para pegar otro. Se conserva el emoji al reordenar, ante un error de guardado y en las sugerencias de Organización, sin modificar el nombre de la actividad.
+- Los avisos del teléfono se ofrecen al entrar con el perfil completo. No se pide permiso al sistema hasta tocar Activar; se muestran instrucciones para permisos bloqueados y para instalar en iPhone/iPad. Más tarde se respeta durante la sesión, y una desactivación explícita no se revierte automáticamente.
+- Las actividades permiten elegir Sin responsable asignado y Sin horario fijo. Usan las estructuras existentes: `p_people: []` y `planned_start: null`, sin migraciones ni ampliación de permisos. Quitar el horario no elimina el programa. El formulario conserva el valor anterior si se vuelve a habilitar un horario antes de guardar.
+- Un error al guardar se muestra dentro de la ventana, sin perder el borrador, y ambos botones de guardado quedan bloqueados mientras se procesa una operación.
+- La verificación usa personas sintéticas, respuestas HTTP simuladas y el SDK oficial 2.117.1. No suplanta una sesión Google real ni comprueba la recepción en un teléfono físico. Ejecutar `TNT_TEST_WORK3_ONLY=1` con `browser-flows.cjs` para aislar estos recorridos.
+- El worker, los documentos y los assets modificados usan la versión `20261021`; se conservan la sesión y los datos personales.
+- Resultado: 193 pruebas automatizadas aprobadas y recorrido completo en Chromium sin errores de JavaScript; se incluyen las regresiones de chat, perfiles, permisos, navegación y programa anteriores.
+
 ## Equipos y destacados por actividad, 18 de octubre de 2026
 
 - 177 pruebas de DOM, permisos, caché y push. Se agregan categorías, acceso directo a Equipo, errores de envío conservando el borrador, destacados por actividad y controles según permisos.
