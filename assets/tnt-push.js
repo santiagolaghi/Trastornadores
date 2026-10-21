@@ -1,11 +1,18 @@
 (() => {
  'use strict';
- const VERSION='20261021r2';
+ const VERSION='20261021r3';
  const PUBLIC_KEY='BF3EVnNKTFBmSHImqA-PpYPylaHMG9L-A-gomiSB20084j_mNWWAT_Gm282-ovE5fXBN6fkPT_QyuXSx4H8r1hI';
  const ICON='/icons/dynamite-app-192.png?v='+VERSION,BADGE='/icons/notification-badge.png?v='+VERSION;
  const receipts=new Map();let registered,lastCheck=0;
  const supported=()=>('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);
  const permission=()=>window.Notification?.permission||'default';
+ const installState=()=>({ios:/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),installed:!!navigator.standalone||!!window.matchMedia?.('(display-mode: standalone)').matches,embedded:/FBAN|FBAV|Instagram|Line\/|MicroMessenger|; wv\)/i.test(navigator.userAgent)});
+ function installInstructions(){
+  const {ios,installed,embedded}=installState(),url=location.origin+'/';
+  return `<section class="tnt-install-guide">${installed?'<p>TNT ya está abierta como app. Podés activar los avisos desde el centro de notificaciones.</p>':`${embedded?'<p class="tnt-install-browser-note">Estás dentro de otra app. Usá su menú para abrir este enlace en '+(ios?'Safari':'tu navegador')+', o copiá la dirección de abajo.</p>':''}<ol>${ios?'<li>Abrí el enlace de TNT en <b>Safari</b>.</li><li>Tocá <b>Compartir</b> en el menú de Safari.</li><li>Elegí <b>Agregar a pantalla de inicio</b>. Si no aparece, bajá hasta <b>Editar acciones</b> y agregá esa opción.</li><li>Si aparece <b>Abrir como app web</b>, dejalo activado. Tocá <b>Agregar</b>.</li>':'<li>Abrí TNT en el navegador de tu teléfono.</li><li>En su menú, elegí <b>Instalar app</b> o <b>Agregar a pantalla de inicio</b>.</li>'}<li>Abrí el nuevo ícono de <b>TNT</b>. Desde ahí podés iniciar sesión y activar los avisos.</li></ol><label>Enlace para instalar<input readonly aria-label="Enlace de TNT para instalar" value="${TNTUI.esc(url)}" data-install-url></label><button type="button" class="tnt-button" data-copy-install>Copiar enlace de TNT</button><p role="status" data-install-status aria-live="polite"></p>`}</section>`;
+ }
+ function bindInstallGuide(host){host.querySelector('[data-copy-install]')?.addEventListener('click',async()=>{const input=host.querySelector('[data-install-url]'),status=host.querySelector('[data-install-status]');try{if(!navigator.clipboard?.writeText)throw Error();await navigator.clipboard.writeText(input.value);status.textContent='Enlace copiado. Pegalo en '+(installState().ios?'Safari':'tu navegador')+'.';}catch{input.focus();input.select();input.setSelectionRange(0,input.value.length);status.textContent='Mantené presionado el enlace seleccionado y elegí Copiar.';}});}
+ function openInstall(){const dialog=TNTUI.modal(installState().ios?'Instalar TNT en iPhone o iPad':'Instalar TNT',installInstructions());bindInstallGuide(dialog);return dialog;}
  const owner=()=>window.TNT?.account?.auth_user_id||window.TNT?.person?.id||'';
  const consentKey=()=> 'tnt-phone-enabled:'+owner();
  const pausedKey=()=> 'tnt-phone-paused:'+owner();
@@ -22,6 +29,7 @@
   return registered;
  }
  async function subscription({ask=true}={}){
+  if(installState().ios&&!installState().installed)throw new Error('Primero agregá TNT a la pantalla de inicio y abrila desde su ícono para activar los avisos.');
   if(!supported())throw new Error('Este teléfono no admite notificaciones web.');
   const allowed=permission()==='default'&&ask?await Notification.requestPermission():permission();
   if(allowed!=='granted')throw new Error('Permití las notificaciones de TNT en los ajustes del navegador.');
@@ -33,7 +41,7 @@
  async function save(sub){if(!window.TNT?.sb||!owner())throw new Error('Iniciá sesión en TNT.');const r=await TNT.sb.rpc('tnt_push_subscribe',{p_subscription:sub.toJSON()});if(r.error)throw r.error;}
  async function workerVersion(reg){if(!window.MessageChannel)return null;return timeout(new Promise(resolve=>{const channel=new MessageChannel();channel.port1.onmessage=e=>{channel.port1.close();resolve(e.data?.version||null);};reg.active.postMessage({type:'TNT_VERSION'},[channel.port2]);}),'Reabrí TNT para terminar la actualización.',3000);}
  const P=window.TNTPush={
-  publicKey:PUBLIC_KEY,version:VERSION,supported,permission,
+  publicKey:PUBLIC_KEY,version:VERSION,supported,permission,installState,installInstructions,bindInstallGuide,openInstall,
   async enableTNT(){const {sub}=await subscription();await save(sub);consent(true);paused(false);document.getElementById('tnt-phone-invite')?.remove();return sub;},
   async disableTNT(){const sub=await P.current();if(sub){const r=await TNT.sb.rpc('tnt_push_unsubscribe',{p_endpoint:sub.endpoint});if(r.error)throw r.error;}consent(false);paused(true);document.getElementById('tnt-phone-invite')?.remove();},
   forget(){consent(false);},
@@ -50,8 +58,7 @@
   if(existing&&existing.dataset.owner!==currentOwner)existing.remove();
   if(!currentOwner||!window.TNT?.identity||!TNT.profileComplete||paused()||dismissed()||promptBusy||document.getElementById('tnt-phone-invite'))return;
   if(permission()==='granted'&&consent())return;
-  const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-  const installed=!!navigator.standalone||!!window.matchMedia?.('(display-mode: standalone)').matches;
+  const {ios,installed}=installState();
   if(!supported()&&!(ios&&!installed))return;
   const install=ios&&!installed,blocked=permission()==='denied',panel=document.createElement('section');
   panel.id='tnt-phone-invite';panel.className='tnt-phone-invite';panel.dataset.owner=currentOwner;panel.setAttribute('aria-labelledby','tnt-phone-invite-title');
@@ -63,7 +70,7 @@
   panel.querySelector('[data-phone-invite-enable]').onclick=async event=>{
    const button=event.currentTarget,status=panel.querySelector('[data-phone-invite-status]');
    status.hidden=false;
-   if(install){status.textContent='Abrí TNT en Safari, tocá Compartir → Agregar a pantalla de inicio. Abrí el ícono de TNT y tocá Activar notificaciones.';return;}
+   if(install){status.hidden=true;P.openInstall();return;}
    if(permission()==='denied'){status.textContent=ios?'En Ajustes → Notificaciones → TNT, activá Permitir notificaciones. Después volvé a abrir TNT.':'Abrí la información del sitio junto a la dirección, entrá en Permisos → Notificaciones y elegí Permitir. Si sigue bloqueado, revisá los ajustes de notificaciones del teléfono.';return;}
    // Only the user's tap may request the system permission (especially on iOS).
    button.disabled=true;promptBusy=true;status.textContent='Activando los avisos…';
