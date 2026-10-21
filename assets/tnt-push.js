@@ -1,6 +1,6 @@
 (() => {
  'use strict';
- const VERSION='20261021r3';
+ const VERSION='20261021r4';
  const PUBLIC_KEY='BF3EVnNKTFBmSHImqA-PpYPylaHMG9L-A-gomiSB20084j_mNWWAT_Gm282-ovE5fXBN6fkPT_QyuXSx4H8r1hI';
  const ICON='/icons/dynamite-app-192.png?v='+VERSION,BADGE='/icons/notification-badge.png?v='+VERSION;
  const receipts=new Map();let registered,lastCheck=0;

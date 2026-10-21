@@ -8,7 +8,7 @@
   const page=()=>{const T=getT();return canonical(T?.module||document.body.dataset.tntSurface||'home');};
   const COMMON=['tnt_experience','tnt_settings','tnt_notifications','tnt_notification_state','tnt_people','tnt_accounts','tnt_access_grants','tnt_role_permission_presets','tnt_person_permission_overrides','tnt_profile_answers'];
   const PAGE_TABLES={
-    home:['tnt_events','tnt_event_members','tnt_tasks','tnt_task_assignees','tnt_library_items','tnt_efe_groups','tnt_efe_memberships'],
+    home:['tnt_events','tnt_event_members','tnt_tasks','tnt_task_assignees','tnt_schedule_days','tnt_schedule_items','tnt_schedule_responsibles','tnt_library_items','tnt_efe_groups','tnt_efe_memberships'],
     organizacion:['tnt_events','tnt_event_members','tnt_tasks','tnt_task_assignees','tnt_schedule_days','tnt_schedule_items','tnt_schedule_responsibles','tnt_task_comments','tnt_event_changes','tnt_chat_threads','tnt_chat_members'],
     chat:['tnt_chat_threads','tnt_chat_members','tnt_chat_messages','tnt_chat_reactions'],
     asistencia:['tnt_efe_groups','tnt_efe_memberships','tnt_efe_meetings','tnt_efe_wednesday_attendance','tnt_saturday_members','tnt_saturday_attendance'],

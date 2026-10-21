@@ -1,5 +1,15 @@
 # TNT regression checks
 
+## Roles, Comunidad e inicio, tercera revisión del 21 de octubre de 2026
+
+- El rol vigente del servidor determina el perfil completo y las preguntas del editor. Revisar un rol actualiza también la declaración anterior; pasar a Comunidad oculta las habilidades correspondientes sin borrar respuestas guardadas. La cuenta se actualiza por tiempo real y al volver a la app.
+- Inicio y los demás módulos comparten el menú de cuenta agrupado. Comunidad conserva perfil, apariencia, cuentas y avisos; no ofrece solicitudes de staff ni módulos. Los métodos anteriores también están bloqueados en el cliente, en los triggers y en RLS. Se conserva el alta inicial y la asignación administrativa de roles.
+- El botón de EFE tiene texto e icono legibles en claro y oscuro. «Mis próximas actividades» reemplaza «Necesita tu atención»: incluye todas las asignaciones, responsabilidades del cronograma y coordinaciones, con fecha, hora, confirmaciones pendientes y enlace al detalle. No limita la lista a tres actividades ni duplica una actividad vinculada al programa.
+- 230 pruebas automatizadas aprobadas: DOM, permisos, caché, teléfono, workers y PostgreSQL aislado. `roles-community-database.cjs` ejecuta SQL real para metadatos, revisión administrativa, conservación de respuestas, solicitudes antiguas, acceso del staff y alta inicial.
+- El recorrido completo de Chromium terminó sin errores de página con HTML publicado y SDK oficial 2.117.1 sobre respuestas HTTP sintéticas. El caso `TNT_TEST_ROLES_ONLY=1` cubre actualización completa de rol, editor, menú y métodos anteriores, once participaciones y ausencia de desbordamientos a 320/390/768/1280 px en ambos temas. Se revisaron capturas. No equivale a una sesión Google real ni a un dispositivo iPhone físico.
+- Migración `20261021225803_roles_and_community` aplicada en Supabase. `roles-community-live.sql` pasó con autenticación de una cuenta de Comunidad real: RPC anterior, transición de cuenta y solicitudes de módulo rechazados; rol del perfil actual. La transacción se revirtió. Los avisos del analizador de seguridad permanecen iguales.
+- Los assets modificados y el service worker usan `20261021r4`. No se alteró el flujo de Campamento.
+
 ## Correcciones de instalación, destinatarios y cronograma del 21 de octubre de 2026
 
 - El botón de inicio abre el popup del cronograma del próximo sábado. Las tarjetas y filas de Perfiles alternan selección; casillas, enlaces y botones conservan su función. Las tarjetas también responden a Enter/Espacio y muestran el estado seleccionado.
@@ -25,7 +35,7 @@
 - `organization-conversations.sql` prepara la prueba completa de integración con identidades sintéticas y rollback. Su ejecución por el conector no se completó: dos intentos devolvieron `Invalid or expired requestState`. La comprobación posterior encontró cero cuentas o eventos temporales. No se afirma que ese caso haya pasado en producción; la validación funcional de SQL se realizó en PostgreSQL aislado y en producción se comprobaron esquema, permisos, conservación de horarios y servicio desplegado.
 
 ```sh
-node --test tests/regression.cjs tests/permissions-and-cache.cjs tests/phone-client.cjs tests/pwa-worker.cjs tests/push-worker.cjs tests/organization-database.cjs
+node --test tests/regression.cjs tests/permissions-and-cache.cjs tests/phone-client.cjs tests/pwa-worker.cjs tests/push-worker.cjs tests/organization-database.cjs tests/roles-community-database.cjs
 ```
 
 ## Pendientes de TNT Work 3.0, 21 de octubre de 2026

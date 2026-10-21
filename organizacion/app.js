@@ -484,7 +484,7 @@ async function moveTemplateItem(templateId,id,dir){const top=$('#modal .sheet')?
 
 
 
-function openDeepLink(){const q=new URLSearchParams(location.search);if(q.get('task')&&taskBy(q.get('task')))taskDetailModal(q.get('task'),q.get('tab')==='team'?'team':null,q.get('comment'));else if(q.get('event')&&eventBy(q.get('event'))){const id=q.get('event');openEncounter(id);if(q.get('program')==='1'&&eventBy(id).status!=='cancelled')quickScheduleModal(id);}else if(q.get('person')&&pBy(q.get('person')))personResponsibilitiesModal(q.get('person'));}
+function openDeepLink(){const q=new URLSearchParams(location.search);if(q.get('task')&&taskBy(q.get('task')))taskDetailModal(q.get('task'),q.get('tab')==='team'?'team':null,q.get('comment'));else if(q.get('event')&&eventBy(q.get('event'))){const id=q.get('event');openEncounter(id);if(q.get('item')&&S.items.some(i=>i.id===q.get('item')&&!i.archived_at&&dayBy(i.day_id)?.event_id===id))scheduleItemDetailModal(q.get('item'));else if(q.get('program')==='1'&&eventBy(id).status!=='cancelled')quickScheduleModal(id);}else if(q.get('person')&&pBy(q.get('person')))personResponsibilitiesModal(q.get('person'));}
 
 function avatars(ids,max=5){return U.avatarStack(ids,S.people,S.accounts,currentPersonId(),max);}
 
