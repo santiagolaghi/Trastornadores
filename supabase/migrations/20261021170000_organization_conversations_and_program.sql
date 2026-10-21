@@ -4,6 +4,7 @@ alter table public.tnt_tasks add column if not exists logistics_phase text not n
 alter table public.tnt_task_comments add column if not exists reply_to uuid references public.tnt_task_comments(id) on delete set null;
 alter table public.tnt_task_comments add column if not exists is_pinned boolean not null default false;
 create index if not exists tnt_activity_replies_idx on public.tnt_task_comments(task_id,reply_to,created_at);
+create index if not exists tnt_activity_reply_parent_idx on public.tnt_task_comments(reply_to) where reply_to is not null;
 update public.tnt_task_comments set is_pinned=true where kind='note' and reply_to is null;
 
 create table public.tnt_event_changes (
@@ -16,12 +17,14 @@ create table public.tnt_event_changes (
  created_at timestamptz not null default now()
 );
 create index tnt_event_changes_recent_idx on public.tnt_event_changes(event_id,created_at desc);
+create index tnt_event_changes_task_idx on public.tnt_event_changes(task_id) where task_id is not null;
+create index tnt_event_changes_actor_idx on public.tnt_event_changes(actor_person_id) where actor_person_id is not null;
 alter table public.tnt_event_changes enable row level security;
 revoke all on public.tnt_event_changes from public,anon,authenticated;
 grant select on public.tnt_event_changes to authenticated;
 grant all on public.tnt_event_changes to service_role;
 create policy tnt_event_changes_read on public.tnt_event_changes for select to authenticated
- using(public.tnt_profile_is_complete() and public.tnt_can_action('organizacion','view','*'));
+ using((select public.tnt_profile_is_complete()) and (select public.tnt_can_action('organizacion','view','*')));
 
 create or replace function tnt_actions.guard_activity_comment() returns trigger
 language plpgsql security definer set search_path='' as $$
@@ -121,7 +124,7 @@ create trigger tnt_checklist_notify after insert or update of done on public.tnt
  for each row execute function public.tnt_notify_task_activity();
 
 -- Untimed activities receive a real day, so they can be placed between timed cards.
-create or replace function public.tnt_save_activity(p_id uuid,p_event uuid,p_values jsonb,p_people uuid[]) returns uuid
+create or replace function tnt_actions.save_activity(p_id uuid,p_event uuid,p_values jsonb,p_people uuid[]) returns uuid
 language plpgsql security definer set search_path='' as $$
 declare v_task_id uuid;v_day_id uuid;ev public.tnt_events%rowtype;t public.tnt_tasks%rowtype;phase text;area boolean;
 begin
@@ -158,8 +161,10 @@ begin
  where i.task_id=t.id and i.archived_at is null on conflict do nothing;
  return t.id;
 end $$;
-revoke all on function public.tnt_save_activity(uuid,uuid,jsonb,uuid[]) from public,anon;
-grant execute on function public.tnt_save_activity(uuid,uuid,jsonb,uuid[]) to authenticated;
+create or replace function public.tnt_save_activity(p_id uuid,p_event uuid,p_values jsonb,p_people uuid[]) returns uuid
+language sql security invoker set search_path='' as $$select tnt_actions.save_activity(p_id,p_event,p_values,p_people)$$;
+revoke all on function tnt_actions.save_activity(uuid,uuid,jsonb,uuid[]),public.tnt_save_activity(uuid,uuid,jsonb,uuid[]) from public,anon;
+grant execute on function tnt_actions.save_activity(uuid,uuid,jsonb,uuid[]),public.tnt_save_activity(uuid,uuid,jsonb,uuid[]) to authenticated;
 
 -- Materialize existing flexible Saturday activities without inventing a time.
 insert into public.tnt_schedule_days(event_id,label,date,sort_order)
