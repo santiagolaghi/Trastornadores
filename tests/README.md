@@ -1,5 +1,23 @@
 # TNT regression checks
 
+## Organización y avisos específicos, segunda revisión del 21 de octubre de 2026
+
+- El inicio del staff enlaza al próximo sábado disponible. El programa reúne coordinación y actividades propias; las advertencias de horario/responsables faltantes solo aparecen para coordinación con permiso de asignar.
+- Se mueven tarjetas flexibles entre las que tienen horario. El cliente y el servidor rechazan invertir dos horas; guardar el orden conserva `starts_at`, `planned_start` y las duraciones, incluidos los valores nulos. También se rechazan listas incompletas, repetidas o con una versión anterior.
+- Las indicaciones se fijan arriba y cada consulta conserva sus respuestas debajo. Los envíos fallidos y las actualizaciones del equipo conservan el borrador. Los avisos enlazan a la consulta exacta y muestran el autor, su foto, actividad, encuentro y fecha.
+- La cola push conserva la foto y el identificador de mensaje/consulta. El servidor vuelve a revisar acceso y existencia del mensaje antes de enviar. El service worker utiliza el retrato como icono principal y mantiene la insignia de TNT. La presentación final depende de las capacidades del sistema operativo.
+- Se detectan cruces con responsables y duración conocida; dos actividades consecutivas no cuentan como superposición. La logística se agrupa antes/durante/después. El historial del encuentro registra cambios concretos y solo se puede consultar con permiso de Organización.
+- 212 pruebas automatizadas aprobadas: DOM, permisos, caché, teléfono, workers y PostgreSQL aislado. `organization-database.cjs` usa PGlite; ejecuta la migración, el RPC anterior de guardado, el guard de coordinación, políticas RLS y triggers reales con proveedores de identidad/perfil/permisos sintéticos. Requiere `@electric-sql/pglite` además de las dependencias de DOM. No equivale a aplicar ni comprobar la migración en Supabase de producción.
+- El recorrido completo de `browser-flows.cjs` pasó con el SDK oficial 2.117.1 y respuestas HTTP sintéticas, sin errores de JavaScript. El caso nuevo también se ejecuta con `TNT_TEST_ORGANIZATION_ONLY=1`; comprueba celular/escritorio y anchos 320/390/768/1280. No se probaron una sesión Google real ni la recepción en un teléfono físico.
+- Supabase conectado y actualización aplicada en `oeodnnomgiddkblnlzay`, registrada como `20261021151635_organization_conversations_and_program`. Los 19 horarios/duraciones de actividades y los de las 14 filas de programa preexistentes se conservaron exactamente. Cinco actividades flexibles ahora tienen una fila de programa; no se modificaron los horarios al ubicarlas.
+- `tnt_save_activity` es un invocador público autenticado y delega en el esquema privado `tnt_actions`. Se verificaron los permisos reales: sin ejecución anónima, historial con RLS, lectura autenticada y sin escritura directa. El analizador de seguridad conserva los mismos avisos anteriores a la actualización.
+- `camp-notifications` versión 6 está activa y su fuente coincide exactamente con la revisada. Conserva la autenticación propia; una petición sin credenciales devuelve el 401 esperado. El último despacho programado terminó correctamente. El frontend `20261021r2` se publica después de estos cambios de servidor.
+- `organization-conversations.sql` prepara la prueba completa de integración con identidades sintéticas y rollback. Su ejecución por el conector no se completó: dos intentos devolvieron `Invalid or expired requestState`. La comprobación posterior encontró cero cuentas o eventos temporales. No se afirma que ese caso haya pasado en producción; la validación funcional de SQL se realizó en PostgreSQL aislado y en producción se comprobaron esquema, permisos, conservación de horarios y servicio desplegado.
+
+```sh
+node --test tests/regression.cjs tests/permissions-and-cache.cjs tests/phone-client.cjs tests/pwa-worker.cjs tests/push-worker.cjs tests/organization-database.cjs
+```
+
 ## Pendientes de TNT Work 3.0, 21 de octubre de 2026
 
 - “Lo que viene” ocupa todo el ancho disponible y distribuye las tarjetas sin columnas vacías. Los coordinadores se resumen con nombres y avatares, sin repetir el encuentro. Se comprueban 320, 390, 768 y 1280 píxeles, tema oscuro y ausencia de desbordamiento horizontal.
