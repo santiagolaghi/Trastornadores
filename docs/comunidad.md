@@ -15,6 +15,12 @@ Los nueve espacios se agrupan en Camino de fe, Vida en comunidad y Familias TNT.
 | Dinámicas y juegos | Cinco juegos y propuestas para encuentros | Preparar dinámicas, preguntas con explicaciones, tiempos y vidas |
 | Para hoy | Leer la propuesta diaria y elegir los recordatorios | Editar el banco de frases, programar días y elegir la hora del aviso |
 
+## Identidad de TNT
+
+Los espacios nuevos heredan la identidad gráfica original: logo, tipografías, colores, bordes y profundidad. Inicio conserva el tarjetero dinámico con desplazamiento táctil, teclado y selección recordada. El menú de cuenta contiene su propia lista desplazable; la agenda de Inicio sigue el desplazamiento de la página. Los estilos del calendario y las acciones del cronograma se ajustan de forma puntual para conservar fechas y textos completos en celular.
+
+Los estilos TNT Gráfico, Editorial y Estudio mantienen su vista previa y publicación administrativa. El modo claro, oscuro o del dispositivo se guarda como preferencia personal.
+
 ## Permisos y datos
 
 Comunidad usa la identidad central de TNT. Los permisos nuevos se delegan por espacio, desde Administrar Comunidad → Permisos del equipo: editar borradores, publicar o administrar. Ser referente no concede acceso de administración. El servidor valida cada transición y las tablas tienen RLS; las escrituras pasan por RPC comprobadas.

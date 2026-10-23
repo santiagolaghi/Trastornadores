@@ -1,7 +1,6 @@
-/* The same community identity applies to every route. */
+/* Shared launch state and community refresh, without changing the TNT identity. */
 (() => {
  'use strict';
- document.documentElement.dataset.tntStyle='community';
  const app=document.getElementById('app');
  const markup='<div class="tnt-startup" role="status"><span class="tnt-startup-orbit"><img src="/icons/dynamite-app.svg" alt=""></span><b>Hay un lugar para vos.</b><p>Preparando tu espacio en TNT</p><i aria-hidden="true"></i></div>';
  if(app&&(!app.textContent.trim()||app.querySelector('.tnt-skeleton')||app.textContent.trim()==='Preparando tu espacio…'))app.innerHTML=markup;

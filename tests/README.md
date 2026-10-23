@@ -1,5 +1,13 @@
 # TNT regression checks
 
+## Restauración de la identidad de TNT, 23 de octubre de 2026
+
+- Se recuperan el logo, la tipografía, los colores, el encabezado y el tarjetero dinámico originales. Las nueve incorporaciones de Comunidad y Para hoy conservan sus datos y flujos. Las reglas nuevas se aplican a sus componentes y a las correcciones puntuales de scroll, menú, calendario y acciones.
+- `TNT_TEST_STYLE_ONLY=1 node tests/browser-flows.cjs` verifica el gesto táctil nativo del tarjetero, teclado, selección recordada, permisos, marco del menú, fechas enteras y acciones legibles a 320/390/412/768/1280 px en claro y oscuro.
+- La prueba de apariencia conserva la publicación administrativa con control de versión y comprueba que guardar solo el modo personal no publique cambios para otras personas.
+- Los scripts de navegador se ejecutan con `TNT_TEST_BROWSER` y `TNT_TEST_SDK`. Las pruebas Node se ejecutan con los archivos `tests/*.cjs` excepto los que contienen `browser` en su nombre.
+- La actualización de assets y service worker es `20261023d`.
+
 ## Roles, Comunidad e inicio, tercera revisión del 21 de octubre de 2026
 
 - El rol vigente del servidor determina el perfil completo y las preguntas del editor. Revisar un rol actualiza también la declaración anterior; pasar a Comunidad oculta las habilidades correspondientes sin borrar respuestas guardadas. La cuenta se actualiza por tiempo real y al volver a la app.

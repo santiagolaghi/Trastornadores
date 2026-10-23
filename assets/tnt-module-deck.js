@@ -3,8 +3,6 @@
   'use strict';
   window.TNTModuleDeck = { bind };
   function bind(track) {
-    if(document.documentElement.dataset.tntStyle==='community'){track.setAttribute('aria-label','Espacios de TNT');return;}
-
     if (track.dataset.deckBound) return;
     track.dataset.deckBound = 'true';
     track.tabIndex = 0;
