@@ -4,7 +4,7 @@ const {PGlite}=require('@electric-sql/pglite');
 const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 const read=f=>fs.readFileSync(path.join(__dirname,'..','..',f),'utf8');
 async function database(){
- const db=new PGlite();await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema tnt_actions;grant usage on schema auth,tnt_actions to authenticated,service_role;
+ const db=new PGlite();await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema tnt_actions;grant usage on schema auth to authenticated,service_role;grant usage on schema tnt_actions to authenticated;
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  create table public.tnt_people(id uuid primary key,full_name text,active boolean default true,birthday date);
  create table public.tnt_accounts(person_id uuid primary key references public.tnt_people,auth_user_id uuid,enabled boolean default true,staff_status text default 'community',system_role text default 'user',onboarding_completed_at timestamptz default now(),avatar_url text);
@@ -24,7 +24,7 @@ async function database(){
  `);
  for(let n=1;n<=5;n++)await db.query('insert into public.tnt_people(id,full_name,birthday) values($1,$2,$3)',[id(n),'Persona '+n,'2000-10-22']);
  for(let n=1;n<=5;n++)await db.query('insert into public.tnt_accounts(person_id,auth_user_id,staff_status,system_role) values($1,$1,$2,$3)',[id(n),n<=2?'approved':'community',n===1?'admin':'user']);
- for(const file of fs.readdirSync(path.join(__dirname,'../../supabase/migrations')).filter(f=>/^\d+_community_(life_|notifications_and_daily)/.test(f)).sort((a,b)=>{const rank=f=>f.includes('_schema')?1:f.includes('_permissions')?2:f.includes('_handler_')?3:f.includes('_actions')?4:f.includes('_bootstrap')?5:6;return rank(a)-rank(b)||a.localeCompare(b);}))await db.exec(read('supabase/migrations/'+file));
+ for(const file of fs.readdirSync(path.join(__dirname,'../../supabase/migrations')).filter(f=>/^\d+_community_(life_|notifications_and_daily|worker_schema_access)/.test(f)).sort((a,b)=>{const rank=f=>f.includes('_worker_schema_access')?7:f.includes('_schema')?1:f.includes('_permissions')?2:f.includes('_handler_')?3:f.includes('_actions')?4:f.includes('_bootstrap')?5:6;return rank(a)-rank(b)||a.localeCompare(b);}))await db.exec(read('supabase/migrations/'+file));
  const login=n=>db.exec(`reset role;set request.jwt.claim.sub='${id(n)}';set role authenticated;`);
  const action=async(name,data={})=>(await db.query('select public.tnt_community_action($1,$2::jsonb) as result',[name,JSON.stringify(data)])).rows[0].result;
  const boot=async()=>(await db.query('select public.tnt_community_bootstrap() as result')).rows[0].result;
