@@ -56,6 +56,11 @@ async function ensureIdentity(session){
  if(!TNT.account||TNT.account.auth_user_id!==session.user.id){const er=await sb.rpc('tnt_ensure_account');if(er.error)throw er.error;const skipped=localStorage.getItem('tnt:profile-match-skipped:'+session.user.id),continued=skipped?{data:{linked:false}}:await sb.rpc('tnt_continue_profile',{p_target:null,p_values:{},p_confirm:false});if(continued.error)console.warn('TNT coincidencia de perfil',continued.error.message);else{TNT.profileCandidate=continued.data?.candidate||null;TNT.profileContinued=!!continued.data?.linked;}}
  const ar=await sb.from('tnt_accounts').select('*').eq('auth_user_id',session.user.id).maybeSingle();if(ar.error)throw ar.error;
  if(!ar.data)throw new Error('No pude vincular tu Cuenta TNT.');if(ar.data.enabled===false)throw new Error('Tu cuenta está deshabilitada. Consultá con un Admin TNT.');
+ const googlePhoto=session.user.user_metadata?.avatar_url||session.user.user_metadata?.picture||'';
+ if(ar.data.avatar_source==='google'&&ar.data.avatar_sync!==false&&/^https:\/\/[a-z0-9.-]+\.googleusercontent\.com\//i.test(googlePhoto)&&googlePhoto!==ar.data.avatar_google_url){
+  const synced=await sb.rpc('tnt_set_profile_photo',{p_source:'google',p_path:null,p_sync:true});
+  if(!synced.error&&synced.data)Object.assign(ar.data,synced.data);
+ }
  const [pr,gr,legacy,rp,pp,profile]=await Promise.all([
    sb.from('tnt_people').select('*').eq('id',ar.data.person_id).single(),
    sb.from('tnt_access_grants').select('*').eq('person_id',ar.data.person_id),
@@ -77,7 +82,8 @@ async function ensureIdentity(session){
  return TNT.identity;
 }
 function renderShell(){
- if($('#tnt-shell')||!TNT.identity)return;
+ // Personal spaces render the approved compact header; existing module headers stay as before.
+ if(document.body.classList.contains('tnt-life')||$('#tnt-shell')||!TNT.identity)return;
  document.body.classList.add('tnt-shell-active');const el=document.createElement('header');el.id='tnt-shell';
  el.innerHTML=`<button class="tnt-shell-home" data-tnt-home aria-label="${moduleName?'Volver al inicio TNT':'Inicio TNT'}">${moduleName?TNTUI.icon('back'):'<img class="tnt-brand-mark" src="/icons/dynamite-app.svg?v=20261013" alt="TNT">'}</button><div class="tnt-shell-brand"><b>${esc(moduleName?moduleLabel:'Trastornadores')}</b><small>${moduleName?'Trastornadores':'Hacemos TNT'}</small></div><nav class="tnt-shell-tools" aria-label="Mi cuenta y configuración">${TNT.isAdmin?`<a class="tnt-shell-icon" data-tnt-admin href="/admin/?tab=settings" aria-label="Configuración de TNT">${TNTUI.icon('settings')}</a>`:''}<button class="tnt-shell-icon" data-tnt-theme aria-label="Cambiar tema">${TNTUI.icon('sun')}</button><button class="tnt-shell-icon" data-tnt-notify aria-label="Notificaciones">${TNTUI.icon('bell')}</button><button class="tnt-shell-user" data-tnt-user aria-label="Abrir mi cuenta">${avatarHtml()}</button></nav>`;
  document.body.appendChild(el);
@@ -92,7 +98,7 @@ function sheet(title,body){return TNTUI.modal(title,body)}
 async function showNotifications(){const r=await sb.from('tnt_notifications').select('*').order('created_at',{ascending:false}).limit(40);const rows=(r.data||[]).filter(n=>!n.person_id||n.person_id===TNT.person?.id);const o=sheet('Notificaciones',`<p>Todo lo que requiere tu atención en TNT.</p><div style="display:grid;gap:7px">${rows.length?rows.map(n=>`<button data-note="${n.id}" data-href="${esc(n.href||'')}" style="text-align:left;border:1px solid var(--tnt-line);background:${n.read_at?'var(--tnt-panel2)':'color-mix(in srgb,var(--tnt-accent) 10%,var(--tnt-panel))'};color:var(--tnt-text);border-radius:13px;padding:10px"><b style="display:block;font-size:14px">${esc(n.title)}</b><small style="color:var(--tnt-muted)">${esc(n.body||'') }</small></button>`).join(''):'<div class="tnt-pill good">No tenés notificaciones pendientes.</div>'}</div>`);o.querySelectorAll('[data-note]').forEach(b=>b.onclick=async()=>{await sb.from('tnt_notifications').update({read_at:new Date().toISOString()}).eq('id',b.dataset.note);if(b.dataset.href)location.href=b.dataset.href;else b.remove()})}
 async function showProfile(){
  const onProfiles=/^\/perfiles\/datos\/?$/.test(location.pathname);
- if(!onProfiles){location.href='/perfiles/datos/?me=1&edit=1';return;}
+ if(!onProfiles&&!/^\/perfil\/?$/.test(location.pathname)){location.href='/perfil?edit=1';return;}
  return TNTProfileEditor.open(TNT.person.id);
 }
 TNT.showMyAttendance=async function(){const r=await sb.rpc('tnt_my_attendance');if(r.error)return TNTUI.toast('No pudimos cargar tus asistencias.',true);sheet('Mis asistencias',`<p>Solo ves tus propios registros.</p><div class="tnt-access-list">${(r.data||[]).map(x=>`<article class="tnt-pill"><b>${esc(TNTUI.date(x.meeting_date))} · ${esc(x.area)}</b><span>${esc({present:'Presente',absent:'Ausente',pending:'Sin registrar',justified:'Justificado'}[x.status]||'Sin registrar')}</span></article>`).join('')||'<p>Todavía no hay asistencias registradas para tu perfil.</p>'}</div>`);};
@@ -126,7 +132,7 @@ TNT.configureMembership=async function(){
  f.onsubmit=async e=>{e.preventDefault();const b=f.querySelector('button');b.disabled=true;try{const r=await sb.rpc('tnt_request_membership',{p_staff:f.elements.staff.value==='yes',p_role:f.elements.staff.value==='yes'?f.elements.role.value:null});if(r.error)throw r.error;await ensureIdentity(TNT.session);await TNTUI.closeModal(o);document.dispatchEvent(new CustomEvent('tnt:membership'));TNTUI.toast('Tu participación quedó guardada.');}catch(err){f.querySelector('[role=status]').textContent=err.message;b.disabled=false;}};
 };
 
-TNT.sheet=sheet;TNT.requestAccess=requestAccess;TNT.editProfile=showProfile;TNT.showMyProfile=()=>{location.href='/perfiles/datos/?me=1';};
+TNT.sheet=sheet;TNT.requestAccess=requestAccess;TNT.editProfile=showProfile;TNT.showMyProfile=()=>{location.href='/perfil';};
 TNT.ownProfilePage=()=>moduleName==='perfiles'&&/^\/perfiles\/datos\/?$/.test(location.pathname)&&new URLSearchParams(location.search).get('me')==='1';
 TNT.refreshIdentity=async()=>{const before=JSON.stringify(TNT.profileContext),identity=await ensureIdentity(TNT.session);const button=document.querySelector('[data-tnt-user]');if(button)button.innerHTML=avatarHtml();if(before!==JSON.stringify(TNT.profileContext))document.dispatchEvent(new CustomEvent('tnt:profile',{detail:{personId:TNT.person.id}}));return identity;};
 TNT.refreshAccess=async()=>{try{await TNT.refreshIdentity();document.dispatchEvent(new CustomEvent('tnt:permissions'));document.dispatchEvent(new CustomEvent('tnt:membership'));TNTUI.toast('Tu acceso está actualizado.');}catch(e){TNTUI.toast(e.message,true);}};

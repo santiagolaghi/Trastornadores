@@ -4,6 +4,8 @@
   const personName = value => String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('es').replace(/(^|[\s’\x27-])\p{L}/gu, part => part.toLocaleUpperCase('es'));
   const paths = {
     home:'M3 10.5 12 3l9 7.5M5 9v12h5v-7h4v7h5V9',
+    user:'M20 21v-2a7 7 0 0 0-14 0v2M13 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8',
+    upload:'M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5',
     calendar:'M4 5h16v16H4zM8 3v4m8-4v4M4 10h16m-12 4h2m4 0h2m-8 4h2',
     chat:'M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-1 2V11.5a8.5 8.5 0 1 1 18 0ZM7 11h10m-10 4h6',
     people:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8m8 .13a4 4 0 0 1 0 7.75',

@@ -1,0 +1,48 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path');
+const {PGlite}=require('@electric-sql/pglite');
+const uid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
+test('Las fotos conservan las anteriores, aíslan carpetas y guardan la preferencia de Google',async()=>{
+ const db=new PGlite();
+ const one=uid(1),two=uid(2),photo=uid(3)+'.webp';
+ try{
+  await db.exec(`create role anon;create role authenticated;create schema auth;create schema storage;
+   create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+   create function auth.jwt() returns jsonb language sql stable as $$select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb$$;
+   create function storage.foldername(text) returns text[] language sql immutable as $$select string_to_array($1,'/')$$;
+   grant usage on schema auth,storage to authenticated;
+   create table public.tnt_accounts(person_id uuid primary key,auth_user_id uuid,enabled boolean,avatar_url text,ministry_role text,system_role text);
+   create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
+   create table storage.objects(bucket_id text,name text,primary key(bucket_id,name));
+   alter table public.tnt_accounts enable row level security;alter table storage.objects enable row level security;
+   grant select,update on public.tnt_accounts to authenticated;grant select,insert,delete on storage.objects to authenticated;
+   create policy self_read on public.tnt_accounts for select to authenticated using(auth_user_id=auth.uid());
+   create policy self_update on public.tnt_accounts for update to authenticated using(auth_user_id=auth.uid()) with check(auth_user_id=auth.uid());
+   insert into public.tnt_accounts values('${one}','${one}',true,'https://lh3.googleusercontent.com/old','Líder','user'),('${two}','${two}',true,'https://old.example/custom.jpg',null,'user');
+  `);
+  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261023001415_profile_photo_preferences.sql'),'utf8'));
+  let rows=(await db.query('select * from public.tnt_accounts order by person_id')).rows;
+  assert.equal(rows[0].avatar_source,'google');assert.equal(rows[0].avatar_sync,true);
+  assert.equal(rows[1].avatar_source,'custom');assert.equal(rows[1].avatar_sync,false);assert.equal(rows[1].avatar_url,'https://old.example/custom.jpg');
+  await db.exec(`set role authenticated;set request.jwt.claim.sub='${one}';set request.jwt.claims='{"user_metadata":{"avatar_url":"https://lh3.googleusercontent.com/fresh"}}';`);
+  const rpc=(source,p=null,sync=true)=>db.query('select public.tnt_set_profile_photo($1,$2,$3) as result',[source,p,sync]);
+  await assert.rejects(db.exec(`insert into storage.objects values('tnt-profile-photos','${two}/${photo}')`),/row-level security/);
+  await db.exec(`insert into storage.objects values('tnt-profile-photos','${one}/${photo}')`);
+  await assert.rejects(rpc('custom',two+'/'+photo),/propia foto/);
+  await assert.rejects(rpc('custom',one+'/../'+photo),/propia foto/);
+  await assert.rejects(rpc('custom',one+'/'+uid(4)+'.webp'),/propia foto/);
+  await rpc('custom',one+'/'+photo);rows=(await db.query('select * from public.tnt_accounts')).rows;
+  assert.equal(rows.length,1);assert.equal(rows[0].avatar_sync,false);assert.equal(rows[0].ministry_role,'Líder');assert.equal(rows[0].system_role,'user');assert(rows[0].avatar_url.endsWith(one+'/'+photo));
+  await rpc('google',null,false);rows=(await db.query('select * from public.tnt_accounts')).rows;assert.equal(rows[0].avatar_url,'https://lh3.googleusercontent.com/fresh');assert.equal(rows[0].avatar_sync,false);
+  await rpc('google',null,true);assert.equal((await db.query('select avatar_sync from public.tnt_accounts')).rows[0].avatar_sync,true);
+  await db.exec(`set request.jwt.claim.sub='${two}';`);
+  assert.equal((await db.query('select * from storage.objects')).rows.length,0);
+  await db.exec('delete from storage.objects');
+  await rpc('custom');assert.equal((await db.query('select avatar_url from public.tnt_accounts')).rows[0].avatar_url,'https://old.example/custom.jpg');
+  await db.exec('reset role');assert.equal((await db.query('select count(*)::int as n from storage.objects')).rows[0].n,1);
+  await db.exec(`update public.tnt_accounts set enabled=false where person_id='${two}';set role authenticated;`);
+  await assert.rejects(rpc('google'),/no está habilitada/);
+  await db.exec('reset role;set role anon');await assert.rejects(rpc('google'),/permission denied/);
+ }finally{await db.close();}
+});

@@ -3,7 +3,7 @@ set -euo pipefail
 
 rm -rf public
 mkdir -p public
-cp -r assets admin asistencia buffet campamento chat efe glosario icons organizacion lista-sabados perfiles manifest.webmanifest icon.svg index.html sw.js public/
+cp -r assets admin asistencia buffet campamento chat efe glosario icons organizacion lista-sabados perfiles comunidad perfil biblia juegos manifest.webmanifest icon.svg index.html sw.js public/
 
 python3 <<'PY'
 from pathlib import Path
