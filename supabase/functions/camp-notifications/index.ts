@@ -21,6 +21,8 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ok:false,error:"unauthorized"}),{status:401,headers:{"content-type":"application/json"}});
   }
   try { await sb.rpc("tnt_camp_prepare_notifications"); } catch (_) {}
+  let communityReady = true;
+  try { const prepared = await sb.rpc("tnt_community_prepare_notifications"); if (prepared.error) { communityReady=false; console.error("Community preparation failed", prepared.error.code); } } catch (_) { communityReady=false; }
 
   const resendKey = Deno.env.get("RESEND_API_KEY") || "";
   const emailFrom = Deno.env.get("TNT_EMAIL_FROM") || "";
@@ -181,6 +183,6 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  return new Response(JSON.stringify({ ok:true, claimed:rows.length, sent, skipped, failed, waiting, team_sent:teamSent, team_skipped:teamSkipped, team_failed:teamFailed, email_ready:emailReady, push_ready:Boolean(vapidPrivate) }), { headers:{ "content-type":"application/json" } });
+  return new Response(JSON.stringify({ ok:true, claimed:rows.length, sent, skipped, failed, waiting, team_sent:teamSent, team_skipped:teamSkipped, team_failed:teamFailed, community_ready:communityReady, email_ready:emailReady, push_ready:Boolean(vapidPrivate) }), { headers:{ "content-type":"application/json" } });
 });
 

@@ -3,6 +3,7 @@
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const personName = value => String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('es').replace(/(^|[\s’\x27-])\p{L}/gu, part => part.toLocaleUpperCase('es'));
   const paths = {
+    heart:'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z',play:'M8 4l12 8-12 8Z',
     home:'M3 10.5 12 3l9 7.5M5 9v12h5v-7h4v7h5V9',
     user:'M20 21v-2a7 7 0 0 0-14 0v2M13 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8',
     upload:'M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5',

@@ -1,6 +1,6 @@
 (() => {
  'use strict';
- const VERSION='20261023b';
+ const VERSION='20261023c';
  const PUBLIC_KEY='BF3EVnNKTFBmSHImqA-PpYPylaHMG9L-A-gomiSB20084j_mNWWAT_Gm282-ovE5fXBN6fkPT_QyuXSx4H8r1hI';
  const ICON='/icons/dynamite-app-192.png?v='+VERSION,BADGE='/icons/notification-badge.png?v='+VERSION;
  const receipts=new Map();let registered,lastCheck=0;
@@ -79,7 +79,7 @@
    finally{promptBusy=false;}
   };
  }
- navigator.serviceWorker?.addEventListener('message',e=>{if(e.data?.type!=='TNT_PUSH_RECEIVED'||!e.data.id)return;receipts.set(e.data.id,Date.now());if(receipts.size>10)receipts.delete(receipts.keys().next().value);document.dispatchEvent(new CustomEvent('tnt:phone-received',{detail:{id:e.data.id}}));});
+ navigator.serviceWorker?.addEventListener('message',e=>{if(e.data?.type==='TNT_NOTIFICATION_RECEIVED'){window.TNTNotifications?.load().catch(()=>{});return;}if(e.data?.type!=='TNT_PUSH_RECEIVED'||!e.data.id)return;receipts.set(e.data.id,Date.now());if(receipts.size>10)receipts.delete(receipts.keys().next().value);document.dispatchEvent(new CustomEvent('tnt:phone-received',{detail:{id:e.data.id}}));});
  // Check on every entry, including direct module links. Never reload a user's draft.
  function check(){if(!('serviceWorker'in navigator)||Date.now()-lastCheck<300000)return;lastCheck=Date.now();registration().then(reg=>reg.update()).catch(()=>{});}
  if(document.readyState==='complete')check();else window.addEventListener('load',check,{once:true});

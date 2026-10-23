@@ -43,3 +43,15 @@ test('Cada juego de preguntas tiene respuestas válidas y puede completarse',()=
   assert.equal(game.status,'won');assert.equal(game.score,100);assert.equal(game.lives,3);
  }
 });
+
+test('Las parejas requieren dos tarjetas distintas, conservan aciertos y consumen una vida al errar',()=>{
+ const game=new Game('pairs','easy');game.start();const q=game.current,a=q.choices[0],b=q.choices.find(c=>c.match===a.match&&c.id!==a.id),wrong=q.choices.find(c=>c.match!==a.match);
+ assert(game.choose(a.id).preview);assert(game.choose(a.id).ignored);assert.equal(game.choose(wrong.id).correct,false);assert.equal(game.lives,2);assert(game.choose(b.id).ignored);game.releasePair();assert(game.choose(a.id).preview);assert(game.choose(b.id).correct);assert(game.matched.includes(a.id));assert(game.choose(a.id).ignored);
+ while(game.status==='playing'){for(const c of game.current.choices){if(game.matched.includes(c.id))continue;game.choose(c.id);const pair=game.current.choices.find(x=>x.id!==c.id&&x.match===c.match);game.choose(pair.id);}if(game.status==='playing')game.next();}assert.equal(game.status,'won');assert.equal(game.history.length,3);
+});
+test('La línea del tiempo conserva el orden y la explicación se puede leer sin consumir tiempo',()=>{
+ let now=0;const game=new Game('timeline','normal',{now:()=>now});game.start();for(const id of game.current.answer)game.choose(id);assert(game.pending);const remaining=game.remainingMs;now+=500000;game.tick();assert.equal(game.remainingMs,remaining);game.next();assert.equal(game.seconds,120);assert(game.hint());assert.equal(game.hint(),null);
+});
+test('Un juego del equipo conserva preguntas, alternativas y explicaciones, y respeta tiempos y vidas configurados',()=>{
+ const game=new Game('quiz','hard',{seconds:210,lives:2,questions:[{question:'Pregunta del equipo',answer:'Sí',wrong:['A','B','C'],explanation:'Explicación del equipo',reference:'Juan 1'}]});assert.equal(game.seconds,210);assert.equal(game.lives,2);game.start();assert(game.choose('Sí').correct);assert.equal(game.status,'won');assert.equal(game.history[0].explanation,'Explicación del equipo');assert.throws(()=>new Game('quiz'),/preguntas/);
+});

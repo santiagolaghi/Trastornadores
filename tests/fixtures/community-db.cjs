@@ -1,0 +1,34 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {PGlite}=require('@electric-sql/pglite');
+const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
+const read=f=>fs.readFileSync(path.join(__dirname,'..','..',f),'utf8');
+async function database(){
+ const db=new PGlite();await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema tnt_actions;grant usage on schema auth,tnt_actions to authenticated,service_role;
+ create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+ create table public.tnt_people(id uuid primary key,full_name text,active boolean default true,birthday date);
+ create table public.tnt_accounts(person_id uuid primary key references public.tnt_people,auth_user_id uuid,enabled boolean default true,staff_status text default 'community',system_role text default 'user',onboarding_completed_at timestamptz default now(),avatar_url text);
+ create function public.tnt_current_person_id() returns uuid language sql stable security definer as $$select person_id from public.tnt_accounts where auth_user_id=auth.uid()$$;
+ create function public.tnt_is_admin() returns boolean language sql stable security definer as $$select coalesce((select system_role='admin' from public.tnt_accounts where auth_user_id=auth.uid()),false)$$;
+ create function public.tnt_profile_values(uuid) returns jsonb language sql as $$select '{}'::jsonb$$;
+ create function public.tnt_profile_missing_values(jsonb) returns jsonb language sql as $$select '[]'::jsonb$$;
+ create function public.tnt_recipient_has_module(uuid,text) returns boolean language sql as $$select true$$;
+ create function tnt_actions.activity_notification_member(uuid,uuid) returns boolean language sql as $$select false$$;
+ create table public.tnt_chat_threads(id uuid,is_archived boolean,task_id uuid);create table public.tnt_chat_members(thread_id uuid,person_id uuid);create table public.tnt_chat_messages(id uuid,thread_id uuid,deleted_at timestamptz,audience_person_ids uuid[]);create table public.tnt_task_comments(id uuid,task_id uuid);
+ create table public.tnt_notifications(id uuid primary key default gen_random_uuid(),person_id uuid references public.tnt_people,scope text default 'general',event_id uuid,task_id uuid,title text,body text,href text,data jsonb default '{}',read_at timestamptz,created_at timestamptz default now());
+ create function public.tnt_notification_visible_for(p_note public.tnt_notifications,p_person uuid) returns boolean language sql stable security definer as $$select p_note.person_id=p_person$$;
+ create function public.tnt_notification_resolved(p_note public.tnt_notifications) returns boolean language sql stable as $$select false$$;
+ create table public.tnt_push_subscriptions(person_id uuid,endpoint text unique,subscription jsonb,updated_at timestamptz default now());
+ create table public.tnt_push_outbox(id uuid primary key default gen_random_uuid(),source_key text,person_id uuid,endpoint text,payload jsonb,status text default 'pending',attempts int default 0,available_at timestamptz default now(),created_at timestamptz default now(),sent_at timestamptz,last_error text,unique(source_key,endpoint));
+ create table public.tnt_notification_state(notification_id uuid,person_id uuid,read_at timestamptz,dismissed_at timestamptz);
+ `);
+ for(let n=1;n<=5;n++)await db.query('insert into public.tnt_people(id,full_name,birthday) values($1,$2,$3)',[id(n),'Persona '+n,'2000-10-22']);
+ for(let n=1;n<=5;n++)await db.query('insert into public.tnt_accounts(person_id,auth_user_id,staff_status,system_role) values($1,$1,$2,$3)',[id(n),n<=2?'approved':'community',n===1?'admin':'user']);
+ for(const file of fs.readdirSync(path.join(__dirname,'../../supabase/migrations')).filter(f=>/^\d+_community_(life_|notifications_and_daily)/.test(f)).sort((a,b)=>{const rank=f=>f.includes('_schema')?1:f.includes('_permissions')?2:f.includes('_handler_')?3:f.includes('_actions')?4:f.includes('_bootstrap')?5:6;return rank(a)-rank(b)||a.localeCompare(b);}))await db.exec(read('supabase/migrations/'+file));
+ const login=n=>db.exec(`reset role;set request.jwt.claim.sub='${id(n)}';set role authenticated;`);
+ const action=async(name,data={})=>(await db.query('select public.tnt_community_action($1,$2::jsonb) as result',[name,JSON.stringify(data)])).rows[0].result;
+ const boot=async()=>(await db.query('select public.tnt_community_bootstrap() as result')).rows[0].result;
+ return{db,login,action,boot};
+}
+
+module.exports={database,id};

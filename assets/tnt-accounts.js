@@ -25,10 +25,10 @@ function toggleAccountMenu() {
  const $=selector=>document.querySelector(selector),esc=TNTUI.esc,avatarHtml=()=>TNTUI.avatar(TNT.person,{...TNT.account,avatar_url:TNT.avatar()});
  const existing = $('#tnt-account-menu');
  if (existing) { existing.dispatchEvent(new Event('tnt:account-close')); return; }
- const U = TNTUI, m = document.createElement('section');
+ const returnFocus=document.activeElement,U = TNTUI, m = document.createElement('section'),backdrop=document.createElement('div');backdrop.className='tnt-account-backdrop';backdrop.setAttribute('aria-hidden','true');
  m.id = 'tnt-account-menu';
  m.setAttribute('role', 'dialog');
- m.setAttribute('aria-label', 'Tu cuenta de TNT');
+ m.setAttribute('aria-label', 'Tu cuenta de TNT');m.setAttribute('aria-modal','true');
  const groups = [
   ['Tu cuenta', [
    ['profile', 'people', 'Mi perfil', 'Tus datos y tu historia en TNT'],
@@ -38,6 +38,7 @@ function toggleAccountMenu() {
   ['Tu experiencia', [
    ['appearance', 'edit', 'Apariencia de TNT', 'Una identidad para toda la app'],
    ['theme', document.documentElement.dataset.tntTheme === 'dark' ? 'sun' : 'moon', 'Modo ' + (document.documentElement.dataset.tntTheme === 'dark' ? 'claro' : 'oscuro'), 'Elegí cómo ver tu pantalla'],
+   ['community', 'people', 'Vida en comunidad', 'Tus lecturas, desafíos y acompañamiento'],
    ['phone', 'bell', 'Avisos en mi teléfono', 'Mensajes y novedades, también al salir'],
    ['tutorial', 'help', 'Cómo se usa este espacio', 'Volvé a recorrer el tutorial']
   ]],
@@ -49,12 +50,12 @@ function toggleAccountMenu() {
  const row = item => '<button type="button" data-' + item[0] + ' class="tnt-account-action"><span class="tnt-account-action-icon">' + U.icon(item[1]) + '</span><span><strong>' + esc(item[2]) + '</strong><small>' + esc(item[3]) + '</small></span>' + U.icon('arrow', 'tnt-account-action-arrow') + '</button>';
  m.innerHTML = '<header class="tnt-account-cover"><span class="tnt-account-eyebrow">TU ESPACIO EN TNT</span><button type="button" class="tnt-account-close" aria-label="Cerrar menú de cuenta">' + U.icon('close') + '</button><div class="tnt-profile-head">' + avatarHtml() + '<div><b>' + esc(TNT.displayName()) + '</b><small>' + esc(TNT.identity?.email || '') + '</small><span class="tnt-account-role">' + esc(TNT.account?.ministry_role || 'Comunidad TNT') + (TNT.isAdmin ? ' · Administrador' : '') + '</span></div></div></header><div class="tnt-menu-actions">' + groups.map(([label, items]) => '<section class="tnt-account-group"><h3>' + esc(label) + '</h3>' + items.map(row).join('') + '</section>').join('') + '<button type="button" class="tnt-account-logout" data-logout>' + U.icon('logout') + '<span>Cerrar sesión</span></button></div>';
  function close() {
-  m.remove();
+  m.remove();backdrop.remove();document.body.classList.remove('tnt-account-open');returnFocus?.focus?.();
   document.removeEventListener('pointerdown', outside, true);
   document.removeEventListener('keydown', escape);
  }
  function outside(event) { if (!m.contains(event.target) && !event.target.closest('[data-tnt-user],#account')) close(); }
- function escape(event) { if (event.key === 'Escape') { close(); $('[data-tnt-user]')?.focus(); } }
+ function escape(event) { if(event.key==='Tab'){const items=[...m.querySelectorAll('button,a[href]')].filter(x=>!x.disabled);if(event.shiftKey&&document.activeElement===items[0]){event.preventDefault();items.at(-1).focus();}else if(!event.shiftKey&&document.activeElement===items.at(-1)){event.preventDefault();items[0].focus();}} if (event.key === 'Escape') { close(); $('[data-tnt-user]')?.focus(); } }
  m.addEventListener('tnt:account-close', close, { once: true });
  m.querySelector('.tnt-account-close').onclick = close;
  const actions = {
@@ -64,7 +65,7 @@ function toggleAccountMenu() {
   appearance: () => TNTAppearance.open(),
   theme: () => TNT.toggleTheme(),
   access: () => TNT.showAccess(),
-  phone: () => TNTNotifications.phone(),
+  phone: () => TNTNotifications.phone(),community:()=>location.href='/comunidad',
   tutorial: () => TNTExperience.startTutorial(),
   studio: () => TNTExperience.openSettings(),
   logout: () => TNT.logout()
@@ -72,7 +73,7 @@ function toggleAccountMenu() {
  Object.entries(actions).forEach(([key, action]) => {
   m.querySelector('[data-' + key + ']')?.addEventListener('click', () => { close(); action(); });
  });
- document.body.appendChild(m);
+ document.body.append(backdrop,m);document.body.classList.add('tnt-account-open');m.querySelector('.tnt-account-close').focus();
  document.addEventListener('pointerdown', outside, true);
  document.addEventListener('keydown', escape);
 }

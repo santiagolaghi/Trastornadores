@@ -1,7 +1,7 @@
 /* A bounded, authenticated gateway. The YouVersion credential never reaches the browser. */
 const SUPABASE='https://oeodnnomgiddkblnlzay.supabase.co';
 const PUBLIC_KEY='sb_publishable_X06jWDKqV6jgKbaa1PrrbQ_zto1XeTJ';
-const DESIRED=[128,2664];
+const DESIRED=[128,2664,149,1782,127];
 const attribution=data=>String(data.copyright||'').trim()||String(data.promotional_content||'').trim();
 const reply=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
 async function remote(path,headers){return fetch(path,{headers,redirect:'error',signal:AbortSignal.timeout(12000)});}

@@ -973,11 +973,11 @@ test('El centro de avisos se mueve con el dedo y un gesto vertical conserva la n
 test('La navegación principal se comparte entre módulos y no repite notificaciones',async()=>{
  for(const [module,query] of [['hub',''],['organization','?view=calendar'],['chat','']]){const a=await app(module,query);try{a.w.TNTNavigation.mount();const nav=a.d.querySelector('#tnt-main-nav');assert(nav);assert.equal(nav.querySelectorAll('a').length,3);assert.deepEqual([...nav.querySelectorAll('a')].map(a=>a.getAttribute('href')),['/','/comunidad','/perfil']);assert(!nav.textContent.includes('Avisos'));assert(!nav.textContent.includes('Admin'));assert(a.d.body.classList.contains('has-tnt-navigation'));}finally{a.close();}}
 });
-test('Los estilos completos se prueban, se cancelan y guardan con control de versión',async()=>{
- const a=await app('hub');try{await a.w.TNTExperience.load(a.w.TNT.sb);a.w.TNTAppearance.open();let o=a.d.querySelector('dialog');o.querySelector('[value=studio]').checked=true;o.querySelector('[value=studio]').dispatchEvent(new a.w.Event('change'));assert.equal(a.d.documentElement.dataset.tntStyle,'studio');o.querySelector('[data-cancel]').click();await until(()=>!o.isConnected);assert.equal(a.d.documentElement.dataset.tntStyle,'graphic');a.w.TNTAppearance.open();o=a.d.querySelector('dialog');o.querySelector('[value=editorial]').dispatchEvent(new a.w.Event('change'));a.w.__fixtureFailures['rpc:tnt_publish_experience']='Otro admin publicó';o.querySelector('form').dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>o.querySelector('[role=status]').textContent==='Otro admin publicó');assert(o.isConnected);delete a.w.__fixtureFailures['rpc:tnt_publish_experience'];o.querySelector('form').dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>!o.isConnected);assert.equal(a.w.__fixtureDB.tnt_experience[0].config.appearance.style,'editorial');assert.equal(a.d.documentElement.dataset.tntStyle,'editorial');assert.deepEqual(a.errors,[]);}finally{a.close();}
+test('La apariencia mantiene Comunidad en toda la app y guarda el modo personal',async()=>{
+ const a=await app('hub');try{assert.equal(a.d.documentElement.dataset.tntStyle,'community');a.w.TNTAppearance.open();const o=a.d.querySelector('dialog');o.querySelector('[value=dark]').checked=true;o.querySelector('form').dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>!o.isConnected);assert.equal(a.d.documentElement.dataset.tntTheme,'dark');assert.equal(a.d.documentElement.dataset.tntStyle,'community');assert(!a.w.__fixtureCalls.some(c=>c.rpc==='tnt_publish_experience'));assert.deepEqual(a.errors,[]);}finally{a.close();}
 });
-test('El carrusel de módulos responde al dedo, conserva el seleccionado y permite volver al anterior',async()=>{
- const a=await app('hub');try{const track=a.d.querySelector('[data-space-track]');assert.equal(track.dataset.deckBound,'true');const pointer=(type,x,y)=>{const e=new a.w.Event(type,{bubbles:true,cancelable:true});Object.assign(e,{pointerId:1,isPrimary:true,button:0,clientX:x,clientY:y});track.dispatchEvent(e);};pointer('pointerdown',300,100);pointer('pointermove',40,105);pointer('pointerup',40,105);assert.equal(a.d.querySelector('[data-space-position]').textContent,'2 / 7');assert.equal(a.d.querySelector('[data-deck-active=true] h3').textContent,'Chat TNT');a.d.querySelector('[data-space-prev]').click();assert.equal(a.d.querySelector('[data-space-position]').textContent,'1 / 7');pointer('pointerdown',300,100);pointer('pointermove',40,105);pointer('pointercancel',40,105);assert.equal(a.d.querySelector('[data-space-position]').textContent,'1 / 7');assert(!a.d.querySelector('[data-space=admin]'));assert.deepEqual(a.errors,[]);}finally{a.close();}
+test('La grilla de módulos deja todos los enlaces disponibles y respeta los permisos',async()=>{
+ const a=await app('hub');try{const track=a.d.querySelector('[data-space-track]');assert(track);assert.equal(track.getAttribute('aria-label'),'Espacios de TNT');assert.equal(a.d.querySelector('[data-space-position]'),null);assert.equal(track.querySelectorAll('.module-card').length,7);assert([...track.querySelectorAll('a')].every(a=>a.tabIndex>=0));assert(!a.d.querySelector('[data-space=admin]'));assert.deepEqual(a.errors,[]);}finally{a.close();}
 });
 test('Los mensajes propios muestran la misma foto de cuenta y preservan respuestas y reacciones',async()=>{
  const a=await app('chat','?thread=00000000-0000-4000-8000-000000000060');try{await until(()=>a.d.querySelector('.chat-message.is-mine .tnt-person-avatar'));assert(a.d.querySelector('.chat-message.is-mine img').getAttribute('src').includes('/avatar/0.svg'));assert(a.d.querySelector('.message-reply'));assert(a.d.querySelector('.message-reactions'));assert.equal(a.d.body.dataset.tntActiveThread,'00000000-0000-4000-8000-000000000060');assert.deepEqual(a.errors,[]);}finally{a.close();}
@@ -1025,26 +1025,9 @@ test('Cada encuentro aparece una sola vez en Mi TNT, con o sin coordinación',as
   }finally{a.close();}
  }
 });
-test('Un deslizamiento corto sobre la portada mueve el carrusel sin activar el enlace',async()=>{
- const a=await app('hub');
- try{
-  const track=a.d.querySelector('[data-space-track]'),link=track.querySelector('.module-card');
-  const image=link.querySelector('img')||link.querySelector('h3');
-  const pointer=(target,type,x,y)=>{const e=new a.w.Event(type,{bubbles:true,cancelable:true});Object.assign(e,{pointerId:41,isPrimary:true,pointerType:'touch',button:0,clientX:x,clientY:y});target.dispatchEvent(e);return e;};
-  assert.equal(link.getAttribute('draggable'),'false');assert.equal(link.style.touchAction,'pan-y');
-  pointer(image,'pointerdown',250,120);pointer(a.w,'pointermove',207,122);
-  assert(track.classList.contains('is-deck-dragging'));
-  const handoff=new a.w.Event('lostpointercapture',{bubbles:true});Object.assign(handoff,{pointerId:41});image.dispatchEvent(handoff);assert(track.classList.contains('is-deck-dragging'));
-  pointer(a.w,'pointerup',207,122);
-  assert.equal(a.d.querySelector('[data-space-position]').textContent,'2 / 7');
-  const tap=new a.w.MouseEvent('click',{bubbles:true,cancelable:true});link.dispatchEvent(tap);assert(tap.defaultPrevented);
-  const active=track.querySelector('[data-deck-active=true] h3');
-  pointer(active,'pointerdown',250,120);const vertical=pointer(a.w,'pointermove',252,170);pointer(a.w,'pointerup',252,170);
-  assert.equal(vertical.defaultPrevented,false);assert.equal(a.d.querySelector('[data-space-position]').textContent,'2 / 7');
-  assert.deepEqual(a.errors,[]);
- }finally{a.close();}
-});
-test('El menú de cuenta agrupa acciones y permite cerrar con Escape',async()=>{
+test('La grilla no intercepta el desplazamiento vertical ni convierte los enlaces en arrastres',async()=>{
+ const a=await app('hub');try{const track=a.d.querySelector('[data-space-track]'),link=track.querySelector('.module-card');const move=new a.w.Event('pointermove',{bubbles:true,cancelable:true});Object.assign(move,{pointerId:41,isPrimary:true,pointerType:'touch',button:0,clientX:252,clientY:170});track.dispatchEvent(move);assert.equal(move.defaultPrevented,false);assert.equal(a.d.querySelector('[data-space-position]'),null);assert.equal(track.classList.contains('is-deck-dragging'),false);assert(link.href);assert.deepEqual(a.errors,[]);}finally{a.close();}
+});test('El menú de cuenta agrupa acciones y permite cerrar con Escape',async()=>{
  const a=await inlinePage('organizacion/index.html',w=>w.document.getElementById('tnt-shell')?.remove(),true);
  try{
   await a.w.TNT.ready;await until(()=>a.d.querySelector('[data-tnt-user]'));
