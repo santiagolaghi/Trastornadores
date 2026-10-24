@@ -1,7 +1,7 @@
 /* Shared TNT configuration, visual editing, tutorials and live updates. */
 (() => {
  'use strict';
- const E=window.TNTExperience={revision:0,config:{},draft:null,editing:false}, moduleId=()=>canonical(window.TNT?.module||document.body.dataset.tntSurface||'home');
+ const E=window.TNTExperience={revision:0,config:{},draft:null,editing:false}, moduleId=()=>canonical(window.TNT?.module||document.body.dataset.tntSurface||({community:'comunidad',profile:'perfil',bible:'biblia',games:'juegos'}[document.body.dataset.lifeArea])||'home');
  const canonical=id=>['efe','lista-sabados'].includes(id)?'asistencia':id;
  const esc=s=>window.TNTUI.esc(s), clone=x=>JSON.parse(JSON.stringify(x)), emit=(name,detail)=>document.dispatchEvent(new CustomEvent(name,{detail}));
  const MODULES=E.modules=[
@@ -17,7 +17,7 @@
  E.text=(id,fallback)=>config().copy?.[id]??fallback;
  E.image=url=>{if(!String(url||'').trim())return '';try{const u=new URL(String(url).trim(),location.origin);return ['https:','http:'].includes(u.protocol)&&(u.protocol==='https:'||u.origin===location.origin)?u.href:'';}catch{return '';}};
  E.logo=(animated=false)=>`<span class="tnt-dynamite ${animated?'is-burning':''}" aria-hidden="true"><img src="/icons/dynamite.svg" alt=""><i class="tnt-fuse-spark"></i></span>`;
- E.loader=(label='Encendiendo TNT…')=>`<div class="tnt-ignition" role="status">${E.logo(true)}<span>${esc(label)}</span></div>`;
+ E.loader=(label='Preparando tu espacio en TNT')=>TNTUI.startup(label);
  E.load=async sb=>{const r=await sb.from('tnt_experience').select('config,revision').eq('id',true).maybeSingle();if(r.error)throw r.error;E.config=r.data?.config||{};E.revision=Number(r.data?.revision||0);E.paint();return E.config;};
  E.paint=()=>{
   const c=config(),m=E.module(moduleId()),accent=m.accent||c.brand?.accent||'#ff7948';
@@ -369,6 +369,12 @@
   ]
  ]
 };
+ Object.assign(TUTORIALS,{
+  comunidad:[['Crecer, juntos.','Camino de fe, Vida en comunidad y Familias TNT reúnen tus propuestas. Abrí un grupo para explorar.','.c-groups'],['Tu lugar para participar','Podés leer, sumarte a planes y desafíos, preguntar y compartir con el equipo. Tus datos privados conservan sus permisos.','.c-space-list'],['El equipo te acompaña','Si te invitan como referente, podés aceptar o indicar que no podés ahora. La invitación se confirma con tu respuesta.','.c-invitation'],['Gestionar Comunidad','El equipo autorizado puede editar los contenidos de cada espacio desde Gestionar. Los permisos se respetan en cada acción.','.c-community-views']],
+  perfil:[['Tu espacio en TNT','Desde tu perfil podés editar tus datos y elegir una foto. Los cambios se usan en tus equipos y conversaciones.','.life-profile'],['Tus colores','Apariencia de TNT ofrece cinco paletas y los modos claro, oscuro y como tu teléfono. Podés probar antes de guardar.','[data-appearance]'],['Tus avisos','Revisá las notificaciones en la app y activá las del teléfono desde Avisos y notificaciones.','[data-phone]']],
+  biblia:[['Elegí tu lectura','Los selectores te llevan a un libro y capítulo. RVR 1909 está disponible dentro de TNT.','.life-reader-controls'],['Volvé a tu lugar','La app guarda la traducción, el capítulo y el tamaño de letra. También podés escribir una referencia.','.c-reader-jump'],['Otras traducciones','Si una traducción necesita habilitación, podés abrir su lectura oficial o seguir dentro de TNT con RVR 1909.','[data-version]']],
+  juegos:[['Aprender jugando','Elegí entre los cinco juegos bíblicos y prepará tu partida.','.life-game-library'],['A tu ritmo','Cada partida tiene dificultad, tiempo, pistas y vidas. Podés pausar y retomar sin apuro.','[data-game]'],['Lo que descubriste','Al terminar podés repasar las respuestas. Tu partida se guarda para sincronizarse con tu cuenta.','.life-game-library']]
+ });
  let tutorial,highlight,tourObserver,tourFrame=0,tourVersion=0,tourPadding='';
  // Keep the callout separate from its target. Scrolling and resizing reuse the
  // same placement calculation, including mobile safe areas and app navigation.
@@ -399,71 +405,41 @@
  E.startTutorial=(id=moduleId(),first=false)=>{
   if(!TNT.profileComplete)return;id=canonical(id);if(!TUTORIALS[id])return;finishTutorial(false);
   let saved={};try{saved=JSON.parse(localStorage.getItem(key(id))||'{}');}catch{}
-  const steps=tourSteps(id);tourPadding=document.body.style.paddingBottom;const base=parseFloat(getComputedStyle(document.body).paddingBottom)||0;document.body.style.paddingBottom=(base+innerHeight)+'px';tutorial={id,steps,step:saved.done?0:Math.min(saved.step||0,steps.length-1),first};paintTutorial();
+  const steps=tourSteps(id);tourPadding=document.body.style.paddingBottom;tutorial={id,steps,step:saved.done?0:Math.min(saved.step||0,steps.length-1),first};paintTutorial();
  };
  function finishTutorial(done){
-  if(!tutorial)return;const t=tutorial;if(done)localStorage.setItem(key(t.id),JSON.stringify({done:true,step:t.step}));
+  if(!tutorial)return;const t=tutorial;tutorial=null;
+  if(done)localStorage.setItem(key(t.id),JSON.stringify({done:true,step:t.step}));
   tourVersion++;cancelAnimationFrame(tourFrame);tourObserver?.disconnect();tourObserver=null;
-  document.getElementById('tnt-tutorial')?.remove();document.getElementById('tnt-tour-focus')?.remove();
-  document.body.classList.remove('tnt-touring');document.body.style.paddingBottom=tourPadding;highlight?.classList.remove('tnt-tutorial-highlight');highlight=null;tutorial=null;
+  const dialog=document.querySelector('.tnt-tutorial-overlay');
+  document.getElementById('tnt-tour-focus')?.remove();
+  document.body.classList.remove('tnt-touring');document.body.style.paddingBottom=tourPadding;
+  highlight?.classList.remove('tnt-tutorial-highlight');highlight=null;
+  if(dialog)TNTUI.closeModal(dialog);else document.getElementById('tnt-tutorial')?.remove();
  }
  function positionTutorial(scroll=false){
-  if(!tutorial)return;const d=document.getElementById('tnt-tutorial'),focus=document.getElementById('tnt-tour-focus');if(!d||!focus)return;
-  const s=tutorial.steps[tutorial.step];let target=visibleTarget(s[2]);
-  d.style.width=Math.min(360,(window.visualViewport?.width||innerWidth)-24)+'px';
-  if(highlight!==target){highlight?.classList.remove('tnt-tutorial-highlight');highlight=target;highlight?.classList.add('tnt-tutorial-highlight');}
-  const vp=window.visualViewport,view={width:vp?.width||innerWidth,height:vp?.height||innerHeight,
-   top:(document.getElementById('tnt-shell')?.getBoundingClientRect().bottom||0)+12,
-   bottom:document.getElementById('tnt-home-bottom')?88:16};
-  if(!target){focus.hidden=true;d.style.left='12px';d.style.top=Math.max(view.top,view.height-d.offsetHeight-view.bottom)+'px';d.style.width=Math.min(360,view.width-24)+'px';return;}
-  if(scroll){
-   const track=target.closest('[data-space-track]');if(track)track.scrollTo?.({left:target.offsetLeft-(track.clientWidth-target.offsetWidth)/2,behavior:'instant'});
-   let rect=target.getBoundingClientRect(),reserve=d.offsetHeight+24,maxTarget=Math.max(80,view.height-view.top-view.bottom-reserve);
-   const desired=view.top+Math.max(0,(maxTarget-Math.min(rect.height,maxTarget))/2);
-   const amount=rect.top-desired;
-   // Scroll the nearest real scroll container as well as the page when needed.
-   let parent=target.parentElement;
-   while(parent&&parent!==document.body){const style=getComputedStyle(parent);
-    if(/auto|scroll/.test(style.overflowY)&&parent.scrollHeight>parent.clientHeight+2){parent.scrollTop+=amount;break;}parent=parent.parentElement;
-   }
-   const remaining=target.getBoundingClientRect().top-desired;
-   window.scrollTo?.({top:Math.max(0,scrollY+remaining),behavior:'instant'});
-  }
-  let rect=target.getBoundingClientRect();const panel={width:Math.min(360,view.width-24),height:d.offsetHeight};
-  let placement=E.tourPlacement(rect,panel,view);
-  if(placement.overlaps){
-   const anchor=[...target.querySelectorAll('h1,h2,h3,b,input,button')].find(el=>{const r=el.getBoundingClientRect();return r.height>0&&r.top>=view.top&&r.bottom<view.height-view.bottom-panel.height-16;});
-   if(anchor){rect=anchor.getBoundingClientRect();placement=E.tourPlacement(rect,panel,view);}
-  }
-  d.style.width=placement.width+'px';d.style.left=placement.x+'px';d.style.top=placement.y+'px';d.dataset.placement=placement.overlaps?'reserved':'adjacent';
-  const top=Math.max(view.top,rect.top),bottom=Math.min(view.height-view.bottom,rect.bottom),left=Math.max(8,rect.left),right=Math.min(view.width-8,rect.right);
-  focus.hidden=bottom<=top||right<=left;focus.style.cssText='left:'+left+'px;top:'+top+'px;width:'+Math.max(0,right-left)+'px;height:'+Math.max(0,bottom-top)+'px';
-  if(placement.overlaps){focus.style.height=Math.max(0,placement.y-gapForTour()-top)+'px';}
+  if(!tutorial)return;
+  const dialog=document.querySelector('.tnt-tutorial-overlay');if(!dialog)return;
+  const vp=window.visualViewport,height=vp?.height||innerHeight;
+  dialog.style.setProperty('--tnt-viewport-height',Math.min(height,innerHeight)+'px');
  }
- function gapForTour(){return 14;}
  function queueTour(){cancelAnimationFrame(tourFrame);tourFrame=requestAnimationFrame(()=>positionTutorial());}
  function paintTutorial(){
   const t=tutorial;if(!t)return;const steps=t.steps,s=steps[t.step];tourVersion++;
-  // Only navigation controls are activated by a tutorial. No save, delete, send
-  // or attendance action ever runs automatically.
+  // Only existing navigation may be opened by the guide. Data actions never run.
   if(s[3]){const nav=document.querySelector(s[3]);if(nav&&!nav.disabled&&nav.getAttribute('aria-current')!=='page'&&!nav.classList.contains('on'))nav.click();}
-  const old=document.getElementById('tnt-tutorial');old?.remove();document.getElementById('tnt-tour-focus')?.remove();
-  const focus=document.createElement('div');focus.id='tnt-tour-focus';focus.setAttribute('aria-hidden','true');document.body.append(focus);
-  const d=document.createElement('aside');d.id='tnt-tutorial';d.setAttribute('role','dialog');d.setAttribute('aria-modal','false');d.setAttribute('aria-label','Tutorial de '+(MODULES.find(m=>m[0]===t.id)?.[1]||'TNT'));
-  d.innerHTML='<header><span>CONOCÉ TNT · '+(t.step+1)+' DE '+steps.length+'</span><button data-skip aria-label="Omitir tutorial">'+TNTUI.icon('close')+'</button></header><progress value="'+(t.step+1)+'" max="'+steps.length+'"></progress><h2>'+esc(s.copyIndex===undefined?s[0]:E.text('tutorial.'+t.id+'.'+s.copyIndex+'.title',s[0]))+'</h2><p>'+esc(s.copyIndex===undefined?s[1]:E.text('tutorial.'+t.id+'.'+s.copyIndex,s[1]))+'</p><footer><button data-skip>Omitir</button><span></span>'+(t.step?'<button data-back aria-label="Paso anterior">Atrás</button>':'')+'<button class="primary" data-next>'+(t.step===steps.length-1?'Listo':'Siguiente')+' '+TNTUI.icon('arrow')+'</button></footer>';
-  document.body.append(d);document.body.classList.add('tnt-touring');d.dataset.step=String(t.step);
+  const content='<article id="tnt-tutorial"><span class="hub-eyebrow">CONOCÉ TNT · '+(t.step+1)+' DE '+steps.length+'</span><div class="guide-illustration" aria-hidden="true"><span>'+TNTUI.icon('sun')+'</span><span><img src="/icons/dynamite-app.svg" alt=""></span><span>'+TNTUI.icon('people')+'</span></div><h2>'+esc(s.copyIndex===undefined?s[0]:E.text('tutorial.'+t.id+'.'+s.copyIndex+'.title',s[0]))+'</h2><p>'+esc(s.copyIndex===undefined?s[1]:E.text('tutorial.'+t.id+'.'+s.copyIndex,s[1]))+'</p><small>Paso '+(t.step+1)+' de '+steps.length+'</small><progress aria-label="Avance del tutorial" value="'+(t.step+1)+'" max="'+steps.length+'"></progress><footer><button type="button" data-skip>Salir</button>'+(t.step?'<button type="button" data-back>Atrás</button>':'')+'<button type="button" class="primary" data-next>'+(t.step===steps.length-1?'Listo':'Siguiente')+' '+TNTUI.icon('arrow')+'</button></footer></article>';
+  const dialog=TNTUI.modal('Cómo se usa',content);dialog.classList.add('tnt-tutorial-overlay');
+  const d=dialog.querySelector('#tnt-tutorial');d.dataset.step=String(t.step);document.body.classList.add('tnt-touring');
   localStorage.setItem(key(t.id),JSON.stringify({done:false,step:t.step}));
-  d.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>finishTutorial(true));
+  dialog.addEventListener('close',()=>{if(tutorial===t)finishTutorial(true);},{once:true});
+  d.querySelector('[data-skip]').onclick=()=>finishTutorial(true);
   d.querySelector('[data-back]')?.addEventListener('click',()=>{t.step--;paintTutorial();});
   d.querySelector('[data-next]').onclick=()=>{if(t.step===steps.length-1)finishTutorial(true);else{t.step++;paintTutorial();}};
-  positionTutorial(true);const version=tourVersion;
-  requestAnimationFrame(()=>{if(version===tourVersion){positionTutorial(true);d.querySelector('[data-next]')?.focus({preventScroll:true});}});
-  tourObserver?.disconnect();tourObserver=new MutationObserver(records=>{
-   if(records.some(r=>!r.target.closest?.('#tnt-tutorial,#tnt-tour-focus')))queueTour();
-  });tourObserver.observe(document.querySelector('#app,#camp-app,#attendance-app,#dashboardView')||document.body,{childList:true,subtree:true});
+  positionTutorial();d.querySelector('[data-next]').focus({preventScroll:true});
  }
- window.addEventListener('resize',queueTour);window.addEventListener('scroll',queueTour,true);
- window.visualViewport?.addEventListener('resize',queueTour);
+ window.addEventListener('resize',queueTour);window.visualViewport?.addEventListener('resize',queueTour);
+ window.visualViewport?.addEventListener('scroll',queueTour);
  function tools(){document.getElementById('tnt-experience-tools')?.remove();document.querySelectorAll('.tnt-inline-tools').forEach(el=>el.remove());}
  let channel,queued=new Set(),liveTimer,identityBusy=false;
  E.subscribe=()=>{

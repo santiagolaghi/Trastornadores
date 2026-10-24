@@ -1,3 +1,11 @@
+## Diseño aprobado y paletas · 23 de octubre de 2026
+
+- `tests/appearance-colors.cjs` comprueba cinco paletas personales, doce colores de actividad, RGB personalizado, validación real en PostgreSQL, los 66 libros locales y la lectura de rangos.
+- `tests/community-browser.cjs` comprueba vista previa/cancelación/guardado de paletas, persistencia al reabrir, nombres de responsables, destacado personalizado, navegación del tarjetero y tutoriales centrados. Usa 320/360/390/412/768/1280 px, claro/oscuro y 844×360 en horizontal; también verifica foto JPEG real, publicación del staff, aceptación de referentes, avance en planes y juegos.
+- La lectura local RVR 1909 usa archivos de dominio público de eBible.org. Las pruebas de NVI son respuestas sintéticas; no certifican una licencia de YouVersion. NVI, NTV, RVR 1960 y RVA 2015 conservan la opción de lectura oficial y la alternativa local.
+- La migración `20261023230939_approved_activity_colors.sql` coincide con la versión aplicada en Supabase. Conserva los valores existentes y RLS, y limita los colores personalizados al formato `#RRGGBB`.
+- `AGENTS.md` fija los parámetros visuales y las comprobaciones necesarias antes de publicar. Recursos, cliente push y service worker usan `20261023e`.
+
 # TNT regression checks
 
 ## Restauración de la identidad de TNT, 23 de octubre de 2026
@@ -6,7 +14,7 @@
 - `TNT_TEST_STYLE_ONLY=1 node tests/browser-flows.cjs` verifica el gesto táctil nativo del tarjetero, teclado, selección recordada, permisos, marco del menú, fechas enteras y acciones legibles a 320/390/412/768/1280 px en claro y oscuro.
 - La prueba de apariencia conserva la publicación administrativa con control de versión y comprueba que guardar solo el modo personal no publique cambios para otras personas.
 - Los scripts de navegador se ejecutan con `TNT_TEST_BROWSER` y `TNT_TEST_SDK`. Las pruebas Node se ejecutan con los archivos `tests/*.cjs` excepto los que contienen `browser` en su nombre.
-- La actualización de assets y service worker es `20261023d`.
+- La actualización de assets y service worker es `20261023e`.
 
 ## Roles, Comunidad e inicio, tercera revisión del 21 de octubre de 2026
 

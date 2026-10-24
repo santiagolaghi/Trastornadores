@@ -1,0 +1,25 @@
+{
+  "id": 1909,
+  "title": "Reina-Valera 1909",
+  "abbreviation": "RVR 1909",
+  "license": "Dominio público",
+  "source": "https://ebible.org/Scriptures/spaRV1909_vpl.zip",
+  "license_url": "https://ebible.org/spaRV1909/copyright.htm",
+  "source_sha256": "c901a31a89421eafa54e82a0a2ad94962c6889e3c5556c2a0834529789c4ac76",
+  "books": 66,
+  "chapters": 1189,
+  "verses": 31102,
+  "book_id_mapping": {
+    "SOL": "SNG",
+    "EZE": "EZK",
+    "JOE": "JOL",
+    "NAH": "NAM",
+    "MAR": "MRK",
+    "JOH": "JHN",
+    "PHI": "PHP",
+    "JAM": "JAS",
+    "1JO": "1JN",
+    "2JO": "2JN",
+    "3JO": "3JN"
+  }
+}
