@@ -102,6 +102,46 @@ async function mockAPI(page,actor=1){
   for(const theme of ['light','dark']){await page.evaluate(t=>TNT.setTheme(t),theme);for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,label+' '+theme+' '+width);assert.equal(await page.locator('#tnt-shell').count(),0);assert(await page.locator('#tnt-main-nav').evaluate(n=>{const b=n.getBoundingClientRect();return b.left>=0&&b.right<=innerWidth&&Math.abs(b.left+b.width/2-innerWidth/2)<1;}),'Centered navigation '+width);if(width===390||width===1280)await page.screenshot({animations:'disabled',fullPage:true,path:path.join(out,label+'-'+theme+'-'+width+'.png')});}}
   await page.setViewportSize({width:390,height:844});await page.evaluate(()=>TNT.setTheme('light'));
  }
+ async function entryFlow(){
+  await visit('/','[data-my-activity]');
+  await page.evaluate(()=>{const people=__fixtureDB.tnt_people;people[0].full_name=people[1].full_name='Santiago Laghi';people.push({...people[0]});document.dispatchEvent(new CustomEvent('tnt:data',{detail:{tables:['tnt_people']}}));});
+  await page.waitForTimeout(450);await page.locator('#hub-query').fill('Santiago Laghi');await page.locator('#hub-search button').click();
+  assert.equal(await page.locator('.hub-search-result').count(),2);assert.equal(await page.locator('.hub-search-result small').first().innerText(),'Tu perfil');
+  async function fit(p){const box=await p.locator('dialog[open]>.tnt-sheet').evaluate(n=>{const b=n.getBoundingClientRect();return{left:b.left,right:b.right,top:b.top,bottom:b.bottom,scroll:n.scrollWidth,client:n.clientWidth,width:innerWidth,height:innerHeight}});const ok=box.left>=11&&box.right<=box.width-11&&box.top>=11&&box.bottom<=box.height-11&&box.scroll<=box.client+1;if(!ok)await p.screenshot({path:path.join(out,'entry-overflow.png')});assert(ok,'Dialog fits '+JSON.stringify(box));}
+  for(const theme of ['light','dark'])for(const width of [320,360,390,412,768,1280]){
+   await page.setViewportSize({width,height:844});await page.evaluate(t=>TNT.setTheme(t),theme);await fit(page);
+   assert(await page.locator('.hub-search-result>.tnt-person-avatar').evaluateAll(nodes=>nodes.every(n=>{const r=n.getBoundingClientRect();return Math.abs(r.width-r.height)<1&&r.width>=40&&r.width<=52&&getComputedStyle(n).borderRadius==='50%';})),'Circular photos');
+   assert(await page.locator('.hub-search-result').evaluateAll(nodes=>nodes.every(n=>{const b=n.getBoundingClientRect();return [...n.children].every(c=>{const r=c.getBoundingClientRect();return r.left>=b.left&&r.right<=b.right;});})),'Search cards fit');
+   if(width===390)await page.screenshot({animations:'disabled',path:path.join(out,'search-'+theme+'.png')});
+  }
+  await page.keyboard.press('Escape');assert.equal(await page.locator('.hub-search-dialog').count(),0);
+  const authState=await context.storageState();
+  for(const [kind,ua] of [['iphone','Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1'],['android','Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36']]){
+   const ctx=await browser.newContext({viewport:{width:390,height:844},userAgent:ua,isMobile:true,hasTouch:true,serviceWorkers:'block'}),p=await ctx.newPage();p.on('pageerror',e=>errors.push(e.stack));await mockAPI(p);
+   await ctx.addInitScript(()=>{window.__installed=false;Object.defineProperty(navigator,'standalone',{get:()=>window.__installed});window.__installCalls=0;});
+   await p.goto(base+'/');await p.locator('#tnt-phone-setup[data-step=install]').waitFor();assert.equal(await p.locator('#email-form').count(),0);assert.equal(await p.locator('#tnt-phone-setup .tnt-close').count(),0);
+   await p.keyboard.press('Escape');assert.equal(await p.locator('#tnt-phone-setup').count(),1);await p.goBack();assert.equal(await p.locator('#tnt-phone-setup').count(),1);
+   for(const theme of ['light','dark'])for(const width of [320,360,390,412,768,1280]){await p.setViewportSize({width,height:844});await p.evaluate(t=>TNT.setTheme(t),theme);await fit(p);if(width===390)await p.screenshot({animations:'disabled',path:path.join(out,'setup-'+kind+'-'+theme+'.png')});}
+   await p.setViewportSize({width:844,height:390});await fit(p);await p.screenshot({path:path.join(out,'setup-'+kind+'-landscape.png')});
+   if(kind==='android'){
+    await p.evaluate(()=>{const e=new Event('beforeinstallprompt',{cancelable:true});e.prompt=async()=>window.__installCalls++;e.userChoice=Promise.resolve({outcome:'accepted'});dispatchEvent(e);});await p.locator('[data-setup-install]').tap();assert.equal(await p.evaluate(()=>__installCalls),1);assert.equal(await p.locator('#tnt-phone-setup[data-step=install]').count(),1);
+   }
+   await p.evaluate(()=>{__installed=true;TNTPush.maybePrompt();});await p.locator('#tnt-phone-setup').waitFor({state:'detached'});await p.locator('#google').waitFor();assert.equal(await p.locator('input[type=email]').count(),0);
+   let oauth;await p.route('**/auth/v1/authorize?**',async r=>{oauth=new URL(r.request().url());await r.fulfill({contentType:'text/html',body:'Google OAuth requested'});});await p.locator('#google').click();await p.getByText('Google OAuth requested').waitFor();assert.equal(oauth.searchParams.get('provider'),'google');assert.equal(oauth.searchParams.get('redirect_to'),base+'/');await ctx.close();
+  }
+  const pushContext=await browser.newContext({storageState:authState,viewport:{width:390,height:844},userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)',isMobile:true,hasTouch:true,serviceWorkers:'block'});
+  await pushContext.addInitScript(()=>{
+   Object.defineProperty(navigator,'standalone',{value:true});window.__permissionCalls=0;let permission='default',sub=null;
+   Object.defineProperty(window,'Notification',{value:{get permission(){return permission},async requestPermission(){window.__permissionCalls++;permission='granted';return permission}}});Object.defineProperty(window,'PushManager',{value:class{}});
+   const reg={active:{state:'activated'},async update(){},pushManager:{async getSubscription(){return sub},async subscribe(){sub={endpoint:'https://push.example.invalid/device',toJSON(){return{endpoint:this.endpoint,keys:{auth:'synthetic',p256dh:'synthetic'}}}};return sub;}}};
+   Object.defineProperty(navigator,'serviceWorker',{value:{async register(){return reg},addEventListener(){}}});
+  });
+  const pushPage=await pushContext.newPage();pushPage.on('pageerror',e=>errors.push(e.stack));await mockAPI(pushPage);await pushPage.goto(base+'/');await pushPage.locator('#tnt-phone-setup[data-step=push]').waitFor();assert.equal(await pushPage.evaluate(()=>__permissionCalls),0);
+  for(const theme of ['light','dark'])for(const width of [320,360,390,412,768,1280]){await pushPage.setViewportSize({width,height:844});await pushPage.evaluate(t=>TNT.setTheme(t),theme);await fit(pushPage);if(width===390)await pushPage.screenshot({animations:'disabled',path:path.join(out,'setup-push-'+theme+'.png')});}
+  await pushPage.locator('[data-setup-enable]').tap();await pushPage.locator('#tnt-phone-setup').waitFor({state:'detached'});assert.equal(await pushPage.evaluate(()=>__permissionCalls),1);assert(await pushPage.evaluate(()=>__fixtureCalls.some(c=>c.rpc==='tnt_push_subscribe')));await pushContext.close();
+  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>{__fixtureDB.tnt_people=__fixtureDB.tnt_people.filter((p,i,all)=>all.findIndex(x=>x.id===p.id)===i);__fixtureDB.tnt_people[0].full_name='Nora Pérez';__fixtureDB.tnt_people[1].full_name='Bruno Díaz';TNT.setTheme('light');});
+  console.log('Entrada: solo Google, instalación Android/iPhone antes del ingreso, aviso tras el toque y guardado sintético, buscador con retratos circulares, seis anchos, dos temas y horizontal: OK');
+ }
  async function startupPerformanceFlow(){
   const requests=[],scripts=[];const track=req=>{const u=new URL(req.url());if(u.pathname.includes('/rest/v1/'))requests.push({name:u.pathname.split('/').at(-1),args:req.method()==='POST'?req.postDataJSON():null});if(u.origin===base&&u.pathname.endsWith('.js'))scripts.push(u.pathname);};page.on('request',track);
   let releaseHome,releaseNotes,releaseCatalog;
@@ -367,6 +407,7 @@ async function mockAPI(page,actor=1){
   console.log('Enlaces externos: tres destinos directos y dos tras comprobar la licencia, toque/teclado, referencia actual, NVIS solo NT, seis anchos, horizontal y ambos temas: OK');
  }
  try{
+  if(process.env.TNT_TEST_ENTRY_ONLY==='1'){await entryFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   if(process.env.TNT_TEST_INLINE_ONLY==='1'){await inlineLicenseFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   if(process.env.TNT_TEST_STARTUP_ONLY==='1'){await startupPerformanceFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   if(!process.env.TNT_TEST_EXTERNAL_ONLY&&!process.env.TNT_TEST_BIBLE_ONLY&&!process.env.TNT_TEST_LAYOUT_ONLY)await startupPerformanceFlow();

@@ -1,5 +1,19 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');const {JSDOM,VirtualConsole}=require('jsdom');const root=path.resolve(__dirname,'..');
 
+test('El ingreso ofrece solo Google y permite reintentar si falla OAuth',async()=>{
+ const calls=[];const a=await inlinePage('index.html',w=>{w.TNT.identity=null;w.TNT.ready=Promise.resolve(null);w.TNT.sb.auth.signInWithOAuth=async args=>{calls.push(args);return{error:calls.length===1?{message:'Conexión interrumpida'}:null}};w.TNT.sb.auth.signInWithOtp=()=>{throw Error('No se debe solicitar ingreso por email')};});
+ try{await a.w.TNT.ready;a.w.eval(fs.readFileSync(path.join(root,'assets/tnt-hub.js'),'utf8'));await until(()=>a.d.querySelector('#google'));assert.equal(a.d.querySelector('#email-form'),null);assert.equal(a.d.querySelector('input[type=email]'),null);a.d.querySelector('#google').click();await until(()=>!a.d.querySelector('#google').disabled);assert(a.d.querySelector('#login-message').textContent.includes('Conexión interrumpida'));a.d.querySelector('#google').click();await until(()=>calls.length===2);assert.equal(calls[1].provider,'google');assert.equal(calls[1].options.redirectTo,a.w.location.origin+'/');assert.equal(calls[1].options.queryParams.prompt,'select_account');assert.deepEqual(a.errors,[]);}finally{a.close();}
+});
+
+test('Buscar distingue tu perfil, conserva homónimos y evita repetir la misma persona',async()=>{
+ const a=await app('hub','',w=>{const people=w.__fixtureDB.tnt_people;people[0].full_name=people[1].full_name='Santiago Laghi';people.push({...people[0]},{...people[2],id:'inactive',full_name:'Santiago Laghi',active:false});});
+ try{const input=a.d.querySelector('#hub-query');input.value='santiago laghi';input.form.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));const rows=[...a.d.querySelectorAll('.hub-search-result')];assert.equal(rows.length,2);assert(rows[0].href.includes(a.w.TNT.person.id));assert.equal(rows[0].querySelector('small').textContent,'Tu perfil');assert.equal(rows[1].querySelector('small').textContent,'Perfil de TNT');assert.equal(rows[0].querySelector('.hub-result-copy b').textContent,'Santiago Laghi');assert.equal(rows[0].querySelectorAll(':scope>.tnt-person-avatar').length,1);assert.deepEqual(a.errors,[]);}finally{a.close();}
+});
+
+test('El paso obligatorio conserva historial, Escape y Atrás; terminarlo permite seguir',async()=>{
+ const a=await app('hub');try{const U=a.w.TNTUI,d=U.modal('Preparar TNT','<button>Instalar TNT</button>',false,{required:true});assert.equal(d.querySelector('.tnt-close'),null);a.d.dispatchEvent(new a.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));assert(d.isConnected);d.dispatchEvent(new a.w.Event('cancel',{cancelable:true}));assert(d.isConnected);d.dispatchEvent(new a.w.MouseEvent('click',{bubbles:true}));assert(d.isConnected);a.w.history.back();await sleep(30);assert(d.isConnected);assert(a.w.history.state.tntLayerStack.includes(d._tntLayerId));await U.closeModal(d);assert.equal(d.isConnected,false);const normal=U.modal('Buscar','<p>Listo</p>');a.d.dispatchEvent(new a.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await sleep(30);assert.equal(normal.isConnected,false);assert.deepEqual(a.errors,[]);}finally{a.close();}
+});
+
 test('La foto de Google se renueva cuando está habilitada y respeta una foto propia o la sincronización apagada',async()=>{
  for(const [source,sync,expected] of [['google',true,true],['google',false,false],['custom',true,false]]){
   const a=await inlinePage('index.html',w=>{

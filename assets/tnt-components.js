@@ -112,8 +112,9 @@
     const top=topOverlay(),old=top?.matches('.tnt-overlay')&&(options.replace||options.stack===false||top.getAttribute('aria-label')===title)?top:null;
     const dialog=root.document.createElement('dialog');dialog.className='tnt-overlay';dialog.setAttribute('aria-label',title);
     dialog.innerHTML=`<section class="tnt-sheet ${wide?'wide':''}"><header class="tnt-sheet-head"><h2>${esc(title)}</h2><button class="tnt-close" type="button" aria-label="Cerrar">${icon('close')}</button></header>${body}</section>`;
-    root.document.body.append(dialog);trackOverlay(dialog,()=>dialog.remove(),{replace:old});
-    const close=()=>dialog._tntClose();dialog.querySelector('.tnt-close').onclick=close;
+    root.document.body.append(dialog);trackOverlay(dialog,()=>dialog.remove(),{replace:old,required:options.required});
+    const close=()=>{if(!options.required)dialog._tntClose();};dialog.querySelector('.tnt-close').onclick=close;
+    if(options.required)dialog.querySelector('.tnt-close').remove();
     dialog.addEventListener('cancel',event=>{event.preventDefault();close();});dialog.addEventListener('click',event=>{if(event.target===dialog)close();});
     if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');return dialog;
   }
@@ -121,21 +122,21 @@
   function startup(label='Preparando tu espacio en TNT') {
     return '<div class="tnt-startup" role="status"><span class="tnt-startup-orbit"><img src="/icons/dynamite-app.svg" alt=""></span><b>Hay un lugar para vos.</b><p>'+esc(label)+'</p><i aria-hidden="true"></i></div>';
   }
-  function trackOverlay(node,dismiss=()=>node.remove(),{replace=null}={}){
+  function trackOverlay(node,dismiss=()=>node.remove(),{replace=null,required=false}={}){
     if(node._tntLayerActive)return;
     const previous=root.document.activeElement,replacing=replace?._tntLayerActive;
     const id=replacing?replace._tntLayerId:'layer-'+Date.now()+'-'+Math.random().toString(36).slice(2);
     if(replacing){replace._tntDisposeBack();replace.remove();}
     const parent=topOverlay();if(parent){parent.style.setProperty('display','none','important');parent.setAttribute('inert','');parent.setAttribute('aria-hidden','true');}
     if(!replacing)root.history.pushState({...root.history.state,tntLayerStack:[...(root.history.state?.tntLayerStack||[]),id]},'');
-    node._tntLayerId=id;node._tntLayerActive=true;overlayNodes.push(node);
+    node._tntLayerId=id;node._tntLayerActive=true;node._tntRequired=!!required;overlayNodes.push(node);
     const dispose=()=>{node._tntLayerActive=false;root.document.removeEventListener('keydown',onKey);const index=overlayNodes.indexOf(node);if(index>=0)overlayNodes.splice(index,1);};
     const finish=()=>{if(!node._tntLayerActive)return;dispose();node.dispatchEvent(new root.Event('close'));dismiss();revealOverlay(topOverlay());if(previous?.isConnected)previous.focus?.({preventScroll:true});};
     const close=()=>{if(!node._tntLayerActive)return;const own= root.history.state?.tntLayerStack?.at(-1)===id;finish();if(own)return backOverlay();};
-    const onKey=event=>{if(event.key==='Escape'&&topOverlay()===node){event.preventDefault();event.stopImmediatePropagation();close();}};
+    const onKey=event=>{if(event.key==='Escape'&&topOverlay()===node){event.preventDefault();event.stopImmediatePropagation();if(!required)close();}};
     node._tntFinish=finish;node._tntDisposeBack=dispose;node._tntClose=close;root.document.addEventListener('keydown',onKey);
   }
-  root.addEventListener?.('popstate',event=>{if(pendingOverlayBack.length){event.stopImmediatePropagation();pendingOverlayBack.shift()();return;}const ids=event.state?.tntLayerStack||[];let top=topOverlay();if(!top||ids.includes(top._tntLayerId))return;event.stopImmediatePropagation();while((top=topOverlay())&&!ids.includes(top._tntLayerId))top._tntFinish();},true);
+  root.addEventListener?.('popstate',event=>{if(pendingOverlayBack.length){event.stopImmediatePropagation();pendingOverlayBack.shift()();return;}const ids=event.state?.tntLayerStack||[];let top=topOverlay();if(!top||ids.includes(top._tntLayerId))return;event.stopImmediatePropagation();while((top=topOverlay())&&!ids.includes(top._tntLayerId)){if(top._tntRequired){root.history.pushState({...event.state,tntLayerStack:[...ids,top._tntLayerId]},'');return;}top._tntFinish();}},true);
   function clearOverlays(predicate=()=>true){for(const node of [...overlayNodes].reverse())if(predicate(node)){node._tntDisposeBack();node.dispatchEvent(new root.Event('close'));node.remove();}const ids=new Set(overlayNodes.map(n=>n._tntLayerId));root.history.replaceState({...root.history.state,tntLayerStack:(root.history.state?.tntLayerStack||[]).filter(id=>ids.has(id))},'');revealOverlay(topOverlay());}
   function ask(message, text=false) {
     return new Promise(resolve=>{
