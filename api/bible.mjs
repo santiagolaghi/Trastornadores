@@ -2,9 +2,39 @@
 const SUPABASE='https://oeodnnomgiddkblnlzay.supabase.co';
 const PUBLIC_KEY='sb_publishable_X06jWDKqV6jgKbaa1PrrbQ_zto1XeTJ';
 const DESIRED=[128,2664,149,1782,127];
-const attribution=data=>String(data.copyright||'').trim()||String(data.promotional_content||'').trim();
+// Cache metadata only. Every passage still checks access with the provider.
+let catalogCache=null;
+// YouVersion returns null in both attribution fields for its authorized RVES (147).
+// Identify that edition and source explicitly; never invent another edition's copyright.
+const attribution=data=>String(data.copyright||'').trim()||String(data.promotional_content||'').trim()||(Number(data.id)===147?'Reina-Valera Antigua (RVES) · Texto provisto por YouVersion.':'');
 const reply=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
 async function remote(path,headers){return fetch(path,{headers,redirect:'error',signal:AbortSignal.timeout(12000)});}
+function providerError(status){
+  if(status===401)return{error:'No pudimos validar la conexión bíblica de TNT.',code:'BIBLE_KEY_INVALID'};
+  if(status===403)return{error:'YouVersion todavía no habilitó esta conexión para TNT.',code:'BIBLE_ACCESS_DENIED'};
+  if(status===429)return{error:'Hay muchas lecturas en este momento. Esperá un poco y volvé a intentar.',code:'BIBLE_RATE_LIMIT'};
+  return{error:'No pudimos cargar las traducciones. Intentá nuevamente.',code:'BIBLE_CONNECTION_ERROR'};
+}
+async function collection(headers,all=false){
+  const versions=new Map(),seen=new Set();let token='';
+  for(let page=0;page<5;page++){
+    const params=new URLSearchParams({'language_ranges[]':'es',page_size:'99'});
+    if(all)params.set('all_available','true');
+    if(token)params.set('page_token',token);
+    const r=await remote('https://api.youversion.com/v1/bibles?'+params,headers);
+    if(!r.ok){const error=Error('Bible catalog unavailable');error.response=reply(providerError(r.status),r.status===429?429:503);throw error;}
+    const data=await r.json();if(!Array.isArray(data.data))throw Error('Invalid Bible catalog');
+    for(const v of data.data){const id=Number(v.id);if(Number.isInteger(id)&&id>0)versions.set(id,{id,title:String(v.localized_title||v.title||''),abbreviation:String(v.localized_abbreviation||v.abbreviation||'')});}
+    token=data.next_page_token||'';if(!token)return[...versions.values()];
+    if(seen.has(token))throw Error('Repeated Bible catalog page');seen.add(token);
+  }
+  throw Error('Bible catalog pagination limit');
+}
+async function licensedCatalog(key,headers,refresh=false){
+  if(!refresh&&catalogCache?.key===key&&catalogCache.expires>Date.now())return catalogCache.versions;
+  const versions=await collection(headers);
+  catalogCache={key,versions,expires:Date.now()+60000};return versions;
+}
 export async function GET(request){
   const auth=request.headers.get('authorization')||'';
   if(!/^Bearer [\w.-]+$/.test(auth))return reply({error:'Iniciá sesión en TNT.',code:'AUTH_REQUIRED'},401);
@@ -29,13 +59,14 @@ export async function GET(request){
       return reply({css:css.length<100000&&!css.includes(key)?css:''});
     }
     if(action==='versions'){
-      const r=await remote('https://api.youversion.com/v1/bibles?language_ranges%5B%5D=es&page_size=99',apiHeaders);
-      if(!r.ok)return reply({error:'No pudimos cargar las traducciones. Intentá nuevamente.'},502);
-      const d=await r.json();
-      return reply({versions:(d.data||[]).filter(v=>DESIRED.includes(v.id)).map(v=>({id:v.id,title:v.localized_title||v.title,abbreviation:v.localized_abbreviation||v.abbreviation})),preferred:128});
+      const versions=await licensedCatalog(key,apiHeaders,true),ids=new Set(versions.map(v=>v.id));
+      // The full catalog classifies unavailable choices; it never grants text access.
+      let offered=null;try{offered=new Set((await collection(apiHeaders,true)).map(v=>v.id));}catch{}
+      return reply({versions,preferred:ids.has(128)?128:versions[0]?.id||1909,
+        unavailable:DESIRED.filter(id=>!ids.has(id)).map(id=>({id,code:offered?(offered.has(id)?'LICENSE_REQUIRED':'VERSION_UNAVAILABLE'):'ACCESS_UNKNOWN'}))});
     }
     const id=Number(params.get('version')||128);
-    if(!DESIRED.includes(id))return reply({error:'Traducción no disponible.'},400);
+    if(!Number.isInteger(id)||id<1)return reply({error:'Traducción no disponible.'},400);
     let path='bibles/'+id;
     if(action==='passage'){
       const passage=params.get('passage')||'';
@@ -44,9 +75,12 @@ export async function GET(request){
       path+='/passages/'+encodeURIComponent(passage)+'?format=html&include_headings=true&include_notes=false';
     }else if(action==='index')path+='/index';
     else if(action!=='version')return reply({error:'Acción no disponible.'},400);
+    const licensed=await licensedCatalog(key,apiHeaders);
+    if(!DESIRED.includes(id)&&!licensed.some(v=>v.id===id))return reply({error:'Traducción no disponible.',code:'VERSION_UNAVAILABLE'},400);
     const r=await remote('https://api.youversion.com/v1/'+path,apiHeaders);
+    if(r.status===401)return reply(providerError(401),503);
     if(r.status===403)return reply({error:'Esta traducción todavía no está habilitada para TNT.',code:'LICENSE_REQUIRED'},403);
-    if(r.status===404)return reply({error:'No encontramos ese pasaje.'},404);
+    if(r.status===404)return reply(licensed.some(v=>v.id===id)?{error:'No encontramos ese pasaje.',code:'PASSAGE_NOT_FOUND'}:{error:'YouVersion no ofrece esta traducción para leer dentro de TNT.',code:'VERSION_UNAVAILABLE'},404);
     if(r.status===429)return reply({error:'Hay muchas lecturas en este momento. Esperá un poco y volvé a intentar.'},429);
     if(!r.ok)return reply({error:'No pudimos cargar la lectura. Intentá nuevamente.'},502);
     const d=await r.json();
@@ -63,6 +97,7 @@ export async function GET(request){
     if(!credit)return reply({error:'No pudimos verificar los créditos de esta traducción.'},502);
     return reply({id:d.id,title:d.localized_title||d.title,abbreviation:d.localized_abbreviation||d.abbreviation,copyright:credit,deep_link:d.youversion_deep_link});
   }catch(error){
+    if(error.response)return error.response;
     console.error('TNT Bible request failed',error.name);
     return reply({error:'La conexión tardó demasiado. Volvé a intentar.'},503);
   }

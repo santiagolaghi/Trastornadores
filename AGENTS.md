@@ -15,3 +15,5 @@ La referencia visual aprobada usa el logo de dinamita, fondo crema, títulos Arc
 - Ejecutar las regresiones y `tests/community-browser.cjs` para paletas, destacado, tutoriales, foto, lectura, comunidad y juegos. Conservar las comprobaciones de permisos y privacidad de notificaciones.
 - Actualizar las versiones de los recursos modificados y el service worker. No borrar datos, sesiones o preferencias para actualizar el estilo.
 - La RVR 1909 local es de dominio público. No atribuir su texto a otra traducción ni copiar traducciones que requieren habilitación de YouVersion.
+- El lector incorpora todas las versiones españolas del catálogo autorizado, con paginación e IDs numéricos normalizados. Los IDs de capítulo de YouVersion pueden ser cadenas. Un error de índice o red no debe presentarse como revocación de licencia.
+- Antes de afirmar que una traducción funciona, verificar su pasaje real y sus créditos; una respuesta sintética o un enlace a Bible.com no certifican lectura dentro de TNT. Distinguir versiones no ofrecidas por la API de licencias pendientes. No publicar claves ni copiar texto protegido para eludir esa habilitación.
