@@ -29,7 +29,7 @@ Las lecturas iniciadas conservan una copia de sus pasos aunque después se edite
 
 ## Biblia
 
-El gateway `/api/bible` usa la variable sensible `YOUVERSION_APP_KEY` exclusivamente en el servidor. Las versiones solicitadas son RVR 1960 (149), RVA 2015 (1782), NTV (127), NVI 2025 (128) y NVI 2015 (2664). La disponibilidad de texto dentro de TNT depende del catálogo y de las licencias concedidas a la aplicación por YouVersion y los editores. El selector y los enlaces a los pasajes oficiales de Bible.com siguen disponibles cuando una traducción no tiene acceso dentro de TNT. No se reemplazan silenciosamente las traducciones solicitadas.
+El gateway `/api/bible` usa la variable sensible `YOUVERSION_APP_KEY` exclusivamente en el servidor. El lector incorpora todas las versiones españolas del catálogo autorizado y conserva la RVR 1909 local. El selector distingue «Leer dentro de TNT» de «Lectura oficial en Bible.com». El 24 de octubre de 2026 se verificó texto real de RVES (147), VBL (3291) y PdDpt (3365). NVI (128 y 2664) requiere aceptación de la licencia Biblica; NTV (127), RVR 1960 (149) y RVA 2015 (1782) no están ofrecidas por esta API. No se reemplazan silenciosamente por otra traducción. El botón de revisión actualiza catálogo e índice sin perder el lugar de lectura.
 
 ## Avisos
 

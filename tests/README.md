@@ -1,3 +1,11 @@
+## Catálogo bíblico y disponibilidad real · 24 de octubre de 2026
+
+- Se conservan todas las versiones españolas autorizadas por YouVersion, con paginación e IDs normalizados. El selector distingue lectura dentro de TNT de enlaces a Bible.com. Un fallo de índice no revoca una licencia y cambiar de libro durante esa consulta no bloquea el selector.
+- Se verificaron respuestas reales del proveedor: índices de 66 libros y texto de Mateo 5:14-16 para RVES (147), VBL (3291) y PdDpt (3365), con sus atribuciones. NVI (128/2664) devuelve 403 y la licencia Biblica aparece sin aceptación; NTV (127), RVR 1960 (149) y RVA 2015 (1782) devuelven 404 y están ausentes del catálogo completo de esta conexión. No se afirma que esas cinco versiones ya se lean dentro de TNT.
+- `bible-api.cjs` comprueba catálogo paginado, nuevas traducciones autorizadas, créditos, separación entre red/licencia/versión inexistente, sesión, cuenta habilitada, clave privada y ausencia de caché de texto. `TNT_TEST_BIBLE_ONLY=1 node tests/community-browser.cjs` comprueba selección y navegación de todas las opciones, capítulos con IDs de texto, rechazo/revocación de licencia, recuperación, el pasaje exacto y enlaces oficiales.
+- Pasaron 274 pruebas automatizadas y el recorrido completo de Chromium con SDK oficial, SQL aislado y respuestas HTTP sintéticas; después pasó la regresión específica del selector durante una consulta de índice pendiente. Se revisaron las capturas del lector en ambos temas. Estas pruebas no equivalen a una sesión Google real ni conceden licencias de YouVersion.
+- Recursos modificados y service worker: `20261024c`. No cambia el esquema de datos. La RVR 1909 local conserva su lectura completa.
+
 ## Widget compacto y una sola carga TNT · 24 de octubre de 2026
 
 - El widget muestra un adelanto de cuatro líneas con tipografía de lectura. «Leer completo» abre el pasaje exacto en la Biblia y «Ver frase» muestra la frase íntegra en una ventana de TNT. Las flechas, los indicadores y el teclado cambian la tarjeta; la rotación automática se puede pausar y reanudar y respeta el movimiento reducido.
