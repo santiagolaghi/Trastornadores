@@ -1,3 +1,10 @@
+## Alturas de Inicio y perfil anterior · 24 de octubre de 2026
+
+- El carrusel ajusta su altura a la tarjeta visible al deslizar, usar flechas/teclado, cambiar el ancho o recibir texto. Una lectura larga no estira la frase corta ni deja un hueco debajo. Las fechas conservan su altura de contenido aunque haya varios coordinadores.
+- Perfil recupera la foto circular, la disposición centrada y «Cambiar foto». Conserva la identidad vigente, los accesos nuevos y las cinco paletas.
+- `TNT_TEST_LAYOUT_ONLY=1` aísla la regresión visual dentro de `community-browser.cjs`: textos largos/cortos, al menos tres coordinadores, ambos temas y 320/360/390/412/768/1280 px. El caso fallaba antes de la corrección y ahora pasa; se revisaron capturas.
+- Pasaron las 270 pruebas automatizadas y el recorrido completo de navegador con SQL aislado, SDK oficial y respuestas HTTP sintéticas. No modifica datos de producción ni representa una sesión Google real. Los recursos modificados y el service worker usan `20261024a`.
+
 ## Diseño aprobado y paletas · 23 de octubre de 2026
 
 - `tests/appearance-colors.cjs` comprueba cinco paletas personales, doce colores de actividad, RGB personalizado, validación real en PostgreSQL, los 66 libros locales y la lectura de rangos.

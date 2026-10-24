@@ -100,6 +100,54 @@ async function mockAPI(page,actor=1){
   for(const theme of ['light','dark']){await page.evaluate(t=>TNT.setTheme(t),theme);for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,label+' '+theme+' '+width);assert.equal(await page.locator('#tnt-shell').count(),0);assert(await page.locator('#tnt-main-nav').evaluate(n=>{const b=n.getBoundingClientRect();return b.left>=0&&b.right<=innerWidth&&Math.abs(b.left+b.width/2-innerWidth/2)<1;}),'Centered navigation '+width);if(width===390||width===1280)await page.screenshot({animations:'disabled',fullPage:true,path:path.join(out,label+'-'+theme+'-'+width+'.png')});}}
   await page.setViewportSize({width:390,height:844});await page.evaluate(()=>TNT.setTheme('light'));
  }
+ async function layoutSizingFlow(){
+  await visit('/','.daily-carousel');
+  await page.evaluate(()=>{
+   const event=__fixtureDB.tnt_events[0];
+   __fixtureDB.tnt_event_members.filter(m=>m.event_id===event.id).forEach(m=>m.event_role='organizer');
+   document.dispatchEvent(new Event('tnt:data'));
+  });
+  await page.waitForFunction(()=>document.querySelectorAll('[data-my-activity^="event-"] .activity-person').length>=3);
+  await page.waitForFunction(()=>document.querySelector('[data-daily-verse]')?.textContent.length>35);
+  await page.evaluate(async()=>{await document.fonts.ready;document.querySelector('[data-daily-verse]').textContent=(await TNTBibleText.passage('PSA.23')).text;});
+  for(const theme of ['light','dark'])for(const width of [320,360,390,412,768,1280]){
+   await page.setViewportSize({width,height:844});await page.evaluate(t=>TNT.setTheme(t),theme);
+   for(const index of [0,1]){
+    await page.evaluate(index=>{const track=document.querySelector('.daily-track');track.scrollTo({left:track.children[index].offsetLeft-track.children[0].offsetLeft,behavior:'instant'});},index);
+    await page.waitForFunction(index=>document.querySelectorAll('.daily-dot')[index].getAttribute('aria-current')==='true',index);
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    const size=await page.evaluate(index=>{
+     const track=document.querySelector('.daily-track'),slide=track.children[index],last=slide.querySelector('.daily-action'),s=getComputedStyle(slide);
+     const blank=slide.getBoundingClientRect().bottom-last.getBoundingClientRect().bottom-parseFloat(s.paddingBottom)-parseFloat(s.borderBottomWidth);
+     return{blank,track:track.getBoundingClientRect().height,slide:slide.getBoundingClientRect().height,dates:[...document.querySelectorAll('.hub-activity-date')].map(n=>n.getBoundingClientRect().height),overflow:document.documentElement.scrollWidth>innerWidth};
+    },index);
+    if(width===390&&index===1){await page.locator('.daily-carousel').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,'layout-daily-'+theme+'.png')});}
+    assert(size.blank<3,'Daily card has no stretched blank area: '+JSON.stringify({theme,width,index,...size}));
+    assert(Math.abs(size.track-size.slide-8)<3,'Carousel follows the active card height: '+JSON.stringify({theme,width,index,...size}));
+    assert(size.dates.every(height=>height<=90),'Date badges do not stretch with a large team: '+JSON.stringify({theme,width,...size}));
+    assert(!size.overflow,'Home fits '+theme+' '+width);
+   }
+  }
+  await page.setViewportSize({width:390,height:844});await page.locator('.daily-carousel').scrollIntoViewIfNeeded();
+  await page.locator('[data-daily-next]').click();
+  await page.waitForFunction(()=>document.querySelectorAll('.daily-dot')[0].getAttribute('aria-current')==='true'&&document.querySelector('.daily-track').scrollLeft<1);
+  await page.locator('.daily-track').focus();await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(()=>{const n=document.querySelector('.daily-track');return document.querySelectorAll('.daily-dot')[1].getAttribute('aria-current')==='true'&&Math.abs(n.scrollLeft-(n.scrollWidth-n.clientWidth))<1;});
+  await page.evaluate(()=>document.querySelector('.daily-phrase blockquote').textContent='Un paso a la vez.');
+  await page.waitForFunction(()=>{const n=document.querySelector('.daily-track');return Math.abs(n.getBoundingClientRect().height-n.children[1].getBoundingClientRect().height-8)<3;});
+  await page.setViewportSize({width:390,height:844});await page.locator('.hub-activities').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,'layout-activities.png')});
+  await visit('/perfil','[data-photo]');
+  for(const theme of ['light','dark'])for(const width of [320,360,390,412,768,1280]){
+   await page.setViewportSize({width,height:844});await page.evaluate(t=>TNT.setTheme(t),theme);
+   assert(await page.locator('.life-profile').evaluate(n=>{
+    const portrait=n.querySelector('.portrait'),r=portrait.getBoundingClientRect(),outer=n.getBoundingClientRect(),s=getComputedStyle(portrait);
+    return Math.abs(r.width-r.height)<1&&s.borderRadius==='50%'&&Math.abs(r.left+r.width/2-outer.left-outer.width/2)<2&&getComputedStyle(n).textAlign==='center'&&document.documentElement.scrollWidth<=innerWidth;
+   }),'Centered circular profile '+theme+' '+width);
+   if(width===390)await page.screenshot({path:path.join(out,'layout-profile-'+theme+'.png'),fullPage:true});
+  }
+  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>TNT.setTheme('light'));await page.locator('[data-appearance]').click();assert.equal(await page.locator('[name=palette]').count(),5);await page.locator('.appearance-form [data-cancel]').click();
+  console.log('Layout: daily cards with different text lengths, 3+ coordinators, compact dates and restored circular profile; six widths, both themes: OK');
+ }
  async function approvedVisualFlow(){
   if(process.env.TNT_TEST_APPROVED_FAST!=='1'){
   await visit('/','.daily-carousel');await page.waitForFunction(()=>document.querySelector('[data-daily-verse]')?.textContent.length>35);
@@ -154,6 +202,8 @@ async function mockAPI(page,actor=1){
   console.log('Approved design: 5 palettes, light/dark, 6 widths, custom color, named responsibles, persistent preference, deck navigation and centered tutorials: OK');
  }
  try{
+  await layoutSizingFlow();
+  if(process.env.TNT_TEST_LAYOUT_ONLY==='1'){assert.equal(errors.length,0,errors.join('\n'));return;}
   await approvedVisualFlow();
   await visit('/comunidad' ,'.c-groups');assert.equal(await page.locator('.c-group').count(),3);await capture('community-new');
   await visit('/comunidad?module=bible&manage=1','[data-create]');await page.locator('[data-create]').click();let form=page.locator('dialog form');await form.locator('[name=title]').fill('Plan desde el equipo');await form.locator('[name=description]').fill('Dos momentos para compartir');await form.locator('[name=status]').selectOption('published',{force:true});await form.locator('[data-step-title]').fill('Descubrir el amor de Dios');await form.locator('[data-reference]').fill('Juan 3:16');await form.locator('[data-reflection]').fill('¿Cómo podés compartir ese amor hoy?');await form.locator('[data-add-step]').click();await form.locator('[data-step-title]').nth(1).fill('Caminar juntos');await form.locator('[data-reference]').nth(1).fill('Hechos 2:42-47');
