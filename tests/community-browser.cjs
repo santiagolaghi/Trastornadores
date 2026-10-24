@@ -89,6 +89,7 @@ async function mockAPI(page,actor=1){
  await page.route('**/api/bible?*',async route=>{
   const r=route.request(),p=new URL(r.url()).searchParams,action=p.get('action'),id=Number(p.get('version')||128);apiCalls.push({action,auth:r.headers().authorization});
   if(action==='versions')return route.fulfill({json:{versions:licensed?[{id:128,title:'NVI 2025'},{id:2664,title:'NVI 2015'}]:[]}});
+  if(action==='passage'&&!licensed)return route.fulfill({status:403,json:{code:'LICENSE_REQUIRED',error:'Traducción de prueba sin habilitar'}});
   if(action==='fonts')return route.fulfill({json:{css:''}});
   if(action==='version')return route.fulfill({json:{id,title:'NVI '+(id===128?'2025':'2015'),copyright:'Créditos sintéticos '+id}});
   if(action==='index')return route.fulfill({json:{books:[{id:'GEN',chapters:[{id:1},{id:2}]},{id:'EXO',chapters:[{id:1}]}]}});
@@ -99,8 +100,62 @@ async function mockAPI(page,actor=1){
   for(const theme of ['light','dark']){await page.evaluate(t=>TNT.setTheme(t),theme);for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,label+' '+theme+' '+width);assert.equal(await page.locator('#tnt-shell').count(),0);assert(await page.locator('#tnt-main-nav').evaluate(n=>{const b=n.getBoundingClientRect();return b.left>=0&&b.right<=innerWidth&&Math.abs(b.left+b.width/2-innerWidth/2)<1;}),'Centered navigation '+width);if(width===390||width===1280)await page.screenshot({animations:'disabled',fullPage:true,path:path.join(out,label+'-'+theme+'-'+width+'.png')});}}
   await page.setViewportSize({width:390,height:844});await page.evaluate(()=>TNT.setTheme('light'));
  }
+ async function approvedVisualFlow(){
+  if(process.env.TNT_TEST_APPROVED_FAST!=='1'){
+  await visit('/','.daily-carousel');await page.waitForFunction(()=>document.querySelector('[data-daily-verse]')?.textContent.length>35);
+  assert(await page.locator('[data-community-home]').evaluate(n=>Boolean(n.compareDocumentPosition(document.querySelector('.hub-activities'))&Node.DOCUMENT_POSITION_FOLLOWING)),'Verse precedes activities');
+  await page.screenshot({animations:'disabled',path:path.join(out,'approved-home.png')});
+  await page.locator('[data-space-track]').scrollIntoViewIfNeeded();await page.locator('[data-deck-active=true] .tnt-space-cover').evaluate(img=>img.decode());await page.screenshot({animations:'disabled',path:path.join(out,'approved-deck.png')});console.log('Deck evidence',await page.locator('.tnt-space-cover').evaluateAll(nodes=>nodes.map(n=>({src:n.src,loaded:n.complete,width:n.naturalWidth,display:getComputedStyle(n).display,visibility:getComputedStyle(n).visibility,opacity:getComputedStyle(n).opacity}))));
+  const first=await page.locator('[data-deck-active=true]').getAttribute('data-space');await page.locator('[data-space-next]').click();assert.notEqual(await page.locator('[data-deck-active=true]').getAttribute('data-space'),first);
+  await page.locator('[data-space-track]').focus();await page.keyboard.press('ArrowLeft');assert.equal(await page.locator('[data-deck-active=true]').getAttribute('data-space'),first);
+  await visit('/perfil','[data-appearance]');await page.locator('[data-appearance]').click();assert.equal(await page.locator('[name=palette]').count(),5);
+  await page.locator('[data-style-card=oceano]').click();assert.equal(await page.evaluate(()=>document.documentElement.dataset.tntPalette),'oceano');
+  await page.locator('.appearance-form [data-cancel]').click();assert.equal(await page.evaluate(()=>document.documentElement.dataset.tntPalette),'original');
+  for(const palette of ['original','bosque','lavanda','oceano','atardecer']){
+   await page.locator('[data-appearance]').click();await page.locator('[data-style-card='+palette+']').click();await page.locator('.appearance-form [type=submit]').click();
+   assert.equal(await page.evaluate(()=>document.documentElement.dataset.tntPalette),palette);
+   for(const theme of ['light','dark']){await page.evaluate(t=>TNT.setTheme(t),theme);for(const width of [320,360,390,412,768,1280]){
+    await page.setViewportSize({width,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Palette fits '+palette+' '+theme+' '+width);
+    assert(await page.locator('#tnt-main-nav').evaluate(n=>{const r=n.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth;}));
+   }}
+   await page.setViewportSize({width:390,height:844});await page.evaluate(()=>TNT.setTheme('light'));await page.screenshot({animations:'disabled',path:path.join(out,'palette-'+palette+'.png')});if(palette==='original')console.log('Profile evidence',await page.locator('.life-row').first().evaluate(n=>({background:getComputedStyle(n).backgroundColor,disabled:n.disabled,root:getComputedStyle(document.documentElement).getPropertyValue('--life-panel'),panel:getComputedStyle(document.documentElement).getPropertyValue('--tnt-panel')})));
+  }
+  await page.reload();await page.locator('[data-appearance]').waitFor();assert.equal(await page.evaluate(()=>document.documentElement.dataset.tntPalette),'atardecer');
+  await page.evaluate(()=>{localStorage.setItem('tnt:palette:'+TNT.session.user.id,'original');TNTAppearance.apply();});
+  }
+  await visit('/organizacion?view=schedule','.agenda-card');const taskId=await page.locator('[data-feature-task]').first().getAttribute('data-feature-task');
+  const named=await page.locator('.agenda-card').first().innerText();assert(!/1 responsable/i.test(named));assert(await page.locator('.agenda-card .activity-person b').count()>0);
+  await page.locator('[data-feature-task="'+taskId+'"]').first().click();assert.equal(await page.locator('[name=feature_color]').count(),13);
+  await page.locator('[name=feature_custom]').fill('#162b49');await page.locator('[name=feature_custom]').dispatchEvent('input');
+  assert.equal(await page.locator('[data-feature-preview]').evaluate(n=>getComputedStyle(n).color),'rgb(255, 255, 255)');
+  await page.screenshot({path:path.join(out,'activity-custom-color.png')});await page.locator('[data-activity-color] [type=submit]').click();
+  await page.locator('[data-activity-color]').waitFor({state:'detached'});
+  assert.equal(await page.evaluate(id=>__fixtureDB.tnt_tasks.find(t=>t.id===id).feature_color,taskId),'#162B49');
+  const colored=page.locator('[data-feature-task="'+taskId+'"]').first().locator('xpath=ancestor::article[1]');
+  await page.waitForTimeout(300);console.log('Color evidence',await page.evaluate(id=>[...document.querySelectorAll('[data-feature-task=\"'+id+'\"]')].map(n=>{const c=n.closest('article');return {cls:c?.className,style:c?.getAttribute('style'),background:c&&getComputedStyle(c).backgroundColor,tone:c&&getComputedStyle(c).getPropertyValue('--feature-tone')};}),taskId));await page.screenshot({path:path.join(out,'approved-schedule-debug.png')});
+  await page.waitForFunction(id=>{const n=document.querySelector('[data-feature-task=\"'+id+'\"]')?.closest('article');return n&&getComputedStyle(n).backgroundColor==='rgb(22, 43, 73)';},taskId);
+  assert.equal(await colored.evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(22, 43, 73)');
+  await page.screenshot({path:path.join(out,'approved-schedule.png')});
+  for(const [url,selector] of [['/comunidad?manage=1','.c-groups'],['/perfil','[data-appearance]'],['/biblia','[data-reading]'],['/juegos','[data-game]'],['/organizacion?view=schedule','.agenda-card'],['/','.hub-activities']]){
+   await visit(url,selector);
+   for(const width of [320,390,1280]){await page.setViewportSize({width,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Route fits '+url+' '+width);assert(await page.locator('.life-header-tools>*,.tnt-shell-tools>*').evaluateAll(nodes=>nodes.filter(n=>getComputedStyle(n).display!=='none').every(n=>{const r=n.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.width>=43&&r.height>=43;})),'Header controls fit '+url+' '+width);}
+   await page.setViewportSize({width:390,height:844});await page.evaluate(()=>TNTExperience.startTutorial());await page.locator('#tnt-tutorial').waitFor();
+   for(let step=0;step<3;step++){
+    for(const [width,height] of [[320,844],[360,740],[390,844],[412,900],[768,900],[844,360],[1280,900]]){
+     await page.setViewportSize({width,height});
+     assert(await page.locator('.tnt-tutorial-overlay .tnt-sheet').evaluate(n=>{const r=n.getBoundingClientRect();return r.left>=10&&r.right<=innerWidth-10&&r.top>=10&&r.bottom<=innerHeight-10;}),'Tutorial fits '+url+' '+width+'x'+height);
+     await page.locator('#tnt-tutorial [data-next]').scrollIntoViewIfNeeded();assert(await page.locator('#tnt-tutorial [data-next]').isVisible());
+    }
+    if(step<2)await page.locator('#tnt-tutorial [data-next]').click();
+   }
+   await page.setViewportSize({width:390,height:844});await page.locator('.tnt-tutorial-overlay .tnt-sheet').evaluate(n=>n.scrollTop=0);await page.screenshot({path:path.join(out,'tutorial-'+(url==='/'?'home':url.split('?')[0].slice(1))+'.png')});
+   await page.keyboard.press('Escape');assert.equal(await page.locator('.tnt-tutorial-overlay').count(),0);
+  }
+  console.log('Approved design: 5 palettes, light/dark, 6 widths, custom color, named responsibles, persistent preference, deck navigation and centered tutorials: OK');
+ }
  try{
-  await visit('/comunidad','.c-groups');assert.equal(await page.locator('.c-group').count(),3);await capture('community-new');
+  await approvedVisualFlow();
+  await visit('/comunidad' ,'.c-groups');assert.equal(await page.locator('.c-group').count(),3);await capture('community-new');
   await visit('/comunidad?module=bible&manage=1','[data-create]');await page.locator('[data-create]').click();let form=page.locator('dialog form');await form.locator('[name=title]').fill('Plan desde el equipo');await form.locator('[name=description]').fill('Dos momentos para compartir');await form.locator('[name=status]').selectOption('published',{force:true});await form.locator('[data-step-title]').fill('Descubrir el amor de Dios');await form.locator('[data-reference]').fill('Juan 3:16');await form.locator('[data-reflection]').fill('¿Cómo podés compartir ese amor hoy?');await form.locator('[data-add-step]').click();await form.locator('[data-step-title]').nth(1).fill('Caminar juntos');await form.locator('[data-reference]').nth(1).fill('Hechos 2:42-47');
   await page.evaluate(()=>window.__communityFailure='Conexión interrumpida de prueba');await form.locator('[type=submit]').click();await form.getByText('Conexión interrumpida de prueba').waitFor();assert.equal(await form.locator('[name=title]').inputValue(),'Plan desde el equipo');await form.locator('[type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByRole('heading',{name:'Plan desde el equipo',exact:true}).waitFor();await capture('staff-plans');
   const plan=await serial(async()=>{await pg.db.exec('reset role');return(await pg.db.query("select id from tnt_community_content where title='Plan desde el equipo'")).rows[0].id;});
@@ -111,7 +166,7 @@ async function mockAPI(page,actor=1){
   // The account panel owns its scroll and fits above every viewport edge.
   await page.locator('[data-account]').click();await page.locator('#tnt-account-menu').waitFor();assert(await page.locator('#tnt-account-menu').evaluate(n=>{const r=n.getBoundingClientRect(),list=n.querySelector('.tnt-menu-actions'),s=getComputedStyle(list);return r.top>=0&&r.bottom<=innerHeight&&s.overflowY==='auto'&&n.scrollHeight<=n.clientHeight+1;}));await page.locator('.tnt-menu-actions').evaluate(n=>n.scrollTop=n.scrollHeight);assert(await page.locator('[data-logout]').isVisible());await page.screenshot({path:path.join(out,'account-scroll.png')});await page.keyboard.press('Escape');assert.equal(await page.locator('#tnt-account-menu').count(),0);assert.equal(await page.evaluate(()=>document.body.classList.contains('tnt-account-open')),false);
   await visit('/','[data-my-activity]');assert(await page.locator('.hub-activity-list').evaluate(n=>getComputedStyle(n).overflowY==='visible'&&getComputedStyle(n).maxHeight==='none'));await page.locator('.hub-activity-list').scrollIntoViewIfNeeded();const before=await page.evaluate(()=>scrollY);await page.mouse.move(190,550);await page.mouse.wheel(0,550);await page.waitForTimeout(250);assert(await page.evaluate(y=>scrollY>y,before));await page.screenshot({path:path.join(out,'home-new.png'),fullPage:true});
-  await visit('/biblia','[data-reading]');await page.getByRole('link',{name:/Leer en Bible.com/}).waitFor();assert((await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href')).includes('/128/GEN.1'));await page.locator('[data-version]').selectOption('149',{force:true});await page.getByRole('link',{name:/Leer en Bible.com/}).waitFor();assert((await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href')).includes('/149/'));await page.locator('[name=reference]').fill('Juan 3:16');await page.locator('.c-reader-jump [type=submit]').click();assert((await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href')).endsWith('JHN.3.16'));await capture('reader-fallback');
+  await visit('/biblia','[data-reading]');await page.getByText('EN el principio crió Dios los cielos y la tierra.',{exact:false}).waitFor();assert.equal(await page.locator('[data-version]').inputValue(),'1909');await page.screenshot({animations:'disabled',path:path.join(out,'reader-rv1909.png')});await page.locator('[data-version]').selectOption('128',{force:true});await page.getByRole('link',{name:/Leer en Bible.com/}).waitFor();assert((await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href')).includes('/128/GEN.1'));await page.locator('[data-version]').selectOption('149',{force:true});await page.getByRole('link',{name:/Leer en Bible.com/}).waitFor();assert((await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href')).includes('/149/'));await page.locator('[name=reference]').fill('Juan 3:16');await page.locator('.c-reader-jump [type=submit]').click();assert((await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href')).endsWith('JHN.3.16'));await capture('reader-fallback');
   licensed=true;await visit('/biblia?v=128&ref=GEN.1','[data-reading]');await page.getByText('Lectura sintética GEN.1').waitFor();await page.locator('[data-next]').click();await page.getByText('Lectura sintética GEN.2').waitFor();await page.locator('[data-next]').click();await page.getByText('Lectura sintética EXO.1').waitFor();assert(await page.locator('[data-next]').isDisabled());await capture('reader-inline');
   await visit('/juegos','[data-game]');assert.equal(await page.locator('[data-game]').count(),5);await capture('games-new');await page.locator('[data-game=pairs]').click();await page.locator('[name=difficulty][value=easy]').check();await page.locator('[data-game-setup] [type=submit]').click();await page.locator('.g-pair-board').waitFor();await capture('game-pairs');
   for(let round=0;round<3;round++){const pairs=await page.locator('[data-answer]').evaluateAll(nodes=>nodes.filter(n=>n.dataset.answer[0]==='p').map(n=>[n.dataset.answer,'o'+n.dataset.answer.slice(1)]));for(const ids of pairs)for(const id of ids)await page.locator('[data-answer="'+id+'"]').click();if(round<2)await page.locator('[data-next-round]').click();}await page.getByText('¡Lo lograste!').waitFor();await page.getByText('Tu partida y tu marca quedaron guardadas en tu cuenta.').waitFor();await capture('game-result-new');

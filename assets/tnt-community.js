@@ -2,8 +2,8 @@
 (() => {
  'use strict';
  const U=()=>window.TNTUI,esc=v=>U().esc(v),icon=v=>U().icon(v);
- const definitions={welcome:['Bienvenida y acompañamiento','people','vida'],birthdays:['Cumpleaños y fechas especiales','calendar','vida'],bible:['Biblia y planes','book','camino'],challenges:['Desafíos semanales','check','camino'],questions:['Preguntas de fe','help','camino'],families:['Familias TNT','people','familias'],baptisms:['Bautismos','heart','camino'],polls:['Encuestas y votaciones','tasks','vida'],games:['Dinámicas y juegos','play','vida'],daily:['Para hoy','sun','camino']};
- const groups={camino:['Camino de fe','Lecturas, preguntas y pasos para vivir tu fe.','book'],vida:['Vida en comunidad','Personas, encuentros y cosas para compartir.','people'],familias:['Familias TNT','Un espacio para las familias que acompañan.','home']};
+ const definitions={welcome:['Bienvenida y acompañamiento','people','vida'],birthdays:['Cumpleaños y fechas especiales','calendar','vida'],bible:['Biblia y planes','book','camino'],challenges:['Desafíos semanales','check','camino'],questions:['Preguntas de fe','help','vida'],families:['Familias TNT','people','familias'],baptisms:['Bautismos','heart','camino'],polls:['Encuestas y votaciones','tasks','vida'],games:['Dinámicas y juegos','play','vida'],daily:['Para hoy','sun','camino']};
+ const groups={camino:['Camino de fe','Bautismos, Biblia, planes y desafíos para vivir tu fe.','book'],vida:['Vida en comunidad','Personas, encuentros y cosas para compartir.','people'],familias:['Familias TNT','Un espacio para las familias que acompañan.','home']};
  const states={draft:'Borrador',scheduled:'Programado',published:'Publicado',archived:'Archivado',pending:'Pendiente',accepted:'Confirmado',declined:'Declinada',unassigned:'Sin referente',verified:'Verificada',rejected:'Revisar con el equipo',interested:'Interesado/a',preparing:'En preparación',ready:'Listo/a para coordinar',completed:'Realizado',active:'En curso',left:'Pausado',open:'Por responder',answered:'Respondida'};
  let data=null,pending=null,renderVersion=0,homeVersion=0;
  const C=window.TNTCommunity={definitions,groups,states,load,action,mount,home,contentDetail,manage,cleanPassage,reference,referenceLabel,readLink,openReading,preferences,gameBank:()=>posts('games').filter(c=>c.config?.kind==='quiz'),gameSettings:()=>moduleInfo('games')?.config||{},get data(){return data;}};
@@ -22,7 +22,7 @@
   function cleanPassage(html){
     const template=document.createElement('template');template.innerHTML=String(html||'');
     template.content.querySelectorAll('script,style,iframe,object,embed,form,input,button,link,meta,svg,math').forEach(n=>n.remove());
-    template.content.querySelectorAll('*').forEach(n=>{for(const attribute of [...n.attributes]){if(attribute.name.startsWith('on')||['srcdoc','style'].includes(attribute.name)||(attribute.name==='href'&&!U.safeUrl(attribute.value)))n.removeAttribute(attribute.name);}});
+    template.content.querySelectorAll('*').forEach(n=>{for(const attribute of [...n.attributes]){if(attribute.name.startsWith('on')||['srcdoc','style'].includes(attribute.name)||(attribute.name==='href'&&!U().safeUrl(attribute.value)))n.removeAttribute(attribute.name);}});
     return template.innerHTML;
   }
  function reference(value){
@@ -50,12 +50,24 @@
  function render(){
   const params=new URLSearchParams(location.search),id=params.get('module'),group=params.get('group');
   if(id&&moduleInfo(id)){if(params.has('manage')&&can(id))return manage(id);return modulePage(id);}
-  let body=title(group?groups[group]?.[0]||'Comunidad':'Comunidad','/')+'<p class="life-lead">Un lugar para encontrarnos, crecer y acompañarnos.</p>';
-  if(!group){body+='<div class="c-groups">'+Object.entries(groups).map(([key,g])=>'<a class="c-group '+key+'" href="/comunidad?group='+key+'"><span class="life-symbol">'+icon(g[2])+'</span><h2>'+g[0]+'</h2><p>'+g[1]+'</p><span>Explorar '+icon('arrow')+'</span></a>').join('')+'</div>';
-   if(data.accompaniment?.some(a=>a.referent_id===TNT.person.id&&a.status==='pending'))body+='<a class="c-invitation" href="/comunidad?module=welcome">'+icon('bell')+'Tenés una invitación para acompañar a alguien '+icon('arrow')+'</a>';
+  const managers=data.modules.filter(m=>m.permission>0),staffView=params.has('manage')&&managers.length>0;
+  let body=group?title(groups[group]?.[0]||'Comunidad','/comunidad'+(staffView?'?manage=1':'')):'<section class="c-community-title"><h1>Crecer, juntos.</h1><p>Tu lugar para compartir y acompañar.</p></section>';
+  if(!group){
+   if(managers.length)body+='<nav class="c-community-views" aria-label="Vista de Comunidad"><a href="/comunidad" '+(!staffView?'aria-current="page"':'')+'>'+icon('people')+'Mi comunidad</a><a href="/comunidad?manage=1" '+(staffView?'aria-current="page"':'')+'>'+icon('settings')+'Gestionar</a></nav>';
+   body+='<div class="c-groups">'+Object.entries(groups).filter(([key])=>Object.keys(definitions).some(id=>definitions[id][2]===key&&moduleInfo(id)&&meaningful(id)&&(moduleInfo(id).enabled||can(id)))).map(([key,g])=>{
+    const names={camino:'Bautismos · Biblia y planes · Desafíos',vida:'Bienvenida · Cumpleaños · Preguntas · Encuestas · Juegos',familias:'Vínculos, permisos y avisos'};
+    const canGroup=managers.some(m=>definitions[m.id]?.[2]===key);
+    return '<a class="c-group '+key+'" href="/comunidad?group='+key+(staffView?'&manage=1':'')+'"><span class="life-symbol">'+icon(g[2])+'</span><div><h2>'+g[0]+'</h2><p>'+names[key]+'</p>'+(staffView&&canGroup?'<span class="c-group-manage">Administrar</span>':'')+'</div><span class="c-group-arrow">'+icon('arrow')+'</span></a>';
+   }).join('')+'</div>';
+   const ownInvites=data.accompaniment?.filter(a=>a.referent_id===TNT.person.id&&a.status==='pending')||[];
+   if(ownInvites.length)body+='<a class="c-invitation" href="/comunidad?module=welcome">'+icon('bell')+'Tenés una invitación para acompañar a alguien '+icon('arrow')+'</a>';
+   if(staffView&&can('welcome')){
+    const invited=(data.accompaniment||[]).filter(a=>a.status==='pending');
+    if(invited.length)body+='<section class="life-card c-referent-invites"><h3>Referentes invitados</h3>'+invited.map(a=>'<p><b>'+esc(a.referent_name||'Referente TNT')+'</b> · Invitación pendiente</p>').join('')+'<small>La asignación se confirma cuando acepta.</small><a class="life-text-button" href="/comunidad?module=welcome&manage=1">Revisar acompañamientos</a></section>';
+   }
    body+='<div data-community-daily></div>';
-  }else body+='<div class="c-space-list">'+Object.keys(definitions).filter(id=>definitions[id][2]===group&&moduleInfo(id)&&meaningful(id)).map(card).join('')+'</div>';
-  if(data.modules.some(m=>m.permission>0))body+='<a class="c-manage-link" href="/comunidad?module=welcome&manage=1">'+icon('settings')+'Administrar Comunidad</a>';
+  }else body+='<div class="c-space-list">'+Object.keys(definitions).filter(id=>definitions[id][2]===group&&moduleInfo(id)&&meaningful(id)).map(id=>{const html=card(id);return staffView&&can(id)?html.replace('/comunidad?module='+id,'/comunidad?module='+id+'&manage=1'):html;}).join('')+'</div>';
+  if(managers.length)body+='<a class="c-manage-link" href="/comunidad?module='+managers[0].id+'&manage=1">'+icon('settings')+'Administrar Comunidad</a>';
   layout(body);bind();dailyCard(document.querySelector('[data-community-daily]'));
  }
  function contentCard(c){const enrollment=data.enrollments?.find(e=>e.content_id===c.id&&e.person_id===TNT.person.id&&e.status!=='left'),n=enrollment?.snapshot_steps?.length||0,done=enrollment?.completed_steps?.length||0;
@@ -100,12 +112,26 @@
  function baptismsHTML(){const b=data.baptisms.find(b=>b.person_id===TNT.person.id),config=moduleInfo('baptisms').config;return '<section class="life-card life-feature"><span class="life-eyebrow">Un paso de fe</span><h2>¿Qué es el bautismo?</h2><p class="c-prose">'+esc(config.intro||'')+'</p><small>'+esc(config.references||'')+'</small></section><section class="life-card"><h2>Tu preparación</h2>'+(b?badge(states[b.status])+'<p>'+(b.status==='completed'?'El equipo registró tu bautismo el '+date(b.completed_on)+'.':'El equipo te acompañará para coordinar los próximos encuentros.')+'</p>':'<p>Podés expresar tu interés y conversar con el equipo sobre los próximos pasos.</p>'+button('Me interesa prepararme','data-c-action="request_baptism"'))+'</section>'+(config.faq?'<section class="life-card"><h3>Preguntas frecuentes</h3><p class="c-prose">'+esc(config.faq)+'</p></section>':'')+posts('baptisms').map(contentCard).join('');}
  function dailyPrefs(){return '<section class="life-card"><h3>Un momento para vos</h3><label class="c-check"><input type="checkbox" data-c-pref="daily_push" '+(data.preferences.daily_push?'checked':'')+'>Recibir el aviso del contenido diario</label><label class="c-check"><input type="checkbox" data-c-pref="reminders" '+(data.preferences.reminders!==false?'checked':'')+'>Recordarme mis planes y desafíos</label><p class="life-small">Los avisos del teléfono se activan desde Mis preferencias.</p></section>';}
  async function dailyCard(host){
-  if(!host||!data?.daily||!moduleInfo('daily'))return;const d=data.daily;
-  host.innerHTML='<section class="c-daily"><div class="c-daily-heading"><span class="life-eyebrow">Para hoy · '+date(d.day)+'</span>'+icon('sun')+'</div><h2>'+esc(referenceLabel(d.reference))+'</h2><div data-daily-verse><p class="life-small">Un momento para acercarte a la Palabra.</p></div><button class="life-text-button" data-c-reading="'+esc(d.reference)+'" data-version="'+d.version+'">Abrir la lectura '+icon('arrow')+'</button><blockquote>'+esc(d.phrase)+(d.author?'<cite>'+esc(d.author)+'</cite>':'')+'</blockquote><a class="c-subtle-link" href="/comunidad?module=daily">Mis avisos del día</a></section>';
-  host.querySelector('[data-c-reading]').onclick=()=>openReading(d.reference,d.version);
+  if(!host||!data?.daily||!moduleInfo('daily')||!moduleInfo('daily').enabled)return;
+  const d=data.daily,ref=reference(d.reference);if(!ref)return;
+  host.innerHTML='<section class="daily-carousel" aria-label="Tu contenido de hoy" aria-roledescription="carrusel"><div class="daily-track" tabindex="0" aria-label="Deslizá para ver el versículo y la frase del día"><article class="daily-slide" role="group" aria-label="1 de 2 · Versículo del día"><header><span>VERSÍCULO DEL DÍA</span>'+icon('sun')+'</header><div class="daily-verse" data-daily-verse aria-live="polite">Preparando la lectura de hoy…</div><p class="daily-reference" data-daily-reference>'+esc(referenceLabel(ref))+' · RVR 1909</p><small class="daily-credit" data-daily-credit>Reina-Valera 1909 · Dominio público</small><button type="button" class="daily-action" data-c-reading="'+esc(ref)+'" data-version="1909">Leer el capítulo '+icon('arrow')+'</button></article><article class="daily-slide daily-phrase" role="group" aria-label="2 de 2 · Una frase para vos"><header><span>UNA FRASE PARA VOS</span>'+icon('heart')+'</header><blockquote>'+esc(d.phrase)+(d.author?'<cite>'+esc(d.author)+'</cite>':'')+'</blockquote><p class="daily-reference">'+esc(date(d.day))+'</p><a class="daily-action" href="/comunidad?module=daily">Mis avisos del día '+icon('arrow')+'</a></article></div><div class="daily-controls"><button type="button" data-daily-prev aria-label="Contenido anterior">'+icon('back')+'</button><span class="daily-dot" aria-current="true"></span><span class="daily-dot" aria-current="false"></span><button type="button" data-daily-next aria-label="Contenido siguiente">'+icon('arrow')+'</button></div></section>';
+  const track=host.querySelector('.daily-track'),dots=[...host.querySelectorAll('.daily-dot')];let index=0,pauseUntil=0;
+  function move(to,manual=true){index=(to+2)%2;if(manual)pauseUntil=Date.now()+30000;const slide=track.children[index];track.scrollTo({left:slide.offsetLeft-track.children[0].offsetLeft,behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'instant':'smooth'});dots.forEach((dot,i)=>dot.setAttribute('aria-current',String(i===index)));}
+  host.querySelector('[data-daily-prev]').onclick=()=>move(index-1);host.querySelector('[data-daily-next]').onclick=()=>move(index+1);
+  track.addEventListener('keydown',event=>{if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();move(index+(event.key==='ArrowRight'?1:-1));}});
+  track.addEventListener('pointerdown',()=>pauseUntil=Date.now()+30000,{passive:true});
+  track.addEventListener('scroll',()=>{const step=track.children[1].offsetLeft-track.children[0].offsetLeft;index=track.scrollLeft>step/2?1:0;dots.forEach((dot,i)=>dot.setAttribute('aria-current',String(i===index)));},{passive:true});
+  const rotation=setInterval(()=>{if(!host.isConnected){clearInterval(rotation);return;}const r=track.getBoundingClientRect();if(document.hidden||Date.now()<pauseUntil||matchMedia('(prefers-reduced-motion:reduce)').matches||host.contains(document.activeElement)||r.bottom<0||r.top>innerHeight)return;move(index+1,false);},12000);
+  const read=host.querySelector('[data-c-reading]');read.onclick=()=>openReading(ref.split('.').slice(0,2).join('.'),Number(read.dataset.version));
+  try{const local=await TNTBibleText.passage(ref);if(!host.isConnected)return;host.querySelector('[data-daily-verse]').textContent=local.text;}
+  catch{if(host.isConnected)host.querySelector('[data-daily-verse]').innerHTML='<a class="daily-action" href="/biblia?ref='+encodeURIComponent(ref)+'&v=1909">Abrir la lectura de hoy '+icon('arrow')+'</a>';}
   if(![128,2664,149,1782,127].includes(d.version))return;
-  try{const session=await TNT.sb.auth.getSession(),token=session.data?.session?.access_token||TNT.session?.access_token;if(!token)return;
-   const r=await fetch('/api/bible?'+new URLSearchParams({action:'passage',version:d.version,passage:d.reference}),{headers:{Authorization:'Bearer '+token},cache:'no-store',signal:AbortSignal.timeout(12000)});if(!r.ok){if(host.isConnected)host.querySelector('[data-daily-verse]').innerHTML='<p class="life-small">Abrí el versículo de hoy en la lectura oficial de esta traducción.</p>';return;}const p=await r.json();if(!host.isConnected)return;const target=host.querySelector('[data-daily-verse]');target.innerHTML='<div class="c-daily-verse">'+cleanPassage(p.content)+'</div><small class="life-attribution">'+esc(p.copyright)+'</small>';
+  try{
+   const session=await TNT.sb.auth.getSession(),token=session.data?.session?.access_token||TNT.session?.access_token;if(!token)return;
+   const r=await fetch('/api/bible?'+new URLSearchParams({action:'passage',version:d.version,passage:ref}),{headers:{Authorization:'Bearer '+token},cache:'no-store',signal:AbortSignal.timeout(12000)});if(!r.ok)return;
+   const passage=await r.json();if(!host.isConnected)return;host.querySelector('[data-daily-verse]').innerHTML=cleanPassage(passage.content);host.querySelector('[data-daily-credit]').textContent=passage.copyright;
+   const abbreviation={128:'NVI 2025',2664:'NVI 2015',149:'RVR 1960',1782:'RVA 2015',127:'NTV'}[d.version];
+   host.querySelector('[data-daily-reference]').textContent=referenceLabel(ref)+' · '+abbreviation;read.dataset.version=String(d.version);
   }catch{}
  }
  async function home(){

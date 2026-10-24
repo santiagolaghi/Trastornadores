@@ -63,11 +63,17 @@
     const all=[...new Set(ids)].sort((a,b)=>(b===myId)-(a===myId));
     return `<span class="tnt-avatar-stack">${all.slice(0,max).map(id=>avatar(people.find(p=>p.id===id),accounts.find(a=>a.person_id===id),id===myId?'is-you':'')).join('')}${all.length>max?`<span class="tnt-avatar-more">+${all.length-max}</span>`:''}</span>`;
   }
+  function namedPeople(ids, people=[], accounts=[], label='Responsable') {
+    return `<span class="activity-person-list">${[...new Set(ids)].map(id=>{
+      const person=people.find(p=>p.id===id)||{id,full_name:'Persona TNT'},account=accounts.find(a=>a.person_id===id)||{};
+      return `<span class="activity-person">${avatar(person,account)}<span><small>${esc(label)}</small><b>${esc(personName(person.full_name||account.nickname))}</b></span></span>`;
+    }).join('')}</span>`;
+  }
   function eventTeam(event, members, people, accounts, responsibleIds=[]) {
     const organizers=[...new Set(members.filter(m=>m.event_id===event.id&&m.event_role==='organizer').map(m=>m.person_id))];
     const assigned=[...new Set(responsibleIds)].filter(id=>!organizers.includes(id));
     const identity=id=>({person:people.find(p=>p.id===id)||{id,full_name:'Persona TNT'},account:accounts.find(a=>a.person_id===id)||{}});
-    return `<div class="tnt-event-team">${organizers.map(id=>{const {person,account}=identity(id);return `<div class="tnt-event-coordinator" data-coordinator="${esc(id)}">${avatar(person,account,'coordinator')}<span><small>COORDINA</small><b>${esc(personName(account.nickname||person.full_name))}</b></span></div>`;}).join('')}${assigned.length?`<div class="tnt-event-responsibles"><small>ENCARGADOS</small>${assigned.map(id=>{const {person,account}=identity(id);return `<span>${avatar(person,account)}<b>${esc(personName(account.nickname||person.full_name))}</b></span>`;}).join('')}</div>`:''}</div>`;
+    return `<div class="tnt-event-team">${organizers.map(id=>{const {person,account}=identity(id);return `<div class="tnt-event-coordinator" data-coordinator="${esc(id)}">${avatar(person,account,'coordinator')}<span><small>COORDINA</small><b>${esc(personName(person.full_name||account.nickname))}</b></span></div>`;}).join('')}${assigned.length?`<div class="tnt-event-responsibles"><small>ENCARGADOS</small>${assigned.map(id=>{const {person,account}=identity(id);return `<span>${avatar(person,account)}<b>${esc(personName(person.full_name||account.nickname))}</b></span>`;}).join('')}</div>`:''}</div>`;
   }
   function dateKey(value=new Date()) {
     const p=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(value));
@@ -112,6 +118,9 @@
     if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');return dialog;
   }
   function closeModal(dialog){if(dialog?._tntClose)return Promise.resolve(dialog._tntClose());dialog?.remove();return Promise.resolve();}
+  function startup(label='Preparando tu espacio en TNT') {
+    return '<div class="tnt-startup" role="status"><span class="tnt-startup-orbit"><img src="/icons/dynamite-app.svg" alt=""></span><b>Hay un lugar para vos.</b><p>'+esc(label)+'</p><i aria-hidden="true"></i></div>';
+  }
   function trackOverlay(node,dismiss=()=>node.remove(),{replace=null}={}){
     if(node._tntLayerActive)return;
     const previous=root.document.activeElement,replacing=replace?._tntLayerActive;
@@ -198,7 +207,7 @@
     const details=scope.matches?.('[data-tnt-collapse]')?[scope]:[...scope.querySelectorAll?.('[data-tnt-collapse]')||[]];
     for(const d of details){if(d.dataset.tntFoldBound)continue;d.dataset.tntFoldBound='true';const key=(root.TNT?.module||'home')+':'+d.dataset.tntCollapse;if(!foldState.has(key)){try{const saved=root.sessionStorage.getItem('tnt-fold:'+root.TNT?.person?.id+':'+key);if(saved!==null)foldState.set(key,saved==='true');}catch{}}if(foldState.has(key))d.open=foldState.get(key);d.addEventListener('toggle',()=>{foldState.set(key,d.open);try{root.sessionStorage.setItem('tnt-fold:'+root.TNT?.person?.id+':'+key,String(d.open));}catch{}});}
   }
-  const api={esc,personName,icon,safeUrl,resourceUrl,photoUrl,initials,avatar,avatarStack,eventTeam,dateKey,addDays,date,time,completed,modal,closeModal,trackOverlay,topOverlay,clearOverlays,confirm,prompt,toast,enhanceSelects,backOverlay,accessInfo,snapshotView,restoreView,enhanceLists};
+  const api={esc,personName,icon,safeUrl,resourceUrl,photoUrl,initials,avatar,avatarStack,namedPeople,eventTeam,dateKey,addDays,date,time,completed,modal,closeModal,startup,trackOverlay,topOverlay,clearOverlays,confirm,prompt,toast,enhanceSelects,backOverlay,accessInfo,snapshotView,restoreView,enhanceLists};
   root.TNTUI=api;
   if(root.document){const init=()=>{enhanceSelects();enhanceLists();if(root.MutationObserver){new root.MutationObserver(records=>{for(const record of records){if(record.target?.parentElement?.classList.contains('tnt-list-fold'))enhanceLists(record.target);for(const node of record.addedNodes)if(node.nodeType===1){enhanceSelects(node);enhanceLists(node);}}}).observe(root.document.body,{childList:true,subtree:true});}root.document.addEventListener('invalid',e=>{for(let el=e.target.parentElement;el;el=el.parentElement)if(el.tagName==='DETAILS')el.open=true;},true);};if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init,{once:true});else init();}
   root.document?.addEventListener('error',e=>{if(e.target?.matches?.('.tnt-person-avatar img')){const avatar=e.target.parentElement;avatar.classList.remove('has-photo');avatar.classList.add('without-photo');e.target.remove();}},true);

@@ -54,6 +54,7 @@ test('Organization migration: real PostgreSQL transactions and audience checks',
   await db.exec(management.match(/create or replace function public\.tnt_event_can_action[\s\S]*?\$\$;/i)[0]);
   await db.exec(`create function public.tnt_can_manage_event(uuid) returns boolean language sql stable as $$select public.tnt_event_can_action($1,'edit_event')$$;`);
   await db.exec(read('supabase/migrations/20261018030254_activity_highlights.sql'));
+  await db.exec(read('supabase/migrations/20261023230939_approved_activity_colors.sql'));
   await db.exec(read('supabase/migrations/20260924_tnt_automatic_notifications.sql').split('create or replace function public.tnt_generate_daily_notifications')[0]);
   await db.exec(base.slice(base.indexOf('create or replace function public.tnt_notify_assignment()'),base.indexOf('create or replace function public.tnt_audit_task_changes()')));
   await db.exec(`grant all on all tables in schema public to authenticated;grant usage,select on all sequences in schema public to authenticated;

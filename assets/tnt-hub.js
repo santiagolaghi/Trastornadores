@@ -24,20 +24,23 @@ function personalActivities(){
   const event=byEvent.get(task.event_id),assignment=own.get(task.id),slots=state.items.filter(i=>i.task_id===task.id&&!i.archived_at),slot=slots.find(i=>assignedItems.has(i.id))||slots[0];
   if(!event||task.archived_at||U.completed(task)||assignment?.assignment_status==='declined'||(!assignment&&!slots.some(i=>assignedItems.has(i.id))))continue;
   const when=timing(task,slot,event),pending=!!assignment&&['pending','assigned','invited'].includes(assignment.assignment_status);
-  rows.push({id:'task-'+task.id,title:task.title,event:event.name,...when,role:pending?'Confirmá tu participación':'Sos parte del equipo',pending,href:'/organizacion/?task='+encodeURIComponent(task.id)});
+  rows.push({id:'task-'+task.id,title:task.title,event:event.name,people:state.assignees.filter(a=>a.task_id===task.id&&a.assignment_status!=='declined').map(a=>a.person_id),featured:task,...when,role:pending?'Confirmá tu participación':'Sos parte del equipo',pending,href:'/organizacion/?task='+encodeURIComponent(task.id)});
  }
  for(const item of state.items){
   if(item.task_id||!assignedItems.has(item.id)||item.archived_at||U.completed(item))continue;
   const date=state.days.find(d=>d.id===item.day_id),event=byEvent.get(date?.event_id);if(!event)continue;
-  rows.push({id:'item-'+item.id,title:item.title,event:event.name,...timing(null,item,event),role:'Sos responsable',href:'/organizacion/?view=schedule&event='+encodeURIComponent(event.id)+'&item='+encodeURIComponent(item.id)});
+  rows.push({id:'item-'+item.id,title:item.title,event:event.name,people:state.responsibles.filter(r=>r.item_id===item.id).map(r=>r.person_id),...timing(null,item,event),role:'Sos responsable',href:'/organizacion/?view=schedule&event='+encodeURIComponent(event.id)+'&item='+encodeURIComponent(item.id)});
  }
- for(const event of coordinated())rows.push({id:'event-'+event.id,title:event.name,event:'Coordinación del encuentro',date:event.start_date,time:'',role:'Coordinás este encuentro',href:'/organizacion/?view=schedule&event='+encodeURIComponent(event.id)+'&program=1'});
+ for(const event of coordinated())rows.push({id:'event-'+event.id,title:event.name,event:event.location||'Encuentro TNT',people:state.members.filter(m=>m.event_id===event.id&&m.event_role==='organizer').map(m=>m.person_id),date:event.start_date,time:event.start_time?.slice(0,5)||'',role:'Coordinás este encuentro',href:'/organizacion/?view=schedule&event='+encodeURIComponent(event.id)+'&program=1'});
  return rows.sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999')||(a.time||'99:99').localeCompare(b.time||'99:99')||a.title.localeCompare(b.title));
 }
 function activitiesSection(){
  if(!can('organizacion'))return '';
  const rows=personalActivities(),day=U.dateKey(),dateLabel=date=>date===day?'Hoy':date===U.addDays(day,1)?'Mañana':U.date(date,{weekday:'short',day:'numeric',month:'short'});
- return `<section class="hub-activities" aria-labelledby="my-activities-title"><header><div><span class="hub-eyebrow">TU EQUIPO CUENTA CON VOS</span><h2 id="my-activities-title">Mis próximas actividades <span>${rows.length}</span></h2><p>Tus participaciones y encuentros que coordinás, en un solo lugar.</p></div><a class="tnt-button" href="/organizacion/?view=my">Ver mi agenda ${U.icon('arrow')}</a></header>${rows.length?`<div class="hub-activity-list" tabindex="0" role="region" aria-label="Todas mis próximas actividades">${rows.map(row=>`<a class="hub-activity ${row.date===day?'is-today':''} ${row.pending?'needs-confirmation':''}" data-my-activity="${U.esc(row.id)}" href="${U.esc(row.href)}"><span class="hub-activity-date">${U.icon('calendar')}<b>${U.esc(dateLabel(row.date))}</b>${row.time?'<strong>'+U.esc(row.time)+'</strong>':''}</span><span class="hub-activity-copy"><b>${U.esc(row.title)}</b><small>${U.esc(row.event)}</small><em>${row.pending?U.icon('alert'):U.icon(row.id.startsWith('event-')?'people':'check')}${U.esc(row.role)}</em></span>${U.icon('arrow')}</a>`).join('')}</div>`:`<p class="hub-activities-empty">${state.errors.some(e=>['tasks','assignees','days','items','responsibles'].includes(e))?'No pudimos actualizar tus actividades. Tocá Reintentar para ver la lista completa.':'Todavía no tenés próximas actividades asignadas.'}</p>`}</section>`;
+ return `<section class="hub-activities" aria-labelledby="my-activities-title"><header><h2 id="my-activities-title">Lo próximo <span>${rows.length}</span></h2><a class="tnt-button" href="/organizacion/?view=my">Ver agenda ${U.icon('arrow')}</a></header>${rows.length?`<div class="hub-activity-list" role="region" aria-label="Todas mis próximas actividades">${rows.map((row,i)=>{
+ const color=row.featured?.is_featured?TNTColors.activityColor(row.featured.feature_color):null,tone=color||['var(--tnt-blue)','var(--tnt-yellow)','var(--tnt-lilac)','var(--tnt-peach)'][i%4];
+ return `<a class="hub-activity ${row.date===day?'is-today':''} ${row.pending?'needs-confirmation':''}" style="--activity-tone:${tone};--activity-ink:${color?TNTColors.ink(color):'#24241f'}" data-my-activity="${U.esc(row.id)}" href="${U.esc(row.href)}"><span class="hub-activity-date"><b>${U.esc(dateLabel(row.date))}</b>${row.time?'<strong>'+U.esc(row.time)+'</strong>':''}</span><span class="hub-activity-copy"><b>${U.esc(row.title)}</b><small>${U.esc(row.event)}</small><em>${row.pending?U.icon('alert'):U.icon(row.id.startsWith('event-')?'people':'check')}${U.esc(row.role)}</em>${U.namedPeople(row.people||[],state.people,state.accounts,row.id.startsWith('event-')?'Coordina':'Responsable')}</span>${U.icon('arrow')}</a>`;
+ }).join('')}</div>`:`<p class="hub-activities-empty">${state.errors.some(e=>['tasks','assignees','days','items','responsibles'].includes(e))?'No pudimos actualizar tus actividades. Tocá Reintentar para ver la lista completa.':'Todavía no tenés próximas actividades asignadas.'}</p>`}</section>`;
 }
 function upcoming(){return state.events.filter(e=>(e.end_date||e.start_date)>=U.dateKey()&&e.status!=='cancelled').sort((a,b)=>a.start_date.localeCompare(b.start_date));}
 function unread(){return state.notes.filter(n=>(!n.person_id||n.person_id===TNT.person.id)&&!n.read_at);}
@@ -117,32 +120,44 @@ function featuredNews(staff){
  return `<section class="tnt-home-news" aria-label="Novedades de TNT"><div class="hub-section"><h2 data-tnt-copy="home.news.title">Lo que está pasando</h2>${TNT.isAdmin?'<button class="tnt-button" id="publish-news">'+U.icon('plus')+' Publicar novedad</button>':''}</div>${news.length?`<div class="tnt-home-news-list">${news.map((n,i)=>{const image=TNTExperience.image(n.image||'');return `<details class="community-news-feature tnt-news-fold ${image?'has-cover':''}" data-tnt-collapse="news-${U.esc(n._key)}" data-tnt-record ${i===0?'open':''} ${image?'style="background-image:url(&quot;'+U.esc(image)+'&quot;)"':''}><summary><span class="hub-eyebrow">NOVEDAD TNT</span><h3>${U.esc(n.title)}</h3></summary><div class="tnt-news-content"><p>${U.esc(n.body||'')}</p><div class="tnt-news-actions">${U.safeUrl(n.href)?`<a class="tnt-button" href="${U.esc(U.safeUrl(n.href))}">${U.esc(n.link_label||'Ir a ver')} ${U.icon('arrow')}</a>`:''}${TNT.isAdmin?`<button class="tnt-button danger" data-delete-home-news="${U.esc(n._key)}" aria-label="Eliminar ${U.esc(n.title)}">${U.icon('trash')}Eliminar</button>`:''}</div></div></details>`;}).join('')}</div>`:`<div class="tnt-news-empty">${U.icon('bell')}<span>${TNT.isAdmin?'Publicá acá lo que todo TNT necesita saber.':'Las novedades del equipo van a aparecer acá, en primera plana.'}</span></div>`}</section>`;
 }
 function decorateHome(staff){
- window.TNTCommunity?.home();
- if(!window.TNTExperience)return;const E=TNTExperience,hero=app.querySelector(staff?'.hub-greeting':'.community-hero'),cfg=E.module('home');
+ if(!window.TNTExperience)return;
+ const E=TNTExperience,hero=app.querySelector(staff?'.hub-greeting':'.community-hero');
  app.querySelectorAll('.tnt-mark').forEach(m=>{m.innerHTML='<img src="/icons/dynamite-app.svg?v=20261013" alt="TNT">';});
- if(hero){const heading=hero.querySelector('h1');heading.dataset.tntDynamic='';if(staff)heading.innerHTML=`<small>Hola, ${U.esc(TNT.displayName().split(' ')[0])}.</small><em data-tnt-copy="home.hero.title">${U.esc(E.text('home.hero.title','Hacemos TNT.'))}</em>`;
- const next=staff?upcoming()[0]:state.community?.events?.[0],title=next?.name||'Un lugar para tus ideas.';
- const art='<div class="tnt-hero-art"><div class="tnt-banner-orbits" aria-hidden="true"><i></i><i></i><span>✦</span><strong>tnt.</strong></div><div class="tnt-banner-ticker" aria-hidden="true"><span>FE + EQUIPO + VOS + FE + EQUIPO + VOS + </span></div><button type="button" class="tnt-hero-sticker" data-hero-event><span>EL PRÓXIMO PLAN <i aria-hidden="true">↗</i></span><b>'+U.esc(title)+'</b><small>'+(next?U.esc(U.date(next.start_date,{day:'numeric',month:'long'})):'FE · COMUNIDAD · PROPÓSITO')+'</small><span class="tnt-hero-cta">Ver el encuentro '+U.icon('arrow')+'</span></button><span class="tnt-hero-spark" aria-hidden="true">✳</span></div>';
- hero.querySelector('.community-brand-art')?.remove();hero.insertAdjacentHTML('beforeend',art);bindHeroEncounter(hero,staff);
- const cover=E.image(cfg.cover||'');if(cover){hero.classList.add('tnt-cover-hero');hero.style.setProperty('--home-cover','url('+JSON.stringify(cover)+')');}
- hero.insertAdjacentHTML('afterend',featuredNews(staff));
- if(staff&&can('organizacion')){const saturday=upcoming().find(e=>e.kind==='saturday');if(saturday)hero.insertAdjacentHTML('afterend',`<a class="hub-saturday-shortcut" href="/organizacion/?view=schedule&event=${encodeURIComponent(saturday.id)}&program=1">${U.icon('calendar')}<span><b>Cronograma del próximo sábado</b><small>${U.esc(U.date(saturday.start_date,{weekday:'long',day:'numeric',month:'long'}))} · ${U.esc(saturday.name)}</small></span>${U.icon('arrow')}</a>`);}
+ if(hero){
+  hero.classList.add('hub-greeting');
+  const heading=hero.querySelector('h1');heading.dataset.tntDynamic='';heading.textContent='Hola, '+TNT.displayName().split(' ')[0]+'.';
+  hero.querySelector('.community-brand-art')?.remove();
+  hero.querySelector('.hero-button')?.remove();
+  hero.querySelector('p').textContent='Tu equipo, tus actividades y lo que viene.';
+  const eyebrow=hero.querySelector('.hub-eyebrow,.community-kicker');if(eyebrow)eyebrow.textContent=U.date(U.dateKey(),{weekday:'long',day:'numeric',month:'long'});
  }
  app.querySelector('.community-grid>.community-news')?.remove();
- app.querySelectorAll('.module-stack').forEach((el,index)=>{const a=el.querySelector('a'),id=el.dataset.space;if(!id)return;const cfg=E.module(id);if(cfg.title)el.querySelector('h3').textContent=cfg.title;if(cfg.description)el.querySelector('.module-bottom p').textContent=cfg.description;if(/^#[\da-f]{6}$/i.test(cfg.accent||''))el.style.setProperty('--module-color',cfg.accent);const cover=E.image(cfg.cover||modules.find(m=>m.id===id)?.cover||(id==='admin'?'/assets/covers/equipo.jpg':''));if(cover){const img=document.createElement('img');img.className='tnt-space-cover';img.alt='';img.src=cover;img.loading='lazy';img.decoding='async';img.addEventListener('error',()=>{img.remove();el.classList.remove('has-cover');},{once:true});a.prepend(img);el.classList.add('has-cover');}el.style.setProperty('--card-order',String(index));a.insertAdjacentHTML('afterbegin','<span class="tnt-space-number">'+String(index+1).padStart(2,'0')+'</span>');});
+ app.querySelectorAll('.module-stack').forEach((el,index)=>{
+  const a=el.querySelector('a'),id=el.dataset.space;if(!id)return;const cfg=E.module(id);
+  if(cfg.title)el.querySelector('h3').textContent=cfg.title;if(cfg.description)el.querySelector('.module-bottom p').textContent=cfg.description;
+  if(/^#[\da-f]{6}$/i.test(cfg.accent||''))el.style.setProperty('--module-color',cfg.accent);
+  const cover=E.image(cfg.cover||modules.find(m=>m.id===id)?.cover||(id==='admin'?'/assets/covers/equipo.jpg':''));
+  if(cover){const img=document.createElement('img');img.className='tnt-space-cover';img.alt='';img.src=cover;img.loading='lazy';img.decoding='async';img.addEventListener('error',()=>{img.remove();el.classList.remove('has-cover');},{once:true});a.prepend(img);el.classList.add('has-cover');}
+  el.style.setProperty('--card-order',String(index));
+ });
  setupSpaces();
- // Upcoming events are a full-width section, not a narrow sidebar of people.
+ const track=app.querySelector('[data-space-track]'),search=app.querySelector('.hub-search');
+ if(track&&search)app.querySelector('.tnt-space-controls').after(search);
+ const activities=app.querySelector('.hub-activities');if(activities)activities.insertAdjacentHTML('afterend',featuredNews(staff));
+ else if(hero)hero.insertAdjacentHTML('afterend',featuredNews(staff));
+ if(staff&&can('organizacion')){const saturday=upcoming().find(e=>e.kind==='saturday');if(saturday&&activities)activities.insertAdjacentHTML('afterend',`<a class="hub-saturday-shortcut" href="/organizacion/?view=schedule&event=${encodeURIComponent(saturday.id)}&program=1">${U.icon('calendar')}<span><b>Cronograma del próximo sábado</b><small>${U.esc(U.date(saturday.start_date,{weekday:'long',day:'numeric',month:'long'}))}</small></span>${U.icon('arrow')}</a>`);}
+ window.TNTCommunity?.home();
  const upnext=staff&&app.querySelector('.hub-upnext'),layout=app.querySelector('.hub-layout');
  if(upnext&&layout){
-   const heading=upnext.querySelector('h2'),head=document.createElement('div'),grid=document.createElement('div');
-   head.className='hub-upnext-heading';heading.id='hub-upnext-title';upnext.setAttribute('aria-labelledby',heading.id);
-   head.append(heading);const calendar=upnext.querySelector('a.tnt-button');if(calendar)head.append(calendar);
-   grid.className='hub-upnext-grid';upnext.querySelectorAll('.hub-event').forEach(card=>grid.append(card));
-   if(!grid.children.length){const empty=upnext.querySelector('p');if(empty)grid.append(empty);}
-   upnext.replaceChildren(head,grid);layout.after(upnext);
+  const heading=upnext.querySelector('h2'),head=document.createElement('div'),grid=document.createElement('div');
+  head.className='hub-upnext-heading';heading.id='hub-upnext-title';upnext.setAttribute('aria-labelledby',heading.id);
+  head.append(heading);const calendar=upnext.querySelector('a.tnt-button');if(calendar)head.append(calendar);
+  grid.className='hub-upnext-grid';upnext.querySelectorAll('.hub-event').forEach(card=>grid.append(card));
+  if(!grid.children.length){const empty=upnext.querySelector('p');if(empty)grid.append(empty);}
+  upnext.replaceChildren(head,grid);layout.after(upnext);
  }
  window.TNTNavigation?.mount();
- document.getElementById('publish-news')?.addEventListener('click',async()=>{if(!window.TNTProfileSettings)return;const r=await TNT.sb.from('tnt_settings').select('*').eq('key','community_news');if(r.error)return U.toast(r.error.message,true);const o=U.modal('Publicar en la portada','<div id="tnt-home-news-editor"></div>',{wide:true});TNTProfileSettings.mountNews(o.querySelector('#tnt-home-news-editor'),r.data||[]);});
+ document.getElementById('publish-news')?.addEventListener('click',async()=>{if(!window.TNTProfileSettings)return;const r=await TNT.sb.from('tnt_settings').select('*').eq('key','community_news');if(r.error)return U.toast(r.error.message,true);const o=U.modal('Publicar en la portada','<div id="tnt-home-news-editor"></div>',true);TNTProfileSettings.mountNews(o.querySelector('#tnt-home-news-editor'),r.data||[]);});
  app.querySelectorAll('[data-delete-home-news]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await TNTProfileSettings.removeNews(b.dataset.deleteHomeNews);}catch(error){U.toast(error.message,true);b.disabled=false;}});
  window.TNTNotifications?.badges();E.paint();
 }
