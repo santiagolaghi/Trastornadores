@@ -114,29 +114,46 @@
  async function dailyCard(host){
   if(!host||!data?.daily||!moduleInfo('daily')||!moduleInfo('daily').enabled)return;
   const d=data.daily,ref=reference(d.reference);if(!ref)return;
-  host.innerHTML='<section class="daily-carousel" aria-label="Tu contenido de hoy" aria-roledescription="carrusel"><div class="daily-track" tabindex="0" aria-label="Deslizá para ver el versículo y la frase del día"><article class="daily-slide" role="group" aria-label="1 de 2 · Versículo del día"><header><span>VERSÍCULO DEL DÍA</span>'+icon('sun')+'</header><div class="daily-verse" data-daily-verse aria-live="polite">Preparando la lectura de hoy…</div><p class="daily-reference" data-daily-reference>'+esc(referenceLabel(ref))+' · RVR 1909</p><small class="daily-credit" data-daily-credit>Reina-Valera 1909 · Dominio público</small><button type="button" class="daily-action" data-c-reading="'+esc(ref)+'" data-version="1909">Leer el capítulo '+icon('arrow')+'</button></article><article class="daily-slide daily-phrase" role="group" aria-label="2 de 2 · Una frase para vos"><header><span>UNA FRASE PARA VOS</span>'+icon('heart')+'</header><blockquote>'+esc(d.phrase)+(d.author?'<cite>'+esc(d.author)+'</cite>':'')+'</blockquote><p class="daily-reference">'+esc(date(d.day))+'</p><a class="daily-action" href="/comunidad?module=daily">Mis avisos del día '+icon('arrow')+'</a></article></div><div class="daily-controls"><button type="button" data-daily-prev aria-label="Contenido anterior">'+icon('back')+'</button><span class="daily-dot" aria-current="true"></span><span class="daily-dot" aria-current="false"></span><button type="button" data-daily-next aria-label="Contenido siguiente">'+icon('arrow')+'</button></div></section>';
-  const track=host.querySelector('.daily-track'),dots=[...host.querySelectorAll('.daily-dot')],events=new AbortController();let index=0,pauseUntil=0,scrollingTo=null,sizeFrame=0,width=track.clientWidth,observer;
+  host.innerHTML=`<section class="daily-carousel" aria-label="Tu contenido de hoy" aria-roledescription="carrusel">
+   <div class="daily-track" tabindex="0" aria-label="Deslizá para ver el versículo y la frase del día">
+    <article class="daily-slide" role="group" aria-label="1 de 2 · Versículo del día">
+     <header><span>VERSÍCULO DEL DÍA</span>${icon('sun')}</header>
+     <div class="daily-verse daily-preview" data-daily-verse aria-label="Adelanto de la lectura" aria-live="polite">Preparando la lectura de hoy…</div>
+     <footer class="daily-footer"><div><p class="daily-reference" data-daily-reference>${esc(referenceLabel(ref))}</p><small class="daily-credit" data-daily-credit>RVR 1909 · Dominio público</small></div><button type="button" class="daily-action" data-c-reading="${esc(ref)}" data-version="1909">Leer completo ${icon('arrow')}</button></footer>
+    </article>
+    <article class="daily-slide daily-phrase" role="group" aria-label="2 de 2 · Una frase para vos">
+     <header><span>UNA FRASE PARA VOS</span>${icon('heart')}</header>
+     <blockquote class="daily-preview">${esc(d.phrase)}</blockquote>
+     <footer class="daily-footer"><div><p class="daily-reference">${esc(date(d.day))}</p>${d.author?'<cite>'+esc(d.author)+'</cite>':''}</div><button type="button" class="daily-action" data-daily-phrase>Ver frase ${icon('arrow')}</button></footer>
+    </article>
+   </div>
+   <div class="daily-controls"><button type="button" data-daily-prev aria-label="Contenido anterior">${icon('back')}</button><button type="button" class="daily-dot" data-daily-go="0" aria-label="Ver versículo del día" aria-current="true"></button><button type="button" class="daily-dot" data-daily-go="1" aria-label="Ver frase del día" aria-current="false"></button><button type="button" data-daily-next aria-label="Contenido siguiente">${icon('arrow')}</button><button type="button" class="daily-pause" data-daily-pause aria-pressed="false" aria-label="Pausar cambio automático">Pausar</button></div>
+  </section>`;
+  const track=host.querySelector('.daily-track'),dots=[...host.querySelectorAll('.daily-dot')],events=new AbortController();let index=0,pauseUntil=0,paused=false,scrollingTo=null,sizeFrame=0,width=track.clientWidth,observer;
   function fit(){const height=Math.ceil(track.children[index].getBoundingClientRect().height+parseFloat(getComputedStyle(track).paddingBottom));if(height>0&&track.style.height!==height+'px')track.style.height=height+'px';dots.forEach((dot,i)=>dot.setAttribute('aria-current',String(i===index)));}
   function move(to,manual=true,instant=false){index=(to+2)%2;if(manual)pauseUntil=Date.now()+30000;fit();const slide=track.children[index],left=Math.min(track.scrollWidth-track.clientWidth,slide.offsetLeft-track.children[0].offsetLeft),smooth=!instant&&!matchMedia('(prefers-reduced-motion:reduce)').matches;scrollingTo=smooth&&Math.abs(track.scrollLeft-left)>1?left:null;track.scrollTo({left,behavior:smooth?'smooth':'instant'});}
   function resize(){cancelAnimationFrame(sizeFrame);sizeFrame=requestAnimationFrame(()=>{if(!host.isConnected){observer?.disconnect();events.abort();return;}const changed=width!==track.clientWidth;width=track.clientWidth;fit();if(changed)move(index,false,true);});}
   if(typeof ResizeObserver==='function'){observer=new ResizeObserver(resize);[track,...track.children].forEach(n=>observer.observe(n));}
   window.addEventListener('resize',resize,{signal:events.signal});document.fonts?.ready?.then(resize);fit();
   host.querySelector('[data-daily-prev]').onclick=()=>move(index-1);host.querySelector('[data-daily-next]').onclick=()=>move(index+1);
+  dots.forEach((dot,i)=>dot.onclick=()=>move(i));
+  host.querySelector('[data-daily-pause]').onclick=event=>{paused=!paused;pauseUntil=0;event.currentTarget.textContent=paused?'Seguir':'Pausar';event.currentTarget.setAttribute('aria-pressed',String(paused));event.currentTarget.setAttribute('aria-label',paused?'Reanudar cambio automático':'Pausar cambio automático');};
+  host.querySelector('[data-daily-phrase]').onclick=()=>U().modal('Una frase para vos','<blockquote class="daily-full-quote">'+esc(d.phrase)+(d.author?'<cite>'+esc(d.author)+'</cite>':'')+'</blockquote><p class="life-small">'+esc(date(d.day))+'</p><a class="life-text-button" href="/comunidad?module=daily">Mis avisos del día</a>');
   track.addEventListener('keydown',event=>{if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();move(index+(event.key==='ArrowRight'?1:-1));}});
   track.addEventListener('pointerdown',()=>{pauseUntil=Date.now()+30000;scrollingTo=null;},{passive:true});
   track.addEventListener('focusin',()=>{pauseUntil=Date.now()+30000;scrollingTo=null;});
   track.addEventListener('scroll',()=>{const step=track.children[1].offsetLeft-track.children[0].offsetLeft;if(scrollingTo!==null&&Math.abs(track.scrollLeft-scrollingTo)>1)return;scrollingTo=null;index=track.scrollLeft>step/2?1:0;fit();},{passive:true});
-  const rotation=setInterval(()=>{if(!host.isConnected){clearInterval(rotation);observer?.disconnect();events.abort();cancelAnimationFrame(sizeFrame);return;}const r=track.getBoundingClientRect();if(document.hidden||Date.now()<pauseUntil||matchMedia('(prefers-reduced-motion:reduce)').matches||host.contains(document.activeElement)||r.bottom<0||r.top>innerHeight)return;move(index+1,false);},12000);
-  const read=host.querySelector('[data-c-reading]');read.onclick=()=>openReading(ref.split('.').slice(0,2).join('.'),Number(read.dataset.version));
+  const rotation=setInterval(()=>{if(!host.isConnected){clearInterval(rotation);observer?.disconnect();events.abort();cancelAnimationFrame(sizeFrame);return;}const r=track.getBoundingClientRect();if(paused||document.hidden||Date.now()<pauseUntil||matchMedia('(prefers-reduced-motion:reduce)').matches||host.contains(document.activeElement)||r.bottom<0||r.top>innerHeight)return;move(index+1,false);},12000);
+  const read=host.querySelector('[data-c-reading]');read.onclick=()=>openReading(ref,Number(read.dataset.version));
   try{const local=await TNTBibleText.passage(ref);if(!host.isConnected)return;host.querySelector('[data-daily-verse]').textContent=local.text;fit();}
   catch{if(host.isConnected){host.querySelector('[data-daily-verse]').innerHTML='<a class="daily-action" href="/biblia?ref='+encodeURIComponent(ref)+'&v=1909">Abrir la lectura de hoy '+icon('arrow')+'</a>';fit();}}
   if(![128,2664,149,1782,127].includes(d.version))return;
   try{
    const session=await TNT.sb.auth.getSession(),token=session.data?.session?.access_token||TNT.session?.access_token;if(!token)return;
    const r=await fetch('/api/bible?'+new URLSearchParams({action:'passage',version:d.version,passage:ref}),{headers:{Authorization:'Bearer '+token},cache:'no-store',signal:AbortSignal.timeout(12000)});if(!r.ok)return;
-   const passage=await r.json();if(!host.isConnected)return;host.querySelector('[data-daily-verse]').innerHTML=cleanPassage(passage.content);host.querySelector('[data-daily-credit]').textContent=passage.copyright;
+   const passage=await r.json();if(!host.isConnected)return;host.querySelector('[data-daily-verse]').innerHTML=cleanPassage(passage.content);
    const abbreviation={128:'NVI 2025',2664:'NVI 2015',149:'RVR 1960',1782:'RVA 2015',127:'NTV'}[d.version];
-   host.querySelector('[data-daily-reference]').textContent=referenceLabel(ref)+' · '+abbreviation;read.dataset.version=String(d.version);fit();
+   host.querySelector('[data-daily-reference]').textContent=referenceLabel(ref);host.querySelector('[data-daily-credit]').textContent=[abbreviation,passage.copyright].filter(Boolean).join(' · ');read.dataset.version=String(d.version);fit();
   }catch{}
  }
  async function home(){

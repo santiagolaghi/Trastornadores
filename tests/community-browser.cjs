@@ -109,7 +109,8 @@ async function mockAPI(page,actor=1){
   });
   await page.waitForFunction(()=>document.querySelectorAll('[data-my-activity^="event-"] .activity-person').length>=3);
   await page.waitForFunction(()=>document.querySelector('[data-daily-verse]')?.textContent.length>35);
-  await page.evaluate(async()=>{await document.fonts.ready;document.querySelector('[data-daily-verse]').textContent=(await TNTBibleText.passage('PSA.23')).text;});
+  await page.evaluate(async()=>{TNTCommunity.data.daily.reference='Mateo 5:14-16';TNTCommunity.data.daily.phrase='Date un momento para orar, respirar y mirar con amor lo que tenés por delante.';TNTCommunity.data.daily.author='';await TNTCommunity.home();await document.fonts.ready;});
+  await page.waitForFunction(()=>document.querySelector('[data-daily-verse]')?.textContent.includes('Vosotros sois la luz del mundo'));
   for(const theme of ['light','dark'])for(const width of [320,360,390,412,768,1280]){
    await page.setViewportSize({width,height:844});await page.evaluate(t=>TNT.setTheme(t),theme);
    for(const index of [0,1]){
@@ -119,13 +120,15 @@ async function mockAPI(page,actor=1){
     const size=await page.evaluate(index=>{
      const track=document.querySelector('.daily-track'),slide=track.children[index],last=slide.querySelector('.daily-action'),s=getComputedStyle(slide);
      const blank=slide.getBoundingClientRect().bottom-last.getBoundingClientRect().bottom-parseFloat(s.paddingBottom)-parseFloat(s.borderBottomWidth);
-     return{blank,track:track.getBoundingClientRect().height,slide:slide.getBoundingClientRect().height,dates:[...document.querySelectorAll('.hub-activity-date')].map(n=>n.getBoundingClientRect().height),overflow:document.documentElement.scrollWidth>innerWidth};
+     return{blank,track:track.getBoundingClientRect().height,slide:slide.getBoundingClientRect().height,dates:[...document.querySelectorAll('.hub-activity-date')].map(n=>n.getBoundingClientRect().height),controls:[...document.querySelectorAll('.daily-controls button')].every(n=>{const r=n.getBoundingClientRect();return r.width>=44&&r.height>=44&&r.left>=0&&r.right<=innerWidth;}),overflow:document.documentElement.scrollWidth>innerWidth};
     },index);
-    if(width===390&&index===1){await page.locator('.daily-carousel').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,'layout-daily-'+theme+'.png')});}
+    if(width===390){await page.locator('.daily-carousel').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,'layout-daily-'+theme+'-'+index+'.png')});}
     assert(size.blank<3,'Daily card has no stretched blank area: '+JSON.stringify({theme,width,index,...size}));
     assert(Math.abs(size.track-size.slide-8)<3,'Carousel follows the active card height: '+JSON.stringify({theme,width,index,...size}));
+    assert(size.slide<=330,'Daily preview stays compact with the reported passage: '+JSON.stringify({theme,width,index,...size}));
     assert(size.dates.every(height=>height<=90),'Date badges do not stretch with a large team: '+JSON.stringify({theme,width,...size}));
     assert(!size.overflow,'Home fits '+theme+' '+width);
+    assert(size.controls,'Daily controls fit and have 44 px touch targets: '+theme+' '+width);
    }
   }
   await page.setViewportSize({width:390,height:844});await page.locator('.daily-carousel').scrollIntoViewIfNeeded();
@@ -135,6 +138,10 @@ async function mockAPI(page,actor=1){
   await page.waitForFunction(()=>{const n=document.querySelector('.daily-track');return document.querySelectorAll('.daily-dot')[1].getAttribute('aria-current')==='true'&&Math.abs(n.scrollLeft-(n.scrollWidth-n.clientWidth))<1;});
   await page.evaluate(()=>document.querySelector('.daily-phrase blockquote').textContent='Un paso a la vez.');
   await page.waitForFunction(()=>{const n=document.querySelector('.daily-track');return Math.abs(n.getBoundingClientRect().height-n.children[1].getBoundingClientRect().height-8)<3;});
+  await page.locator('[data-daily-phrase]').click();assert((await page.locator('dialog .daily-full-quote').innerText()).includes('lo que tenés por delante.'));await page.keyboard.press('Escape');
+  await page.locator('[data-daily-go="0"]').click();await page.locator('[data-c-reading]').click();await page.waitForURL('**/biblia?ref=MAT.5.14-16&v=1909');await page.locator('[data-reading] p').first().waitFor();
+  assert(await page.evaluate(async()=>{const original=await(await fetch('/assets/bible/rvr1909/MAT.json')).json(),text=document.querySelector('[data-reading]').innerText;return original.chapters['5'].filter(v=>v.verse>=14&&v.verse<=16).every(v=>text.includes(v.text));}),'The complete daily passage is intact in the reader');
+  await visit('/','.daily-carousel');
   await page.setViewportSize({width:390,height:844});await page.locator('.hub-activities').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,'layout-activities.png')});
   await visit('/perfil','[data-photo]');
   for(const theme of ['light','dark'])for(const width of [320,360,390,412,768,1280]){
@@ -146,7 +153,26 @@ async function mockAPI(page,actor=1){
    if(width===390)await page.screenshot({path:path.join(out,'layout-profile-'+theme+'.png'),fullPage:true});
   }
   await page.setViewportSize({width:390,height:844});await page.evaluate(()=>TNT.setTheme('light'));await page.locator('[data-appearance]').click();assert.equal(await page.locator('[name=palette]').count(),5);await page.locator('.appearance-form [data-cancel]').click();
-  console.log('Layout: daily cards with different text lengths, 3+ coordinators, compact dates and restored circular profile; six widths, both themes: OK');
+  console.log('Layout: compact Matthew 5:14-16 preview, complete reading/phrase, 3+ coordinators, compact dates and circular profile; six widths, both themes: OK');
+ }
+ async function loadingAndRotationFlow(){
+  await visit('/','.daily-carousel');await page.locator('[data-daily-pause]').click();await page.locator('.hub-greeting h1').click();
+  await page.waitForTimeout(12500);assert.equal(await page.locator('.daily-dot').first().getAttribute('aria-current'),'true','Explicit pause survives losing focus');
+  await page.locator('[data-daily-pause]').click();await page.locator('.hub-greeting h1').click();
+  await page.waitForFunction(()=>document.querySelectorAll('.daily-dot')[1].getAttribute('aria-current')==='true',null,{timeout:14000});
+  await page.evaluate(()=>document.getElementById('app').insertAdjacentHTML('beforeend',TNTUI.startup()));
+  for(const theme of ['light','dark'])for(const [width,height] of [[320,640],[360,740],[390,844],[412,900],[768,900],[844,360],[1280,900]]){
+   await page.setViewportSize({width,height});await page.evaluate(t=>TNT.setTheme(t),theme);
+   assert(await page.locator('.tnt-startup').evaluate(n=>{
+    const r=n.getBoundingClientRect(),badge=n.querySelector('.tnt-startup-orbit'),img=badge.querySelector('img'),s=getComputedStyle(badge,'::after');
+    const parts=[...n.children].map(c=>c.getBoundingClientRect()),center=(Math.min(...parts.map(p=>p.top))+Math.max(...parts.map(p=>p.bottom)))/2;
+    return r.left===0&&r.top===0&&Math.abs(r.width-innerWidth)<1&&Math.abs(r.height-innerHeight)<1&&Math.abs(center-innerHeight/2)<18&&s.content==='none'&&s.animationName==='none'&&getComputedStyle(img).animationName==='none'&&document.elementFromPoint(10,10).closest('.tnt-startup')===n&&document.elementFromPoint(innerWidth/2,innerHeight-10).closest('.tnt-startup')===n;
+   }),'One centered TNT loading screen, without the old ring: '+theme+' '+width+'x'+height);
+   if(width===390||width===844)await page.screenshot({path:path.join(out,'loading-tnt-'+theme+'-'+width+'.png')});
+  }
+  await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await page.locator('.tnt-startup>i').evaluate(n=>getComputedStyle(n).animationName),'none');await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.locator('.tnt-startup').evaluate(n=>n.remove());await page.setViewportSize({width:390,height:844});await page.evaluate(()=>TNT.setTheme('light'));
+  console.log('Widget rotation/pause/resume and a single centered TNT loader without the old ring; both themes, portrait/landscape and reduced motion: OK');
  }
  async function approvedVisualFlow(){
   if(process.env.TNT_TEST_APPROVED_FAST!=='1'){
@@ -203,6 +229,7 @@ async function mockAPI(page,actor=1){
  }
  try{
   await layoutSizingFlow();
+  await loadingAndRotationFlow();
   if(process.env.TNT_TEST_LAYOUT_ONLY==='1'){assert.equal(errors.length,0,errors.join('\n'));return;}
   await approvedVisualFlow();
   await visit('/comunidad' ,'.c-groups');assert.equal(await page.locator('.c-group').count(),3);await capture('community-new');
@@ -216,7 +243,7 @@ async function mockAPI(page,actor=1){
   // The account panel owns its scroll and fits above every viewport edge.
   await page.locator('[data-account]').click();await page.locator('#tnt-account-menu').waitFor();assert(await page.locator('#tnt-account-menu').evaluate(n=>{const r=n.getBoundingClientRect(),list=n.querySelector('.tnt-menu-actions'),s=getComputedStyle(list);return r.top>=0&&r.bottom<=innerHeight&&s.overflowY==='auto'&&n.scrollHeight<=n.clientHeight+1;}));await page.locator('.tnt-menu-actions').evaluate(n=>n.scrollTop=n.scrollHeight);assert(await page.locator('[data-logout]').isVisible());await page.screenshot({path:path.join(out,'account-scroll.png')});await page.keyboard.press('Escape');assert.equal(await page.locator('#tnt-account-menu').count(),0);assert.equal(await page.evaluate(()=>document.body.classList.contains('tnt-account-open')),false);
   await visit('/','[data-my-activity]');assert(await page.locator('.hub-activity-list').evaluate(n=>getComputedStyle(n).overflowY==='visible'&&getComputedStyle(n).maxHeight==='none'));await page.locator('.hub-activity-list').scrollIntoViewIfNeeded();const before=await page.evaluate(()=>scrollY);await page.mouse.move(190,550);await page.mouse.wheel(0,550);await page.waitForTimeout(250);assert(await page.evaluate(y=>scrollY>y,before));await page.screenshot({path:path.join(out,'home-new.png'),fullPage:true});
-  await visit('/biblia','[data-reading]');await page.getByText('EN el principio crió Dios los cielos y la tierra.',{exact:false}).waitFor();assert.equal(await page.locator('[data-version]').inputValue(),'1909');await page.screenshot({animations:'disabled',path:path.join(out,'reader-rv1909.png')});await page.locator('[data-version]').selectOption('128',{force:true});await page.getByRole('link',{name:/Leer en Bible.com/}).waitFor();assert((await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href')).includes('/128/GEN.1'));await page.locator('[data-version]').selectOption('149',{force:true});await page.getByRole('link',{name:/Leer en Bible.com/}).waitFor();assert((await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href')).includes('/149/'));await page.locator('[name=reference]').fill('Juan 3:16');await page.locator('.c-reader-jump [type=submit]').click();assert((await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href')).endsWith('JHN.3.16'));await capture('reader-fallback');
+  await visit('/biblia?ref=GEN.1&v=1909','[data-reading]');await page.getByText('EN el principio crió Dios los cielos y la tierra.',{exact:false}).waitFor();assert.equal(await page.locator('[data-version]').inputValue(),'1909');await page.screenshot({animations:'disabled',path:path.join(out,'reader-rv1909.png')});await page.locator('[data-version]').selectOption('128',{force:true});await page.getByRole('link',{name:/Leer en Bible.com/}).waitFor();assert((await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href')).includes('/128/GEN.1'));await page.locator('[data-version]').selectOption('149',{force:true});await page.getByRole('link',{name:/Leer en Bible.com/}).waitFor();assert((await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href')).includes('/149/'));await page.locator('[name=reference]').fill('Juan 3:16');await page.locator('.c-reader-jump [type=submit]').click();assert((await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href')).endsWith('JHN.3.16'));await capture('reader-fallback');
   licensed=true;await visit('/biblia?v=128&ref=GEN.1','[data-reading]');await page.getByText('Lectura sintética GEN.1').waitFor();await page.locator('[data-next]').click();await page.getByText('Lectura sintética GEN.2').waitFor();await page.locator('[data-next]').click();await page.getByText('Lectura sintética EXO.1').waitFor();assert(await page.locator('[data-next]').isDisabled());await capture('reader-inline');
   await visit('/juegos','[data-game]');assert.equal(await page.locator('[data-game]').count(),5);await capture('games-new');await page.locator('[data-game=pairs]').click();await page.locator('[name=difficulty][value=easy]').check();await page.locator('[data-game-setup] [type=submit]').click();await page.locator('.g-pair-board').waitFor();await capture('game-pairs');
   for(let round=0;round<3;round++){const pairs=await page.locator('[data-answer]').evaluateAll(nodes=>nodes.filter(n=>n.dataset.answer[0]==='p').map(n=>[n.dataset.answer,'o'+n.dataset.answer.slice(1)]));for(const ids of pairs)for(const id of ids)await page.locator('[data-answer="'+id+'"]').click();if(round<2)await page.locator('[data-next-round]').click();}await page.getByText('¡Lo lograste!').waitFor();await page.getByText('Tu partida y tu marca quedaron guardadas en tu cuenta.').waitFor();await capture('game-result-new');
