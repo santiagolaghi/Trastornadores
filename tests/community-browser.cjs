@@ -101,6 +101,40 @@ async function mockAPI(page,actor=1){
   for(const theme of ['light','dark']){await page.evaluate(t=>TNT.setTheme(t),theme);for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,label+' '+theme+' '+width);assert.equal(await page.locator('#tnt-shell').count(),0);assert(await page.locator('#tnt-main-nav').evaluate(n=>{const b=n.getBoundingClientRect();return b.left>=0&&b.right<=innerWidth&&Math.abs(b.left+b.width/2-innerWidth/2)<1;}),'Centered navigation '+width);if(width===390||width===1280)await page.screenshot({animations:'disabled',fullPage:true,path:path.join(out,label+'-'+theme+'-'+width+'.png')});}}
   await page.setViewportSize({width:390,height:844});await page.evaluate(()=>TNT.setTheme('light'));
  }
+ async function startupPerformanceFlow(){
+  const requests=[],scripts=[];const track=req=>{const u=new URL(req.url());if(u.pathname.includes('/rest/v1/'))requests.push({name:u.pathname.split('/').at(-1),args:req.method()==='POST'?req.postDataJSON():null});if(u.origin===base&&u.pathname.endsWith('.js'))scripts.push(u.pathname);};page.on('request',track);
+  let releaseHome,releaseNotes,releaseCatalog;
+  const homeGate=new Promise(r=>releaseHome=r),notesGate=new Promise(r=>releaseNotes=r),catalogGate=new Promise(r=>releaseCatalog=r);
+  const homeRoute=async route=>{await homeGate;await route.fallback();},noteRoute=async route=>{await notesGate;await route.fallback();};
+  await page.route('**/rest/v1/rpc/tnt_home_context',homeRoute);await page.route('**/rest/v1/rpc/tnt_my_notifications',noteRoute);
+  await visit('/','.module-card');await page.locator('.daily-carousel').waitFor();
+  assert.equal(await page.locator('.tnt-startup').count(),0);assert.equal(await page.locator('.hub-activities[aria-busy=true]').count(),1);assert(!(await page.locator('.hub-activities').innerText()).includes('Todavía no tenés'));
+  await page.locator('[data-tnt-notify]').click();await page.locator('.tnt-notifications-root').waitFor();assert.equal(requests.filter(r=>r.name==='tnt_my_notifications').length,1,'Header, home and dialog share one pending notification request');await page.locator('dialog .tnt-close').click();
+  releaseNotes();await page.waitForFunction(()=>TNTNotifications.notes.length>0);
+  await page.locator('[data-daily-pause]').click();await page.locator('[data-space-next]').click();const space=await page.locator('[data-deck-active=true]').getAttribute('data-space');
+  await page.locator('#hub-query').fill('mi búsqueda mientras carga');await page.evaluate(()=>{document.querySelector('[data-space-track]').scrollIntoView({block:'center'});document.querySelector('#hub-query').focus({preventScroll:true});});
+  const before=await page.locator('[data-space-track]').evaluate(n=>n.getBoundingClientRect().top);
+  await page.screenshot({animations:'disabled',path:path.join(out,'startup-pending.png')});
+  releaseHome();await page.locator('.hub-activity-list').waitFor();await page.waitForFunction(()=>!document.querySelector('.hub-activities[aria-busy]'));await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+  assert.equal(await page.locator('#hub-query').inputValue(),'mi búsqueda mientras carga');assert.equal(await page.locator('#hub-query').evaluate(n=>document.activeElement===n),true);assert.equal(await page.locator('[data-deck-active=true]').getAttribute('data-space'),space);assert.equal(await page.locator('[data-daily-pause]').getAttribute('aria-pressed'),'true');
+  const after=await page.locator('[data-space-track]').evaluate(n=>n.getBoundingClientRect().top);assert(Math.abs(after-before)<3,'Delayed activities keep the visible module deck in place');
+  assert.equal(requests.filter(r=>r.name==='tnt_startup_context').length,1);assert.equal(requests.filter(r=>['tnt_ensure_account','tnt_continue_profile','tnt_profile_context','tnt_access_grants','tnt_role_permission_presets'].includes(r.name)).length,0,'One identity HTTP request replaces the individual startup requests');
+  assert.equal(scripts.filter(s=>s==='/assets/tnt-experience.js').length,1);assert(!scripts.some(s=>s==='/assets/tnt-experience-base.js'||s==='/assets/tnt-unified.js'),'Production uses the ordered shared bundle');
+  await page.unroute('**/rest/v1/rpc/tnt_home_context',homeRoute);await page.unroute('**/rest/v1/rpc/tnt_my_notifications',noteRoute);
+  await page.evaluate(()=>{__fixtureFailures['rpc:tnt_home_context']='Conexión de actividades interrumpida';document.dispatchEvent(new CustomEvent('tnt:data',{detail:{tables:['tnt_events']}}));});await page.locator('#reload').waitFor();assert(await page.locator('.hub-activity-list').count());assert(await page.locator('[data-space-track]').count());
+  await page.evaluate(()=>{delete __fixtureFailures['rpc:tnt_home_context'];__fixtureDB.tnt_tasks[0].title='Actividad actualizada después de reintentar';});await page.locator('#reload').click();await page.getByText('Actividad actualizada después de reintentar',{exact:true}).first().waitFor();
+  await visit('/perfil','.life-profile');const startups=requests.filter(r=>r.name==='tnt_startup_context');assert.equal(startups.length,2);assert.equal(startups[1].args.p_sync,false);assert.equal(startups[1].args.p_continue,false);
+  const catalogueRoute=async route=>{await catalogGate;await route.fallback();};await page.route('**/api/bible?action=versions',catalogueRoute);
+  const communityBefore=requests.filter(r=>r.name==='tnt_community_bootstrap').length;
+  await visit('/biblia?v=1909&ref=MAT.5.14-16','[data-reading]');await page.getByText(/Vosotros sois la luz del mundo/).waitFor();assert.equal(await page.locator('[data-version]').isEnabled(),true);
+  // Let the actual reading-save debounce finish. It must not load the whole
+  // Community dashboard or refetch all notifications just to save a bookmark.
+  await page.waitForTimeout(850);assert.equal(requests.filter(r=>r.name==='tnt_community_bootstrap').length,communityBefore);
+  await page.screenshot({animations:'disabled',path:path.join(out,'reader-before-catalog.png')});releaseCatalog();await page.waitForFunction(()=>[...document.querySelector('[data-version]').options].some(o=>o.value==='3291'));
+  await page.unroute('**/api/bible?action=versions',catalogueRoute);page.off('request',track);
+  fs.writeFileSync(path.join(out,'startup-evidence.json'),JSON.stringify({identityRequestsPerPage:1,sharedScriptRequests:1,notificationRequestsDuringHomeAndDialog:1,localReaderWaitsForCatalogue:false,homeSurvivesActivityFailure:true,searchFocusDeckAndDailyPausePreserved:true},null,2));
+  console.log('Carga: acceso en una consulta, paquete compartido único, inicio usable con actividades/avisos pendientes, foco/scroll/pausa conservados, reintento, navegación sin resinc y lectura local sin esperar catálogo: OK');
+ }
  async function layoutSizingFlow(){
   await visit('/','.daily-carousel');
   await page.evaluate(()=>{
@@ -295,6 +329,8 @@ async function mockAPI(page,actor=1){
   console.log('Enlaces externos: cinco destinos por toque/teclado, búsqueda, referencia actual, NVIS solo NT, selector interno, seis anchos, horizontal y ambos temas: OK');
  }
  try{
+  if(process.env.TNT_TEST_STARTUP_ONLY==='1'){await startupPerformanceFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
+  if(!process.env.TNT_TEST_EXTERNAL_ONLY&&!process.env.TNT_TEST_BIBLE_ONLY&&!process.env.TNT_TEST_LAYOUT_ONLY)await startupPerformanceFlow();
   if(process.env.TNT_TEST_EXTERNAL_ONLY==='1'){await externalReadingFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   await externalReadingFlow();
   await bibleVersionsFlow();

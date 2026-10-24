@@ -17,6 +17,20 @@ const sb={from:t=>new Q(t),rpc:async(n,args)=>{window.__fixtureCalls.push({rpc:n
  if(n==='tnt_archive_schedule_item'){const item=db.tnt_schedule_items.find(i=>i.id===args.p_item);if(item)item.archived_at=args.p_restore?null:new Date().toISOString();return{data:null,error:null};}
  if(n==='tnt_bulk_profiles'){const result=[];for(const id of args.p_ids){const action={archive:'tnt_set_profile_active',activate:'tnt_set_profile_active',delete:'tnt_delete_profile',restore_deleted:'tnt_restore_deleted_profile'}[args.p_action];const r=await sb.rpc(action,{p_person:id,...(['archive','activate'].includes(args.p_action)?{p_active:args.p_action==='activate'}:{})});result.push(r.error?{id,ok:false,error:r.error.message}:{id,ok:true});}return{data:result,error:null};}
  if(n==='tnt_publish_experience'){let row=(db.tnt_experience||[])[0];if(!row){row={id:true,config:{},revision:0};db.tnt_experience=[row];}if(row.revision!==args.p_revision)return{error:{message:'Otro administrador publicó cambios.'}};row.config=structuredClone(args.p_config);row.revision++;return{data:row.revision,error:null};}
+ if(n==='tnt_startup_context'){
+  if(args.p_sync)await sb.rpc('tnt_ensure_account');
+  const continuation=args.p_continue?(await sb.rpc('tnt_continue_profile',{p_target:null,p_values:{},p_confirm:false})).data||{}:{};
+  const a=db.tnt_accounts[0],p=db.tnt_people.find(p=>p.id===a?.person_id);
+  if(!a?.enabled||!p?.active)return{error:{message:'Tu cuenta o perfil no está habilitado'}};
+  const profile=await sb.rpc('tnt_profile_context');if(profile.error)return profile;
+  return{data:structuredClone({account:a,person:p,profile:profile.data,grants:(db.tnt_access_grants||TNT.grants||[]).filter(g=>!g.person_id||g.person_id===p.id),legacy:(db.tnt_module_access||[]).filter(g=>g.person_id===p.id),role_permissions:(db.tnt_role_permission_presets||[]).filter(g=>g.role===a.ministry_role),person_permissions:(db.tnt_person_permission_overrides||[]).filter(g=>g.person_id===p.id&&!g.archived_at),experience:db.tnt_experience?.[0]||{},continuation,reading:db.tnt_community_preferences?.find(v=>v.person_id===p.id)?.reading||{}}),error:null};
+ }
+ if(n==='tnt_home_context'){
+  const tables={events:'tnt_events',tasks:'tnt_tasks',assignees:'tnt_task_assignees',days:'tnt_schedule_days',items:'tnt_schedule_items',responsibles:'tnt_schedule_responsibles',people:'tnt_people',accounts:'tnt_accounts',members:'tnt_event_members'},data={};
+  for(const [key,table] of Object.entries(tables)){if(window.__fixtureFailures[table])return{error:{message:window.__fixtureFailures[table]}};data[key]=structuredClone(db[table]||[]);}
+  data.events=data.events.filter(e=>e.status!=='cancelled');data.tasks=data.tasks.filter(t=>!t.archived_at&&data.events.some(e=>e.id===t.event_id));
+  return{data,error:null};
+ }
  if(n==='tnt_continue_profile')return{data:{linked:false},error:null};
  if(n==='tnt_complete_profile'){window.__profileValues={...window.__profileValues,...args.p_values};return{data:null,error:null};}
  if(n==='tnt_finish_onboarding'){window.__profileValues={...window.__profileValues,...args.p_values};db.tnt_accounts[0].onboarding_completed_at=new Date().toISOString();return{data:null,error:null};}
