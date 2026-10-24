@@ -77,7 +77,7 @@ async function mockAPI(page,actor=1){
   const token=enc({alg:'HS256',typ:'JWT'})+'.'+enc({sub:id,role:'authenticated',aud:'authenticated',exp:Math.floor(Date.now()/1000)+86400,user_metadata:user.user_metadata})+'.test';
   localStorage.setItem(key,JSON.stringify({access_token:token,refresh_token:'synthetic-refresh',expires_at:Math.floor(Date.now()/1000)+86400,expires_in:86400,token_type:'bearer',user}));localStorage.setItem('tnt-theme','light');
  },{id:pid(100),key:'sb-oeodnnomgiddkblnlzay-auth-token'});
- const page=await context.newPage(),errors=[],storage=[],apiCalls=[];let licensed=false,catalogDown=false,indexDown=0,revoked=0,deferredIndex=0,indexStarted=()=>{},releaseIndex;
+ const page=await context.newPage(),errors=[],storage=[],apiCalls=[];let licensed=false,catalogDown=false,passageDown=false,indexDown=0,revoked=0,deferredIndex=0,indexStarted=()=>{},releaseIndex,deferredCatalog=false,catalogStarted=()=>{},releaseCatalog;
  page.setDefaultTimeout(12000);page.on('pageerror',e=>errors.push(e.stack));await mockAPI(page);
  await page.route('https://cdn.youversion.com/**',r=>r.fulfill({contentType:'text/css',body:''}));
  await page.route('https://lh3.googleusercontent.com/**',r=>r.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><circle cx="50" cy="50" r="50" fill="#007d80"/></svg>'}));
@@ -89,8 +89,9 @@ async function mockAPI(page,actor=1){
  await page.route('**/api/bible?*',async route=>{
   const r=route.request(),p=new URL(r.url()).searchParams,action=p.get('action'),id=Number(p.get('version')||128);apiCalls.push({action,id,passage:p.get('passage'),auth:r.headers().authorization});
   const available=[{id:147,title:'Reina-Valera Antigua',abbreviation:'RVES'},{id:3291,title:'Versión Biblia Libre',abbreviation:'VBL'},{id:3365,title:'Palabra de Dios para ti',abbreviation:'PdDpt'},...(licensed?[{id:128,title:'NVI 2025',abbreviation:'NVI-S'},{id:2664,title:'NVI 2015',abbreviation:'NVI-S'}]:[])].filter(v=>v.id!==revoked);
-  if(action==='versions')return catalogDown?route.fulfill({status:503,json:{code:'BIBLE_CONNECTION_ERROR',error:'Conexión sintética interrumpida'}}):route.fulfill({json:{versions:available,unavailable:[128,2664,149,1782,127].filter(id=>!available.some(v=>v.id===id)).map(id=>({id,code:[128,2664].includes(id)?'LICENSE_REQUIRED':'VERSION_UNAVAILABLE'}))}});
-  if(action==='passage'&&!available.some(v=>v.id===id))return route.fulfill({status:403,json:{code:'LICENSE_REQUIRED',error:'Traducción de prueba sin habilitar'}});
+  if(action==='versions'){if(deferredCatalog){catalogStarted();await new Promise(resolve=>releaseCatalog=resolve);}return catalogDown?route.fulfill({status:503,json:{code:'BIBLE_CONNECTION_ERROR',error:'Conexión sintética interrumpida'}}):route.fulfill({json:{versions:available,unavailable:[128,2664,149,1782,127].filter(id=>!available.some(v=>v.id===id)).map(id=>({id,code:[128,2664].includes(id)?'LICENSE_REQUIRED':'VERSION_UNAVAILABLE'}))}});}
+  if(action==='passage'&&passageDown)return route.fulfill({status:503,json:{code:'BIBLE_CONNECTION_ERROR',error:'Conexión sintética interrumpida'}});
+  if(action==='passage'&&!available.some(v=>v.id===id)){const pending=[128,2664].includes(id);return route.fulfill({status:pending?403:404,json:{code:pending?'LICENSE_REQUIRED':'VERSION_UNAVAILABLE',error:'Traducción de prueba sin habilitar'}});}
   if(action==='fonts')return route.fulfill({json:{css:''}});
   if(action==='version')return route.fulfill({json:{id,title:'NVI '+(id===128?'2025':'2015'),copyright:'Créditos sintéticos '+id}});
   if(action==='index'){if(deferredIndex===id){indexStarted();await new Promise(resolve=>releaseIndex=resolve);}return indexDown===id?route.fulfill({status:503,json:{error:'Índice sintético interrumpido'}}):route.fulfill({json:{books:[{id:'GEN',chapters:[{id:'1'},{id:'2'}]},{id:'EXO',chapters:[{id:'1'}]}]}});}
@@ -265,7 +266,8 @@ async function mockAPI(page,actor=1){
  async function bibleVersionsFlow(){
   await visit('/biblia?ref=GEN.1&v=1909','[data-reading]');await page.getByText('EN el principio crió Dios los cielos y la tierra.',{exact:false}).waitFor();
   assert.deepEqual(await page.locator('optgroup[label="Leer dentro de TNT"] option').evaluateAll(nodes=>nodes.map(n=>n.value)),['1909','147','3291','3365']);
-  assert.equal(await page.locator('optgroup[label="Lectura oficial en Bible.com"] option').count(),5);
+  assert.equal(await page.locator('optgroup[label="Lectura oficial en Bible.com"] option').count(),3);
+  assert.equal(await page.locator('optgroup[label="Comprobar acceso en TNT"] option').count(),2);
   for(const id of [147,3291,3365]){
    await page.locator('[data-version]').selectOption(String(id));await page.getByText('Lectura sintética GEN.1',{exact:true}).waitFor();
    assert.equal(await page.locator('[data-attribution]').innerText(),'Créditos sintéticos '+id);
@@ -291,24 +293,51 @@ async function mockAPI(page,actor=1){
   await visit('/biblia?ref=GEN.1&v=128','[data-reading]');await page.getByText('Esta traducción necesita que se habilite su licencia',{exact:false}).waitFor();licensed=true;
   await page.locator('[data-reader-retry]').click();await page.getByText('Lectura sintética GEN.1',{exact:true}).waitFor();assert.equal(await page.locator('optgroup[label="Leer dentro de TNT"] option[value="128"]').count(),1);
   revoked=128;await page.locator('[data-next]').click();await page.getByText('Esta traducción necesita que se habilite su licencia',{exact:false}).waitFor();
-  licensed=false;revoked=0;catalogDown=true;await visit('/biblia?ref=MAT.5.14-16&v=127','[data-reading]');await page.getByText('No pudimos conectar la lectura.',{exact:false}).waitFor();
-  catalogDown=false;await page.locator('[data-reader-retry]').click();await page.getByText('Esta versión se lee en Bible.com.',{exact:false}).waitFor();await page.locator('[data-reader-local]').click();await page.locator('[data-reading] p').first().waitFor();assert.equal(await page.locator('[data-version]').inputValue(),'1909');
+  licensed=false;revoked=0;catalogDown=true;passageDown=true;await visit('/biblia?ref=MAT.5.14-16&v=127','[data-reading]');await page.getByText('No pudimos conectar la lectura.',{exact:false}).waitFor();
+  catalogDown=false;passageDown=false;await page.locator('[data-reader-retry]').click();await page.getByText('Esta versión se lee en Bible.com.',{exact:false}).waitFor();await page.locator('[data-reader-local]').click();await page.locator('[data-reading] p').first().waitFor();assert.equal(await page.locator('[data-version]').inputValue(),'1909');
   assert(apiCalls.some(c=>c.id===147&&c.action==='passage'));assert(apiCalls.some(c=>c.id===3291&&c.action==='passage'));assert(apiCalls.some(c=>c.id===3365&&c.action==='passage'));
   console.log('Biblia: catálogo completo habilitado, capítulos con IDs de texto, navegación de todas las versiones, NTV/RVR/RVA no ofrecidas, NVI pendiente, fallo de índice, alta/revocación de licencia y recuperación: OK');
+ }
+ async function inlineLicenseFlow(){
+  const popups=[],track=popup=>popups.push(popup);context.on('page',track);
+  try{
+   licensed=false;await visit('/biblia?ref=GEN.1&v=1909','[data-reading]');await page.locator('option[value="147"]').waitFor({state:'attached'});
+   await page.getByRole('button',{name:'Traducción',exact:true}).click();
+   const nvi=page.locator('.tnt-select-dialog [data-option]').filter({hasText:'NVI ·'}).filter({hasNotText:'Simplificada'});
+   assert.equal(await nvi.evaluate(n=>n.tagName),'BUTTON','A pending NVI license must be checked inside TNT, rather than opening an external link');
+   licensed=true;await nvi.tap();await page.getByText('Lectura sintética GEN.1',{exact:true}).waitFor();
+   assert.equal(await page.locator('[data-version]').inputValue(),'128');assert.equal(await page.locator('[data-attribution]').innerText(),'Créditos sintéticos 128');assert.equal(popups.length,0);
+   assert.equal(await page.locator('optgroup[label="Leer dentro de TNT"] option[value="128"]').count(),1);
+   // The user can open the menu while the catalogue is still arriving. Its
+   // choice must keep its value when new versions change the option indices.
+   licensed=false;deferredCatalog=true;const started=new Promise(resolve=>catalogStarted=resolve);
+   await visit('/biblia?ref=GEN.1&v=1909','[data-reading]');await started;await page.locator('[data-reading] p').first().waitFor();
+   await page.getByRole('button',{name:'Traducción',exact:true}).click();const earlyNVI=page.locator('.tnt-select-dialog button[data-option]').filter({hasText:'NVI ·'}).filter({hasNotText:'Simplificada'});
+   await earlyNVI.waitFor();deferredCatalog=false;releaseCatalog();await page.locator('option[value="147"]').waitFor({state:'attached'});licensed=true;
+   await earlyNVI.press('Enter');await page.getByText('Lectura sintética GEN.1',{exact:true}).waitFor();assert.equal(await page.locator('[data-version]').inputValue(),'128');assert.equal(popups.length,0);
+   await page.locator('[data-next]').click();await page.getByText('Lectura sintética GEN.2',{exact:true}).waitFor();
+   // An unavailable catalogue does not deny text the provider authorizes.
+   catalogDown=true;await visit('/biblia?ref=GEN.1&v=1909','[data-reading]');await page.locator('[data-reading] p').first().waitFor();
+   await page.getByRole('button',{name:'Traducción',exact:true}).click();await page.locator('.tnt-select-dialog button[data-option]').filter({hasText:'NVI ·'}).filter({hasNotText:'Simplificada'}).tap();
+   await page.getByText('Lectura sintética GEN.1',{exact:true}).waitFor();assert.equal(await page.locator('[data-attribution]').innerText(),'Créditos sintéticos 128');assert.equal(popups.length,0);catalogDown=false;
+   await page.screenshot({path:path.join(out,'nvi-inline-after-license.png'),fullPage:true});
+  }finally{context.off('page',track);licensed=false;deferredCatalog=false;catalogDown=false;}
+  console.log('NVI: permiso nuevo desde el menú real, texto y créditos internos, cero pestañas externas y selección estable durante la carga del catálogo: OK');
  }
  async function externalReadingFlow(){
   const destinations=[];
   await context.route('https://www.bible.com/**',route=>{destinations.push(route.request().url());return route.fulfill({contentType:'text/html',body:'<!doctype html><html lang="es"><title>Destino oficial de prueba</title><body><h1>Enlace externo de prueba</h1></body></html>'});});
   await visit('/biblia?ref=MAT.5.14-16&v=1909','[data-reading]');await page.locator('[data-reading] p').first().waitFor();
+  await page.locator('option[value="127"][data-tnt-href]').waitFor({state:'attached'});
   await page.getByRole('button',{name:'Traducción',exact:true}).click();
   for(const theme of ['light','dark'])for(const [width,height] of [[320,844],[360,740],[390,844],[412,900],[768,900],[1280,900],[844,360]]){
    await page.evaluate(t=>TNT.setTheme(t),theme);await page.setViewportSize({width,height});
    assert(await page.locator('.tnt-select-dialog').evaluate(n=>{const r=n.getBoundingClientRect();return r.left>=10&&r.right<=innerWidth-10&&r.top>=10&&r.bottom<=innerHeight-10;}),'External picker fits '+theme+' '+width);
-   for(const item of await page.locator('.tnt-select-dialog a[data-option]').all()){await item.scrollIntoViewIfNeeded();assert(await item.evaluate(n=>{const r=n.getBoundingClientRect(),s=n.querySelector('span').getBoundingClientRect(),style=getComputedStyle(n);return r.width>=44&&r.height>=44&&r.left>=10&&r.right<=innerWidth-10&&s.top>=r.top+parseFloat(style.paddingTop)-1&&s.bottom<=r.bottom-parseFloat(style.paddingBottom)+1;}),'External link and its complete label fit without clipping');}
-   if(width===390)await page.screenshot({path:path.join(out,'external-picker-'+theme+'.png')});
+   for(const item of await page.locator('.tnt-select-dialog [data-option]').all()){await item.scrollIntoViewIfNeeded();assert(await item.evaluate(n=>{const r=n.getBoundingClientRect(),s=n.querySelector('span').getBoundingClientRect(),style=getComputedStyle(n);return r.width>=44&&r.height>=44&&r.left>=10&&r.right<=innerWidth-10&&s.top>=r.top+parseFloat(style.paddingTop)-1&&s.bottom<=r.bottom-parseFloat(style.paddingBottom)+1;}),'Each translation and its complete label fit without clipping');}
+   if(width===390){await page.locator('.tnt-select-list').evaluate(n=>n.scrollTop=0);await page.screenshot({path:path.join(out,'external-picker-'+theme+'.png')});}
   }
   await page.setViewportSize({width:390,height:844});await page.evaluate(()=>TNT.setTheme('light'));await page.locator('.tnt-select-close').click();await page.locator('.tnt-select-dialog').waitFor({state:'hidden'});
-  for(const [id,name] of [[127,'NTV'],[149,'RVR 1960'],[1782,'RVA 2015'],[128,'NVI'],[2664,'NVI Simplificada']]){
+  for(const [id,name] of [[127,'NTV'],[149,'RVR 1960'],[1782,'RVA 2015']]){
    await page.getByRole('button',{name:'Traducción',exact:true}).click();await page.locator('.tnt-select-dialog').waitFor();
    const choice=page.locator('.tnt-select-dialog [data-option]').filter({hasText:name}).filter({has:page.locator('span')});
    const item=id===128?choice.filter({hasNotText:'Simplificada'}):choice;
@@ -318,22 +347,33 @@ async function mockAPI(page,actor=1){
    await page.locator('.tnt-select-dialog').waitFor({state:'hidden'});assert.equal(await page.locator('[data-version]').inputValue(),'1909');
    assert.equal(await page.locator('.c-reader-external').count(),0,'An external destination does not replace the internal reading with an error');
   }
+  // Offered but not yet licensed translations check the provider inside TNT.
+  // Opening Bible.com is an explicit fallback action after that check fails.
+  for(const [id,name] of [[128,'NVI ·'],[2664,'NVI Simplificada']]){
+   await page.getByRole('button',{name:'Traducción',exact:true}).click();
+   await page.locator('.tnt-select-dialog button[data-option]').filter({hasText:name}).tap();await page.getByText('Esta traducción necesita que se habilite su licencia',{exact:false}).waitFor();
+   const opened=context.waitForEvent('page',{timeout:4000});await page.getByRole('link',{name:/Leer en Bible.com/}).tap();const target=await opened;
+   await target.waitForURL('https://www.bible.com/bible/'+id+'/MAT.5.14-16');await target.getByRole('heading',{name:'Enlace externo de prueba'}).waitFor();await target.close();
+   assert.equal(await page.locator('[data-version]').inputValue(),String(id));await page.locator('[data-reader-local]').click();await page.locator('[data-reading] p').first().waitFor();
+  }
   // The destination must follow the current book, chapter and verse, rather than the initial reference.
   await page.locator('[name=reference]').fill('Juan 3:16');await page.locator('.c-reader-jump [type=submit]').click();await page.getByRole('button',{name:'Traducción',exact:true}).click();
   assert((await page.locator('.tnt-select-dialog a[data-option]').filter({hasText:'NTV'}).getAttribute('href')).endsWith('/127/JHN.3.16'));await page.keyboard.press('Escape');
   await page.locator('[name=reference]').fill('Génesis 1');await page.locator('.c-reader-jump [type=submit]').click();await page.getByRole('button',{name:'Traducción',exact:true}).click();
-  const simplified=page.locator('.tnt-select-dialog a[data-option]').filter({hasText:'NVI Simplificada'});assert.equal(await simplified.getAttribute('href'),'https://www.bible.com/versions/2664');assert((await simplified.innerText()).includes('Solo Nuevo Testamento'));await page.keyboard.press('Escape');
+  await page.locator('.tnt-select-dialog button[data-option]').filter({hasText:'NVI Simplificada'}).tap();await page.getByText('NVI Simplificada incluye solo el Nuevo Testamento.',{exact:false}).waitFor();assert.equal(await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href'),'https://www.bible.com/versions/2664');
   // Ordinary selections still load internally and consume only the selector's history entry.
   await page.getByRole('button',{name:'Traducción',exact:true}).click();await page.locator('.tnt-select-dialog button[data-option]').filter({hasText:'VBL'}).tap();await page.getByText('Lectura sintética GEN.1',{exact:true}).waitFor();assert.equal(await page.locator('[data-version]').inputValue(),'3291');
   assert.equal(destinations.length,5);await context.unroute('https://www.bible.com/**');
-  console.log('Enlaces externos: cinco destinos por toque/teclado, búsqueda, referencia actual, NVIS solo NT, selector interno, seis anchos, horizontal y ambos temas: OK');
+  console.log('Enlaces externos: tres destinos directos y dos tras comprobar la licencia, toque/teclado, referencia actual, NVIS solo NT, seis anchos, horizontal y ambos temas: OK');
  }
  try{
+  if(process.env.TNT_TEST_INLINE_ONLY==='1'){await inlineLicenseFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   if(process.env.TNT_TEST_STARTUP_ONLY==='1'){await startupPerformanceFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   if(!process.env.TNT_TEST_EXTERNAL_ONLY&&!process.env.TNT_TEST_BIBLE_ONLY&&!process.env.TNT_TEST_LAYOUT_ONLY)await startupPerformanceFlow();
   if(process.env.TNT_TEST_EXTERNAL_ONLY==='1'){await externalReadingFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   await externalReadingFlow();
   await bibleVersionsFlow();
+  await inlineLicenseFlow();
   if(process.env.TNT_TEST_BIBLE_ONLY==='1'){assert.equal(errors.length,0,errors.join('\n'));return;}
   await layoutSizingFlow();
   await loadingAndRotationFlow();

@@ -246,6 +246,9 @@ html[data-tnt-style] body :is(.activity-card,.agenda-card).is-featured .activity
 .life-page>.c-groups+[data-community-daily] { margin-top:28px; }
 
 /* External reading choices are native links, activated directly by touch or keyboard. */
+.tnt-select-list button[data-option] { height:max-content; }
+.tnt-select-list button[data-option]>span { flex:1;min-width:0; }
+.tnt-select-list button[data-option]>svg { flex:none; }
 .tnt-select-list a[data-option] { display:flex;align-items:center;justify-content:space-between;gap:10px;height:max-content;min-height:52px;width:100%;padding:10px 14px;border:1px solid var(--tnt-line);border-radius:13px;background:var(--tnt-panel2);color:var(--tnt-text);text-align:left;text-decoration:none;font:inherit;font-size:16px;overflow-wrap:anywhere; }
 .tnt-select-list a[data-option]>span { flex:1;min-width:0; }
 .tnt-select-list a[data-option] small { display:block;margin-top:4px;font-size:12px;line-height:1.4;font-weight:500;color:var(--tnt-muted); }

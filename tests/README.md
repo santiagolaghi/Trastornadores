@@ -1,3 +1,10 @@
+## NVI dentro del lector y actualización de licencias · 24 de octubre de 2026
+
+- Una traducción con licencia pendiente o catálogo desconocido aparece en «Comprobar acceso en TNT». Elegir NVI desde el menú real actualiza su acceso y solicita el pasaje dentro del lector. Las versiones que el proveedor confirma como no ofrecidas conservan sus enlaces nativos; para NVI, Bible.com queda como acción explícita después de un error.
+- Si el catálogo cambia con el selector abierto, la elección conserva el valor de la traducción. Un enlace anterior se comprueba otra vez antes de salir. El gateway consulta directamente el acceso al contenido de las ediciones solicitadas, conserva autenticación y créditos, y distingue un pasaje inexistente de una traducción ausente mediante sus metadatos.
+- Pasaron 283 comprobaciones unitarias, DOM, permisos, PWA y SQL aislado, y el recorrido completo de `community-browser.cjs`. `TNT_TEST_INLINE_ONLY=1` reproduce una licencia aceptada con la página abierta, selección durante el catálogo pendiente, catálogo caído con pasaje autorizado y cero pestañas externas. El recorrido externo comprueba los tres enlaces directos y los dos enlaces explícitos de respaldo, seis anchos, horizontal y ambos temas. Se revisaron capturas.
+- Las respuestas de YouVersion en estas pruebas son sintéticas; no certifican texto NVI real con la sesión del usuario en producción. No se modificaron cuentas ni datos personales. Recursos modificados, cliente push y service worker: `20261024f`.
+
 ## Apertura directa de Bible.com · 24 de octubre de 2026
 
 - Se reprodujo el problema desde el selector real: elegir una opción externa no abría su destino, sino que cambiaba a una pantalla de aviso. Ahora esas opciones son enlaces HTTPS nativos que abren la lectura con el gesto del usuario y conservan el marcador interno. El cierre del selector ocurre después de activar el enlace.

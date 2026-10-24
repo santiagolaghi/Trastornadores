@@ -75,12 +75,22 @@ export async function GET(request){
       path+='/passages/'+encodeURIComponent(passage)+'?format=html&include_headings=true&include_notes=false';
     }else if(action==='index')path+='/index';
     else if(action!=='version')return reply({error:'Acción no disponible.'},400);
-    const licensed=await licensedCatalog(key,apiHeaders);
-    if(!DESIRED.includes(id)&&!licensed.some(v=>v.id===id))return reply({error:'Traducción no disponible.',code:'VERSION_UNAVAILABLE'},400);
+    // For the requested editions, the content endpoint is the authority on
+    // access. A stale or failed catalogue must not hide a newly accepted license.
+    const desired=DESIRED.includes(id),licensed=desired?[]:await licensedCatalog(key,apiHeaders);
+    if(!desired&&!licensed.some(v=>v.id===id))return reply({error:'Traducción no disponible.',code:'VERSION_UNAVAILABLE'},400);
     const r=await remote('https://api.youversion.com/v1/'+path,apiHeaders);
     if(r.status===401)return reply(providerError(401),503);
     if(r.status===403)return reply({error:'Esta traducción todavía no está habilitada para TNT.',code:'LICENSE_REQUIRED'},403);
-    if(r.status===404)return reply(licensed.some(v=>v.id===id)?{error:'No encontramos ese pasaje.',code:'PASSAGE_NOT_FOUND'}:{error:'YouVersion no ofrece esta traducción para leer dentro de TNT.',code:'VERSION_UNAVAILABLE'},404);
+    if(r.status===404){
+      let known=licensed.some(v=>v.id===id);
+      if(desired&&action!=='version'){
+        const metadata=await remote('https://api.youversion.com/v1/bibles/'+id,apiHeaders);
+        if(metadata.status!==200&&metadata.status!==404)return reply(providerError(metadata.status),metadata.status===429?429:503);
+        known=metadata.ok;
+      }
+      return reply(known?{error:'No encontramos ese pasaje.',code:'PASSAGE_NOT_FOUND'}:{error:'YouVersion no ofrece esta traducción para leer dentro de TNT.',code:'VERSION_UNAVAILABLE'},404);
+    }
     if(r.status===429)return reply({error:'Hay muchas lecturas en este momento. Esperá un poco y volvé a intentar.'},429);
     if(!r.ok)return reply({error:'No pudimos cargar la lectura. Intentá nuevamente.'},502);
     const d=await r.json();

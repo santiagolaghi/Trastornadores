@@ -473,6 +473,17 @@ test('Las opciones externas son enlaces HTTPS seguros y conservan la selección 
  }finally{a.close();}
 });
 
+test('Una opción que recibió acceso interno mientras el menú estaba abierto conserva su valor y evita el enlace viejo',async()=>{
+ const a=await app('hub');try{
+  const parent=a.w.TNTUI.modal('Lectura','<label>Traducción<select><option value="1909">Local</option><option value="128" data-tnt-href="https://www.bible.com/bible/128/GEN.1">NVI</option></select></label>');
+  await until(()=>parent.querySelector('.tnt-select-trigger'));const select=parent.querySelector('select');let changed=false;select.addEventListener('change',()=>changed=true);parent.querySelector('.tnt-select-trigger').click();
+  const picker=a.d.querySelector('.tnt-select-dialog'),oldLink=picker.querySelector('a[data-option="1"]');
+  select.innerHTML='<option value="1909">Local</option><option value="147">Otra versión</option><option value="128">NVI habilitada</option>';
+  const event=new a.w.MouseEvent('click',{bubbles:true,cancelable:true});oldLink.dispatchEvent(event);assert.equal(event.defaultPrevented,true);
+  await until(()=>changed);assert.equal(select.value,'128');assert(!picker.isConnected);assert(parent.isConnected);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
 test('El selector consume su cierre antes de abrir otra ventana desde el cambio',async()=>{
  const a=await app('hub');
  try{

@@ -186,8 +186,17 @@
         dialog.querySelectorAll('[data-option]').forEach(item=>{
           // Real anchors keep navigation in the user's gesture, including installed mobile apps.
           // Close after the browser activates the link; keep the internal selection and bookmark.
-          if(item.tagName==='A'){item.onclick=()=>{root.setTimeout(()=>close(),0);};return;}
-          item.onclick=async()=>{if(closing)return;select.selectedIndex=Number(item.dataset.option);sync();await close();if(select.isConnected)select.dispatchEvent(new root.Event('change',{bubbles:true}));};
+          const value=options[Number(item.dataset.option)].value;
+          item.onclick=async e=>{
+            if(closing){e.preventDefault();return;}
+            // Options may be replaced while this menu is open (e.g. a newly
+            // licensed Bible). Keep the chosen value and recheck its link.
+            const current=[...select.options].find(option=>option.value===value);
+            if(select.disabled||!current||current.disabled){e.preventDefault();await close();return;}
+            const url=safeUrl(current.dataset.tntHref);
+            if(item.tagName==='A'&&url.startsWith('https://')){item.href=url;root.setTimeout(()=>close(),0);return;}
+            e.preventDefault();select.value=value;sync();await close();if(select.isConnected)select.dispatchEvent(new root.Event('change',{bubbles:true}));
+          };
         });
         const search=dialog.querySelector('.tnt-select-search');if(search)search.oninput=()=>{const term=search.value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();dialog.querySelectorAll('[data-option]').forEach(item=>{const value=(item.dataset.search||item.textContent).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();item.hidden=!value.includes(term);});};
         if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');

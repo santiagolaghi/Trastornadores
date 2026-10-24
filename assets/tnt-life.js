@@ -121,7 +121,7 @@
   async function bible(){
     layout(title('Biblia en comunidad')+'<p class="life-lead">Elegí tu lectura. Retomá donde te quedaste.</p><div data-reader><p class="life-reader-loading" role="status">Preparando tu lectura…</p></div>');
     const root=app.querySelector('[data-reader]'),requested=[{id:1909,title:'Reina-Valera 1909',short:'RVR 1909'},{id:149,title:'Reina-Valera 1960',short:'RVR 1960'},{id:1782,title:'Reina Valera Actualizada 2015',short:'RVA 2015'},{id:127,title:'Nueva Traducción Viviente',short:'NTV'},{id:128,title:'Nueva Versión Internacional',short:'NVI'},{id:2664,title:'Nueva Versión Internacional Simplificada',short:'NVI Simplificada'}];
-    let previous={...(TNT.readingPreference||TNTCommunity.data?.preferences?.reading||{}),...safeRead(key('reading'),{})},available=[],unavailable=[],translations=[...requested],catalogError=false;
+    let previous={...(TNT.readingPreference||TNTCommunity.data?.preferences?.reading||{}),...safeRead(key('reading'),{})},available=[],unavailable=[],translations=[...requested],catalogError=false,catalogFinished=false;
     function catalog(data){
       available=(data.versions||[]).map(v=>({id:Number(v.id),title:String(v.title||''),short:String(v.abbreviation||v.title||'')})).filter(v=>Number.isInteger(v.id)&&v.id>0&&v.id!==1909);
       unavailable=data.unavailable||[];translations=[requested[0],...available,...requested.slice(1).filter(v=>!available.some(a=>a.id===v.id))];catalogError=false;
@@ -129,16 +129,19 @@
     // The local reading and controls do not wait for the online catalogue or
     // for the complete Community dashboard. Saved cloud preferences arrive
     // with the authenticated startup context.
-    const catalogReady=api('versions').then(catalog).catch(()=>{catalogError=true;});
+    const catalogReady=api('versions').then(catalog).catch(error=>{catalogError=error;}).finally(()=>{catalogFinished=true;});
     if(!root.isConnected)return;
     const params=new URLSearchParams(location.search),ref=params.get('ref'),parts=ref?.split('.')||[];
     let version=translations.find(v=>v.id===Number(params.get('v')||previous.version))||translations.find(v=>v.id===1909),books=G.books.map(b=>({...b,chapters:Array.from({length:b.chapters},(_,i)=>({id:i+1}))})),book=books.find(b=>b.id===(parts[0]||previous.book))||books[0],chapter=Number(parts[1]||previous.chapter)||1,verse=parts[2]||'',size=Math.min(30,Math.max(17,Number(previous.size)||21)),credit='',serial=0,persistTimer;
     if(!book.chapters.some(c=>c.id===chapter))chapter=1;
     const inline=id=>id===1909||available.some(v=>v.id===id);
     const access=id=>unavailable.find(v=>v.id===id)?.code||'ACCESS_UNKNOWN';
+    // A missing license or a catalogue still loading is not an external-only
+    // translation. Check its current access in TNT when the user selects it.
+    const externalOnly=id=>!inline(id)&&access(id)==='VERSION_UNAVAILABLE';
     function versionOptions(){
       const option=v=>'<option value="'+v.id+'" '+(version.id===v.id?'selected':'')+'>'+U.esc(v.short+' · '+v.title)+'</option>';
-      return '<optgroup label="Leer dentro de TNT">'+translations.filter(v=>inline(v.id)).map(option).join('')+'</optgroup><optgroup label="Lectura oficial en Bible.com">'+translations.filter(v=>!inline(v.id)).map(option).join('')+'</optgroup>';
+      return '<optgroup label="Leer dentro de TNT">'+translations.filter(v=>inline(v.id)).map(option).join('')+'</optgroup><optgroup label="Comprobar acceso en TNT">'+translations.filter(v=>!inline(v.id)&&!externalOnly(v.id)).map(option).join('')+'</optgroup><optgroup label="Lectura oficial en Bible.com">'+translations.filter(v=>externalOnly(v.id)).map(option).join('')+'</optgroup>';
     }
     const passage=()=>book.id+'.'+chapter+(verse?'.'+verse:'');
     const external=()=>TNTCommunity.readLink(passage(),version.id);
@@ -148,30 +151,30 @@
     const bookSelect=root.querySelector('[data-book]'),chapterSelect=root.querySelector('[data-chapter]'),text=root.querySelector('[data-reading]');
     function target(direction){const i=book.chapters.findIndex(c=>c.id===chapter)+direction;if(i>=0&&i<book.chapters.length)return{book,chapter:book.chapters[i].id};const b=books[books.indexOf(book)+direction];return b?{book:b,chapter:direction>0?b.chapters[0].id:b.chapters.at(-1).id}:null;}
     function controls(){bookSelect.innerHTML=books.map(b=>'<option value="'+b.id+'" '+(b.id===book.id?'selected':'')+'>'+U.esc(b.name)+'</option>').join('');chapterSelect.innerHTML=book.chapters.map(c=>'<option value="'+c.id+'" '+(c.id===chapter?'selected':'')+'>'+c.id+'</option>').join('');root.querySelector('[data-version-name]').textContent=version.short;root.querySelector('[data-prev]').disabled=!target(-1);root.querySelector('[data-next]').disabled=!target(1);text.style.setProperty('--reading-size',size+'px');root.querySelector('[data-attribution]').textContent=credit;
-      for(const option of root.querySelector('[data-version]').options){const id=Number(option.value);if(inline(id)){delete option.dataset.tntHref;delete option.dataset.tntLinkHint;}else{option.dataset.tntHref=TNTCommunity.readLink(passage(),id);option.dataset.tntLinkHint=id===2664&&book.testament==='old'?'Solo Nuevo Testamento · abrir versión en Bible.com':'Abrir en Bible.com · otra pestaña';}}
+      for(const option of root.querySelector('[data-version]').options){const id=Number(option.value);if(!externalOnly(id)){delete option.dataset.tntHref;delete option.dataset.tntLinkHint;}else{option.dataset.tntHref=TNTCommunity.readLink(passage(),id);option.dataset.tntLinkHint=id===2664&&book.testament==='old'?'Solo Nuevo Testamento · abrir versión en Bible.com':'Abrir en Bible.com · otra pestaña';}}
     }
     function fallback(error){
       const code=error?.code||access(version.id),message=version.id===2664&&book.testament==='old'?'NVI Simplificada incluye solo el Nuevo Testamento. Abrí la versión en Bible.com para elegir un pasaje disponible.':code==='VERSION_UNAVAILABLE'?'Esta versión se lee en Bible.com. YouVersion no ofrece su texto para la conexión de TNT.':code==='LICENSE_REQUIRED'?'Esta traducción necesita que se habilite su licencia para leerla dentro de TNT. Podés abrir este mismo pasaje en Bible.com.':code==='PASSAGE_NOT_FOUND'?'No encontramos ese pasaje en esta traducción. Probá otra referencia o abrilo en Bible.com.':'No pudimos conectar la lectura. Podés intentar de nuevo o abrir el pasaje en Bible.com.';
       text.innerHTML='<div class="c-reader-external"><span class="life-symbol">'+icon('book')+'</span><span class="life-eyebrow">'+U.esc(version.short)+'</span><h2>'+U.esc(book.name+' '+chapter+(verse?':'+verse:''))+'</h2><p>'+message+'</p><a class="life-button" href="'+external()+'" target="_blank" rel="noopener noreferrer">Leer en Bible.com '+arrow()+'</a><button class="life-button outline" data-reader-local>Leer acá en RVR 1909</button><button class="life-text-button" data-reader-retry>Revisar conexión</button>'+(TNT.isAdmin&&code==='LICENSE_REQUIRED'?'<a class="life-text-button" href="https://platform.youversion.com/" target="_blank" rel="noopener noreferrer">Revisar licencia en YouVersion</a>':'')+'<small>La lectura se abre fuera de TNT. Tu lugar queda guardado acá.</small></div>';
       text.querySelector('[data-reader-local]').onclick=()=>{version=translations.find(v=>v.id===1909);root.querySelector('[data-version]').value='1909';root.querySelector('[data-version]').dispatchEvent(new Event('change',{bubbles:true}));};
-      text.querySelector('[data-reader-retry]').onclick=async e=>{const selected=version.id;e.target.disabled=true;try{catalog(await api('versions'));if(!root.isConnected||version.id!==selected)return;version=translations.find(v=>v.id===selected)||version;root.querySelector('[data-version]').innerHTML=versionOptions();}catch{catalogError=true;}if(root.isConnected&&version.id===selected)changeVersion();};root.querySelector('[data-attribution]').textContent='Acceso a la lectura oficial en YouVersion / Bible.com.';
+      text.querySelector('[data-reader-retry]').onclick=e=>{e.target.disabled=true;changeVersion(true);};root.querySelector('[data-attribution]').textContent='Acceso a la lectura oficial en YouVersion / Bible.com.';
     }
     async function read(){
       const request=++serial;credit='';controls();persist();
-      if(!inline(version.id)){fallback(catalogError?Error('connection'):null);return;}
+      if(externalOnly(version.id)){fallback(catalogError||null);return;}
       text.textContent='Cargando '+book.name+' '+chapter+'…';
-      try{const result=version.id===1909?await TNTBibleText.passage(passage()):await api('passage',{version:version.id,passage:passage()});if(request!==serial||!text.isConnected)return;text.innerHTML=cleanPassage(result.content);text.dataset.yvTheme=document.documentElement.dataset.tntTheme==='dark'?'dark':'light';credit=result.copyright;root.querySelector('[data-attribution]').textContent=credit;
+      try{const result=version.id===1909?await TNTBibleText.passage(passage()):await api('passage',{version:version.id,passage:passage()});if(request!==serial||!text.isConnected)return;if(!inline(version.id)){available.push(version);unavailable=unavailable.filter(v=>Number(v.id)!==version.id);root.querySelector('[data-version]').innerHTML=versionOptions();controls();}text.innerHTML=cleanPassage(result.content);text.dataset.yvTheme=document.documentElement.dataset.tntTheme==='dark'?'dark':'light';credit=result.copyright;root.querySelector('[data-attribution]').textContent=credit;
        if(version.id!==1909&&!document.getElementById('life-bible-fonts'))api('fonts').then(({css})=>{if(!css||document.getElementById('life-bible-fonts'))return;const style=document.createElement('style');style.id='life-bible-fonts';style.textContent=css;document.head.append(style);}).catch(()=>{});
-      }catch(e){if(request===serial)fallback(e);}
+      }catch(e){if(request===serial){if(['LICENSE_REQUIRED','VERSION_UNAVAILABLE'].includes(e.code)){available=available.filter(v=>v.id!==version.id);unavailable=unavailable.filter(v=>Number(v.id)!==version.id).concat({id:version.id,code:e.code});root.querySelector('[data-version]').innerHTML=versionOptions();controls();}fallback(e);}}
     }
-    async function changeVersion(){const request=++serial;credit='';controls();text.textContent='Preparando '+version.short+'…';
-      if(version.id!==1909){await catalogReady;if(request!==serial||!root.isConnected)return;version=translations.find(v=>v.id===version.id)||version;}
+    async function changeVersion(refresh=false){const request=++serial,waitingForCatalog=!catalogFinished;credit='';controls();text.textContent='Preparando '+version.short+'…';
+      if(version.id!==1909){await catalogReady;if(request!==serial||!root.isConnected)return;if(refresh&&!waitingForCatalog){try{const data=await api('versions');if(request!==serial||!root.isConnected)return;catalog(data);}catch(error){if(request!==serial||!root.isConnected)return;catalogError=error;}}version=translations.find(v=>v.id===version.id)||version;root.querySelector('[data-version]').innerHTML=versionOptions();}
       root.querySelector('[data-version]').disabled=true;
       try{if(version.id!==1909&&inline(version.id)){const index=await api('index',{version:version.id});if(request!==serial)return;const list=(index.books||[]).map(b=>({...b,name:G.books.find(x=>x.id===b.id)?.name,chapters:(b.chapters||[]).map(c=>({...c,id:Number(c.id)})).filter(c=>Number.isInteger(c.id)&&c.id>0)})).filter(b=>b.name&&b.chapters.length);if(list.length){books=list;book=books.find(b=>b.id===book.id)||books[0];if(!book.chapters.some(c=>c.id===chapter))chapter=book.chapters[0].id;}}
        else canonicalIndex();
       }catch{if(request===serial)canonicalIndex();/* An index timeout does not revoke a translation's license. */}finally{root.querySelector('[data-version]').disabled=false;}if(request===serial)await read();
     }
-    root.querySelector('[data-version]').onchange=e=>{version=translations.find(v=>v.id===Number(e.target.value));changeVersion();};
+    root.querySelector('[data-version]').onchange=e=>{version=translations.find(v=>v.id===Number(e.target.value))||version;changeVersion(!inline(version.id)&&!externalOnly(version.id));};
     bookSelect.onchange=()=>{book=books.find(b=>b.id===bookSelect.value);chapter=book.chapters[0].id;verse='';read();};chapterSelect.onchange=()=>{chapter=Number(chapterSelect.value);verse='';read();};
     for(const [selector,dir] of [['[data-prev]',-1],['[data-next]',1]])root.querySelector(selector).onclick=()=>{const to=target(dir);if(to){({book,chapter}=to);verse='';read();text.scrollIntoView({behavior:'smooth',block:'start'});}};
     root.querySelector('[data-smaller]').onclick=()=>{size=Math.max(17,size-2);text.style.setProperty('--reading-size',size+'px');persist();};root.querySelector('[data-larger]').onclick=()=>{size=Math.min(30,size+2);text.style.setProperty('--reading-size',size+'px');persist();};

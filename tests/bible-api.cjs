@@ -4,7 +4,7 @@ test('La conexión bíblica valida catálogo, capítulos, licencias y créditos 
  const {GET}=await import('../api/bible.mjs'),originalFetch=global.fetch,originalKey=process.env.YOUVERSION_APP_KEY;
  const secret='synthetic-test-key';process.env.YOUVERSION_APP_KEY=secret;
  const defaults=[{id:147,title:'Reina-Valera Antigua',abbreviation:'RVES'},{id:3291,title:'Versión Biblia Libre',abbreviation:'VBL'},{id:3365,title:'Palabra de Dios para ti',abbreviation:'PdDpt'}];
- let auth=true,enabled=true,upstreamStatus=200,catalogStatus=200,fullCatalogStatus=200,credit='Créditos de prueba',promo='',calls=[],licensed=defaults,paginated=false,repeatPage=false,leakyCss=false;
+ let auth=true,enabled=true,upstreamStatus=200,catalogStatus=200,fullCatalogStatus=200,credit='Créditos de prueba',promo='',calls=[],licensed=defaults,paginated=false,repeatPage=false,leakyCss=false,knownMetadata=false;
  global.fetch=async(url,options)=>{
   calls.push({url,options});
   if(url.includes('/auth/v1/user'))return Response.json({id:'test-user'},{status:auth?200:401});
@@ -21,7 +21,7 @@ test('La conexión bíblica valida catálogo, capítulos, licencias y créditos 
    return Response.json({data:licensed});
   }
   if(u.pathname.includes('/fonts/'))return new Response(leakyCss?secret:'@font-face {font-family:Test;src:url(https://cdn.youversion.com/test.woff2)}');
-  if(upstreamStatus!==200)return Response.json({}, {status:upstreamStatus});
+  if(upstreamStatus!==200&&!(knownMetadata&&/^\/v1\/bibles\/128$/.test(u.pathname)))return Response.json({}, {status:upstreamStatus});
   if(u.pathname.includes('/passages/'))return Response.json({id:'JHN.3',reference:'Juan 3',content:'<p>Contenido sintético</p>'});
   if(u.pathname.includes('/index'))return Response.json({books:[{id:'GEN',chapters:[{id:'1'},{id:'2'}]}],text_direction:'ltr'});
   return Response.json({id,title:licensed.find(v=>Number(v.id)===id)?.title,copyright:credit,promotional_content:promo});
@@ -55,6 +55,12 @@ test('La conexión bíblica valida catálogo, capítulos, licencias y créditos 
    upstreamStatus=404;response=await request('action=passage&passage=JHN.3&version=127');assert.equal((await response.json()).code,'VERSION_UNAVAILABLE');
    response=await request('action=passage&passage=JHN.999&version=3291');assert.equal((await response.json()).code,'PASSAGE_NOT_FOUND');
    upstreamStatus=401;response=await request('action=passage&passage=JHN.3&version=3291');assert.equal(response.status,503);assert.equal((await response.json()).code,'BIBLE_KEY_INVALID');upstreamStatus=200;
+  });
+  await t.test('Una licencia nueva comprueba el texto sin depender del catálogo anterior o interrumpido',async()=>{
+   calls=[];catalogStatus=503;let response=await request('action=passage&passage=JHN.3&version=128');assert.equal(response.status,200);assert.equal((await response.json()).copyright,credit);
+   assert(!calls.some(c=>new URL(c.url).pathname==='/v1/bibles'));assert(calls.some(c=>c.url.includes('/bibles/128/passages/')));
+   upstreamStatus=403;response=await request('action=passage&passage=JHN.3&version=128');assert.equal(response.status,403);assert.equal((await response.json()).code,'LICENSE_REQUIRED');
+   catalogStatus=200;upstreamStatus=404;knownMetadata=true;response=await request('action=passage&passage=JHN.999&version=128');assert.equal((await response.json()).code,'PASSAGE_NOT_FOUND');knownMetadata=false;upstreamStatus=200;
   });
   await t.test('Cada pasaje obtiene créditos actuales; RVES con campos nulos conserva edición y fuente sin inventar copyright',async()=>{
    calls=[];const response=await request('action=passage&passage=JHN.3&version=3291');assert.equal(response.status,200);const data=await response.json();assert.equal(data.copyright,credit);assert(calls.some(c=>c.url.endsWith('/bibles/3291')));assert(!JSON.stringify(data).includes(secret));
