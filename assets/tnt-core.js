@@ -50,34 +50,38 @@ TNT.displayName=function(){return TNTUI.personName(TNT.identity?.display_name||T
 TNT.avatar=function(){return TNT.account?.avatar_url||TNT.identity?.avatar_url||''};
 TNT.logout=async function(){window.TNTAccounts?.forget();window.TNTPush?.forget();try{const sub=await window.TNTPush?.current();if(sub)await sb.rpc('tnt_push_unsubscribe',{p_endpoint:sub.endpoint});}catch{}await sb?.auth?.signOut?.({scope:'local'});localStorage.removeItem('tnt-central-user');location.replace('/?v=14')};
 function avatarHtml(cls='tnt-avatar'){return TNTUI.avatar(TNT.person,{...TNT.account,avatar_url:TNT.avatar()},cls);}
-async function ensureIdentity(session){
+let identityFlight;
+function ensureIdentity(session){
+ if(identityFlight)return identityFlight;
+ identityFlight=loadIdentity(session).finally(()=>identityFlight=null);return identityFlight;
+}
+async function loadIdentity(session){
  if(!sb||!session)return null;
- // Creating/syncing an account is a sign-in operation, not part of a live read.
- if(!TNT.account||TNT.account.auth_user_id!==session.user.id){const er=await sb.rpc('tnt_ensure_account');if(er.error)throw er.error;const skipped=localStorage.getItem('tnt:profile-match-skipped:'+session.user.id),continued=skipped?{data:{linked:false}}:await sb.rpc('tnt_continue_profile',{p_target:null,p_values:{},p_confirm:false});if(continued.error)console.warn('TNT coincidencia de perfil',continued.error.message);else{TNT.profileCandidate=continued.data?.candidate||null;TNT.profileContinued=!!continued.data?.linked;}}
- const ar=await sb.from('tnt_accounts').select('*').eq('auth_user_id',session.user.id).maybeSingle();if(ar.error)throw ar.error;
- if(!ar.data)throw new Error('No pude vincular tu Cuenta TNT.');if(ar.data.enabled===false)throw new Error('Tu cuenta está deshabilitada. Consultá con un Admin TNT.');
+ // Only the sign-in synchronization marker survives navigation. It grants no
+ // access: account, profile, permissions and module configuration are read fresh.
+ const syncKey='tnt:account-sync:'+session.user.id,signIn=session.user.last_sign_in_at||'tab';
+ let synced=false;try{synced=sessionStorage.getItem(syncKey)===signIn;}catch{}
+ const sync=(!TNT.account||TNT.account.auth_user_id!==session.user.id)&&!synced;
+ const result=await sb.rpc('tnt_startup_context',{p_sync:sync,p_continue:sync&&!localStorage.getItem('tnt:profile-match-skipped:'+session.user.id)});
+ if(result.error)throw result.error;
+ const ctx=result.data,ar={data:ctx?.account},pr={data:ctx?.person};
+ if(!ar.data||ar.data.auth_user_id!==session.user.id||ar.data.enabled!==true)throw new Error('Tu cuenta no está habilitada. Consultá con un administrador.');
+ if(!pr.data||pr.data.id!==ar.data.person_id||pr.data.active!==true||!ctx.profile)throw new Error('Tu perfil no está disponible. Consultá con un administrador.');
+ if(sync){TNT.profileCandidate=ctx.continuation?.candidate||null;TNT.profileContinued=!!ctx.continuation?.linked;if(ctx.continuation?.error)console.warn('TNT coincidencia de perfil',ctx.continuation.error);}
  const googlePhoto=session.user.user_metadata?.avatar_url||session.user.user_metadata?.picture||'';
  if(ar.data.avatar_source==='google'&&ar.data.avatar_sync!==false&&/^https:\/\/[a-z0-9.-]+\.googleusercontent\.com\//i.test(googlePhoto)&&googlePhoto!==ar.data.avatar_google_url){
   const synced=await sb.rpc('tnt_set_profile_photo',{p_source:'google',p_path:null,p_sync:true});
   if(!synced.error&&synced.data)Object.assign(ar.data,synced.data);
  }
- const [pr,gr,legacy,rp,pp,profile]=await Promise.all([
-   sb.from('tnt_people').select('*').eq('id',ar.data.person_id).single(),
-   sb.from('tnt_access_grants').select('*').eq('person_id',ar.data.person_id),
-   sb.from('tnt_module_access').select('*').eq('person_id',ar.data.person_id),
-   ar.data.ministry_role?sb.from('tnt_role_permission_presets').select('*').eq('role',ar.data.ministry_role):Promise.resolve({data:[]}),
-   sb.from('tnt_person_permission_overrides').select('*').eq('person_id',ar.data.person_id),
-   sb.rpc('tnt_profile_context')
- ]);
- for(const result of [pr,gr,legacy,rp,pp,profile])if(result.error)throw result.error;
- if(pr.data.active===false)throw new Error('Tu perfil está archivado. Consultá con un administrador.');
- TNT.grants=gr.data||[];
- for(const g of legacy.data||[])if(g.module!=='efe'&&!TNT.grants.some(x=>x.module===g.module&&x.scope==='*'))TNT.grants.push({module:g.module,scope:'*',enabled:g.enabled,access_level:g.access_level});
- TNT.rolePermissions=rp.data||[];TNT.personPermissions=(pp.data||[]).filter(x=>!x.archived_at);
- TNT.profileContext=profile.data;TNT.profileComplete=profile.data?.complete===true;
+ TNT.grants=ctx.grants||[];
+ for(const g of ctx.legacy||[])if(g.module!=='efe'&&!TNT.grants.some(x=>x.module===g.module&&x.scope==='*'))TNT.grants.push({module:g.module,scope:'*',enabled:g.enabled,access_level:g.access_level});
+ TNT.rolePermissions=ctx.role_permissions||[];TNT.personPermissions=(ctx.person_permissions||[]).filter(x=>!x.archived_at);
+ TNT.profileContext=ctx.profile;TNT.profileComplete=ctx.profile.complete===true;
+ TNT.readingPreference=ctx.reading||{};
  TNT.account=ar.data;TNT.person=pr.data;TNT.isAdmin=ar.data.system_role==='admin';TNT.isStaff=ar.data.staff_status==='approved';
  TNT.identity={person_id:pr.data.id,auth_user_id:session.user.id,email:session.user.email||ar.data.email||'',full_name:pr.data.full_name||'',nickname:ar.data.nickname||'',display_name:ar.data.nickname||pr.data.full_name||session.user.email||'TNT',system_role:ar.data.system_role,ministry_role:ar.data.ministry_role||'',avatar_url:ar.data.avatar_url||session.user.user_metadata?.avatar_url||session.user.user_metadata?.picture||''};
- if(window.TNTExperience&&!TNTExperience.loaded){await TNTExperience.load(sb);TNTExperience.loaded=true;}
+ if(window.TNTExperience&&!TNTExperience.editing){TNTExperience.config=ctx.experience?.config||{};TNTExperience.revision=Number(ctx.experience?.revision||0);TNTExperience.loaded=true;TNTExperience.paint();}
+ if(sync)try{sessionStorage.setItem(syncKey,signIn);}catch{}
  localStorage.setItem('tnt-central-user',JSON.stringify(TNT.identity));
  return TNT.identity;
 }
@@ -136,14 +140,16 @@ TNT.sheet=sheet;TNT.requestAccess=requestAccess;TNT.editProfile=showProfile;TNT.
 TNT.ownProfilePage=()=>moduleName==='perfiles'&&/^\/perfiles\/datos\/?$/.test(location.pathname)&&new URLSearchParams(location.search).get('me')==='1';
 TNT.refreshIdentity=async()=>{const before=JSON.stringify(TNT.profileContext),identity=await ensureIdentity(TNT.session);const button=document.querySelector('[data-tnt-user]');if(button)button.innerHTML=avatarHtml();if(before!==JSON.stringify(TNT.profileContext))document.dispatchEvent(new CustomEvent('tnt:profile',{detail:{personId:TNT.person.id}}));return identity;};
 TNT.refreshAccess=async()=>{try{await TNT.refreshIdentity();document.dispatchEvent(new CustomEvent('tnt:permissions'));document.dispatchEvent(new CustomEvent('tnt:membership'));TNTUI.toast('Tu acceso está actualizado.');}catch(e){TNTUI.toast(e.message,true);}};
+let profileCheckBusy=false;
 async function checkProfileRequirements(){
- if(!TNT.identity||!TNT.profileComplete||document.hidden)return;
+ if(!TNT.identity||!TNT.profileComplete||document.hidden||profileCheckBusy||identityFlight)return;
+ profileCheckBusy=true;
  try{const r=await sb.rpc('tnt_profile_context');if(r.error)return;const before=JSON.stringify(TNT.profileContext);const oldRole=TNT.profileContext?.values?._ministry_role,oldStatus=TNT.profileContext?.values?._staff_status;if(oldRole!==r.data.values?._ministry_role||oldStatus!==r.data.values?._staff_status||JSON.stringify(TNT.profileContext?.values?._profile_roles)!==JSON.stringify(r.data.values?._profile_roles)){await TNT.refreshIdentity();document.dispatchEvent(new CustomEvent('tnt:membership'));}else{TNT.profileContext=r.data;if(before!==JSON.stringify(r.data))document.dispatchEvent(new CustomEvent('tnt:profile',{detail:{personId:TNT.person.id}}));}
   if(r.data.complete!==true){TNT.profileComplete=false;TNT.blocked=true;
    if(moduleName){document.body.classList.remove('tnt-access-ready');location.replace('/?onboarding=1');}
    else document.dispatchEvent(new CustomEvent('tnt:membership'));
   }
- }catch(e){console.warn('Actualización de requisitos',e);}
+ }catch(e){console.warn('Actualización de requisitos',e);}finally{profileCheckBusy=false;}
 }
 document.addEventListener('visibilitychange',checkProfileRequirements);
 const profileRequirementsTimer=setInterval(checkProfileRequirements,30000);
