@@ -1,3 +1,10 @@
+## Widget compacto y una sola carga TNT · 24 de octubre de 2026
+
+- El widget muestra un adelanto de cuatro líneas con tipografía de lectura. «Leer completo» abre el pasaje exacto en la Biblia y «Ver frase» muestra la frase íntegra en una ventana de TNT. Las flechas, los indicadores y el teclado cambian la tarjeta; la rotación automática se puede pausar y reanudar y respeta el movimiento reducido.
+- La carga ocupa la pantalla completa y centra una sola presentación con el logo de TNT. Se quitaron el aro animado y los estilos anteriores de carga de `tnt-unified.css`; se conserva la barra de TNT y el estado para conexiones lentas.
+- La regresión utiliza Mateo 5:14-16, como en la captura reportada: tarjeta de hasta 330 px, controles de 44 px y contenido completo comprobado en el lector. También verifica frase completa, pausa/reanudación real, seis anchos, ambos temas y carga en horizontal. Se revisaron las capturas.
+- Pasaron las 270 pruebas automatizadas y el recorrido completo de Chromium con SDK oficial, SQL aislado y respuestas HTTP sintéticas. El caso de Génesis usa una referencia explícita para ser independiente del marcador que guarda la lectura del widget. No se modifica información de producción. Recursos modificados y service worker: `20261024b`.
+
 ## Alturas de Inicio y perfil anterior · 24 de octubre de 2026
 
 - El carrusel ajusta su altura a la tarjeta visible al deslizar, usar flechas/teclado, cambiar el ancho o recibir texto. Una lectura larga no estira la frase corta ni deja un hueco debajo. Las fechas conservan su altura de contenido aunque haya varios coordinadores.
