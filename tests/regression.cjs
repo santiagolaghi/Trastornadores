@@ -464,6 +464,15 @@ test('Hub counts active assignments and displays only authorized module cards',a
 
 test('Selectores compartidos abren una hoja personalizada, buscan y conservan el cambio nativo',async()=>{const a=await app('hub');try{const dialog=a.w.TNTUI.modal('Configuración','<label for="test-choice">Elegí equipo</label><select id="test-choice"><option value="">Elegí</option><option value="north">Norte</option><option value="south">Sur</option></select>');await until(()=>dialog.querySelector('.tnt-select-trigger'));let changed=false;const sel=dialog.querySelector('select');sel.addEventListener('change',()=>changed=true);dialog.querySelector('.tnt-select-trigger').click();assert(a.d.querySelector('.tnt-select-dialog'));a.d.querySelector('[data-option="2"]').click();assert.equal(sel.value,'south');await until(()=>changed);assert(dialog.isConnected);assert(dialog.querySelector('.tnt-select-trigger').textContent.includes('Sur'));assert.deepEqual(a.errors,[]);}finally{a.close();}});
 
+test('Las opciones externas son enlaces HTTPS seguros y conservan la selección interna y la ventana anterior',async()=>{
+ const a=await app('hub');try{
+  const parent=a.w.TNTUI.modal('Lectura','<label>Traducción<select><option value="local">Leer acá</option><option value="ntv" data-tnt-href="https://www.bible.com/bible/127/MAT.5.14-16" data-tnt-link-hint="Abrir Bible.com">NTV</option><option value="bad" data-tnt-href="javascript:alert(1)">No ejecutar</option><option value="http" data-tnt-href="http://example.test">No HTTPS</option><option value="off" disabled data-tnt-href="https://example.test">Deshabilitada</option></select></label>');
+  await until(()=>parent.querySelector('.tnt-select-trigger'));const select=parent.querySelector('select');let changes=0;select.addEventListener('change',()=>changes++);parent.querySelector('.tnt-select-trigger').click();const picker=a.d.querySelector('.tnt-select-dialog'),link=picker.querySelector('a[data-option="1"]');
+  assert.equal(link.getAttribute('href'),'https://www.bible.com/bible/127/MAT.5.14-16');assert.equal(link.target,'_blank');assert(link.rel.includes('noopener'));assert(link.rel.includes('noreferrer'));assert.equal(picker.querySelectorAll('a').length,1);assert(picker.querySelector('[data-option="4"]').disabled);
+  link.addEventListener('click',e=>e.preventDefault());link.click();await until(()=>!picker.isConnected);assert.equal(select.value,'local');assert.equal(changes,0);assert(parent.isConnected);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
 test('El selector consume su cierre antes de abrir otra ventana desde el cambio',async()=>{
  const a=await app('hub');
  try{

@@ -1,3 +1,11 @@
+## Apertura directa de Bible.com · 24 de octubre de 2026
+
+- Se reprodujo el problema desde el selector real: elegir una opción externa no abría su destino, sino que cambiaba a una pantalla de aviso. Ahora esas opciones son enlaces HTTPS nativos que abren la lectura con el gesto del usuario y conservan el marcador interno. El cierre del selector ocurre después de activar el enlace.
+- Se verificaron en un navegador real los cinco destinos de Mateo 5:14-16: NTV, RVR 1960, RVA 2015, NVI y NVI Simplificada. El ID 2664 se identifica correctamente como NVI Simplificada, disponible solo para el Nuevo Testamento; ante una referencia del Antiguo se abre su página de versión, sin fabricar otro pasaje ni atribuirle otra traducción.
+- `TNT_TEST_EXTERNAL_ONLY=1 node tests/community-browser.cjs` comprueba apertura de pestañas por toque/Enter desde el menú, búsqueda, referencia actual tras cambiar de libro, selección interna conservada, retorno a opciones internas y destinos de NVIS. Los destinos de esta regresión son respuestas HTTP sintéticas; la comprobación pública de Bible.com se realizó por separado. Verifica seis anchos, horizontal, ambos temas y que títulos/ayuda no desborden las tarjetas.
+- Pasaron 275 pruebas automatizadas y el recorrido completo de Chromium con SDK oficial, SQL aislado y respuestas HTTP sintéticas. Después se repitió el recorrido específico del selector al corregir su altura para nombres largos, con capturas revisadas. No se probó un teléfono físico ni se concedieron licencias de YouVersion.
+- Recursos y service worker: `20261024d`. La actualización conserva datos, sesiones y preferencias.
+
 ## Catálogo bíblico y disponibilidad real · 24 de octubre de 2026
 
 - Se conservan todas las versiones españolas autorizadas por YouVersion, con paginación e IDs normalizados. El selector distingue lectura dentro de TNT de enlaces a Bible.com. Un fallo de índice no revoca una licencia y cambiar de libro durante esa consulta no bloquea el selector.

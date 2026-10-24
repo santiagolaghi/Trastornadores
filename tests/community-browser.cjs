@@ -70,7 +70,7 @@ async function mockAPI(page,actor=1){
  fs.mkdirSync(out,{recursive:true});await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const base='http://127.0.0.1:'+server.address().port;
  const browser=await chromium.launch({executablePath:process.env.TNT_TEST_BROWSER,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu'],headless:true});
- const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,serviceWorkers:'block'});
+ const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:'block'});
  await context.addInitScript(({id,key})=>{
   if(location.protocol!=='http:')return;const enc=v=>btoa(JSON.stringify(v)).replaceAll('=','').replaceAll('+','-').replaceAll('/','_');
   const user={id,email:'demo@example.test',aud:'authenticated',role:'authenticated',user_metadata:{avatar_url:'https://lh3.googleusercontent.com/synthetic-photo'}};
@@ -262,7 +262,41 @@ async function mockAPI(page,actor=1){
   assert(apiCalls.some(c=>c.id===147&&c.action==='passage'));assert(apiCalls.some(c=>c.id===3291&&c.action==='passage'));assert(apiCalls.some(c=>c.id===3365&&c.action==='passage'));
   console.log('Biblia: catálogo completo habilitado, capítulos con IDs de texto, navegación de todas las versiones, NTV/RVR/RVA no ofrecidas, NVI pendiente, fallo de índice, alta/revocación de licencia y recuperación: OK');
  }
+ async function externalReadingFlow(){
+  const destinations=[];
+  await context.route('https://www.bible.com/**',route=>{destinations.push(route.request().url());return route.fulfill({contentType:'text/html',body:'<!doctype html><html lang="es"><title>Destino oficial de prueba</title><body><h1>Enlace externo de prueba</h1></body></html>'});});
+  await visit('/biblia?ref=MAT.5.14-16&v=1909','[data-reading]');await page.locator('[data-reading] p').first().waitFor();
+  await page.getByRole('button',{name:'Traducción',exact:true}).click();
+  for(const theme of ['light','dark'])for(const [width,height] of [[320,844],[360,740],[390,844],[412,900],[768,900],[1280,900],[844,360]]){
+   await page.evaluate(t=>TNT.setTheme(t),theme);await page.setViewportSize({width,height});
+   assert(await page.locator('.tnt-select-dialog').evaluate(n=>{const r=n.getBoundingClientRect();return r.left>=10&&r.right<=innerWidth-10&&r.top>=10&&r.bottom<=innerHeight-10;}),'External picker fits '+theme+' '+width);
+   for(const item of await page.locator('.tnt-select-dialog a[data-option]').all()){await item.scrollIntoViewIfNeeded();assert(await item.evaluate(n=>{const r=n.getBoundingClientRect(),s=n.querySelector('span').getBoundingClientRect(),style=getComputedStyle(n);return r.width>=44&&r.height>=44&&r.left>=10&&r.right<=innerWidth-10&&s.top>=r.top+parseFloat(style.paddingTop)-1&&s.bottom<=r.bottom-parseFloat(style.paddingBottom)+1;}),'External link and its complete label fit without clipping');}
+   if(width===390)await page.screenshot({path:path.join(out,'external-picker-'+theme+'.png')});
+  }
+  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>TNT.setTheme('light'));await page.locator('.tnt-select-close').click();await page.locator('.tnt-select-dialog').waitFor({state:'hidden'});
+  for(const [id,name] of [[127,'NTV'],[149,'RVR 1960'],[1782,'RVA 2015'],[128,'NVI'],[2664,'NVI Simplificada']]){
+   await page.getByRole('button',{name:'Traducción',exact:true}).click();await page.locator('.tnt-select-dialog').waitFor();
+   const choice=page.locator('.tnt-select-dialog [data-option]').filter({hasText:name}).filter({has:page.locator('span')});
+   const item=id===128?choice.filter({hasNotText:'Simplificada'}):choice;
+   if(id===127){await page.locator('.tnt-select-search').fill('NTV');assert.equal(await page.locator('.tnt-select-dialog [data-option]:visible').count(),1);}
+   const opened=context.waitForEvent('page',{timeout:4000});if(id===127)await item.press('Enter');else await item.tap();const target=await opened;
+   await target.waitForURL('https://www.bible.com/bible/'+id+'/MAT.5.14-16');await target.getByRole('heading',{name:'Enlace externo de prueba'}).waitFor();await target.close();
+   await page.locator('.tnt-select-dialog').waitFor({state:'hidden'});assert.equal(await page.locator('[data-version]').inputValue(),'1909');
+   assert.equal(await page.locator('.c-reader-external').count(),0,'An external destination does not replace the internal reading with an error');
+  }
+  // The destination must follow the current book, chapter and verse, rather than the initial reference.
+  await page.locator('[name=reference]').fill('Juan 3:16');await page.locator('.c-reader-jump [type=submit]').click();await page.getByRole('button',{name:'Traducción',exact:true}).click();
+  assert((await page.locator('.tnt-select-dialog a[data-option]').filter({hasText:'NTV'}).getAttribute('href')).endsWith('/127/JHN.3.16'));await page.keyboard.press('Escape');
+  await page.locator('[name=reference]').fill('Génesis 1');await page.locator('.c-reader-jump [type=submit]').click();await page.getByRole('button',{name:'Traducción',exact:true}).click();
+  const simplified=page.locator('.tnt-select-dialog a[data-option]').filter({hasText:'NVI Simplificada'});assert.equal(await simplified.getAttribute('href'),'https://www.bible.com/versions/2664');assert((await simplified.innerText()).includes('Solo Nuevo Testamento'));await page.keyboard.press('Escape');
+  // Ordinary selections still load internally and consume only the selector's history entry.
+  await page.getByRole('button',{name:'Traducción',exact:true}).click();await page.locator('.tnt-select-dialog button[data-option]').filter({hasText:'VBL'}).tap();await page.getByText('Lectura sintética GEN.1',{exact:true}).waitFor();assert.equal(await page.locator('[data-version]').inputValue(),'3291');
+  assert.equal(destinations.length,5);await context.unroute('https://www.bible.com/**');
+  console.log('Enlaces externos: cinco destinos por toque/teclado, búsqueda, referencia actual, NVIS solo NT, selector interno, seis anchos, horizontal y ambos temas: OK');
+ }
  try{
+  if(process.env.TNT_TEST_EXTERNAL_ONLY==='1'){await externalReadingFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
+  await externalReadingFlow();
   await bibleVersionsFlow();
   if(process.env.TNT_TEST_BIBLE_ONLY==='1'){assert.equal(errors.length,0,errors.join('\n'));return;}
   await layoutSizingFlow();
