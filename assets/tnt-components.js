@@ -176,14 +176,19 @@
         const entries=options.map((option,index)=>({option,index,group:option.parentElement?.tagName==='OPTGROUP'?option.parentElement.label:''}));
         const groups=[];entries.forEach(entry=>{let group=groups.find(x=>x.label===entry.group);if(!group){group={label:entry.group,items:[]};groups.push(group);}group.items.push(entry);});
         const dialog=root.document.createElement('dialog');dialog.className='tnt-select-dialog';dialog.setAttribute('aria-label',label);
-        dialog.innerHTML=`<div class="tnt-select-sheet"><header><h2>${esc(label)}</h2><button type="button" class="tnt-select-close" aria-label="Cerrar">${icon('close')}</button></header>${options.length>8?'<input type="search" class="tnt-select-search" placeholder="Buscar opción…" aria-label="Buscar opción">':''}<div class="tnt-select-list" role="listbox">${groups.map(group=>`${group.label?`<div class="tnt-select-group" role="presentation">${esc(group.label)}</div>`:''}${group.items.map(({option,index})=>`<button type="button" role="option" data-option="${index}" data-search="${esc(`${group.label} ${option.textContent.trim()}`)}" aria-selected="${option.selected}" ${option.disabled?'disabled':''}><span>${esc(option.textContent.trim())}</span>${option.selected?icon('check'):''}</button>`).join('')}`).join('')}</div></div>`;
+        dialog.innerHTML=`<div class="tnt-select-sheet"><header><h2>${esc(label)}</h2><button type="button" class="tnt-select-close" aria-label="Cerrar">${icon('close')}</button></header>${options.length>8?'<input type="search" class="tnt-select-search" placeholder="Buscar opción…" aria-label="Buscar opción">':''}<div class="tnt-select-list" role="listbox">${groups.map(group=>`${group.label?`<div class="tnt-select-group" role="presentation">${esc(group.label)}</div>`:''}${group.items.map(({option,index})=>{const url=safeUrl(option.dataset.tntHref),href=!option.disabled&&url.startsWith('https://')?url:'',tag=href?'a':'button';return `<${tag} ${href?`href="${esc(href)}" target="_blank" rel="noopener noreferrer"`:'type="button"'} role="option" data-option="${index}" data-search="${esc(`${group.label} ${option.textContent.trim()}`)}" aria-selected="${option.selected}" ${option.disabled?'disabled':''}><span>${esc(option.textContent.trim())}${href?`<small>${esc(option.dataset.tntLinkHint||'Abrir en otra pestaña')}</small>`:''}</span>${href?icon('up'):option.selected?icon('check'):''}</${tag}>`;}).join('')}`).join('')}</div></div>`;
         root.document.body.append(dialog);
         trackOverlay(dialog);
         let closing=false;const close=async()=>{if(closing)return;closing=true;await closeModal(dialog);};
         dialog.querySelector('.tnt-select-close').onclick=close;
         dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
         dialog.addEventListener('click',e=>{if(e.target===dialog)close();});
-        dialog.querySelectorAll('[data-option]').forEach(item=>item.onclick=async()=>{if(closing)return;select.selectedIndex=Number(item.dataset.option);sync();await close();if(select.isConnected)select.dispatchEvent(new root.Event('change',{bubbles:true}));});
+        dialog.querySelectorAll('[data-option]').forEach(item=>{
+          // Real anchors keep navigation in the user's gesture, including installed mobile apps.
+          // Close after the browser activates the link; keep the internal selection and bookmark.
+          if(item.tagName==='A'){item.onclick=()=>{root.setTimeout(()=>close(),0);};return;}
+          item.onclick=async()=>{if(closing)return;select.selectedIndex=Number(item.dataset.option);sync();await close();if(select.isConnected)select.dispatchEvent(new root.Event('change',{bubbles:true}));};
+        });
         const search=dialog.querySelector('.tnt-select-search');if(search)search.oninput=()=>{const term=search.value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();dialog.querySelectorAll('[data-option]').forEach(item=>{const value=(item.dataset.search||item.textContent).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();item.hidden=!value.includes(term);});};
         if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');
         (search||dialog.querySelector('[aria-selected=true]')||dialog.querySelector('[data-option]'))?.focus();
