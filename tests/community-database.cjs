@@ -53,7 +53,7 @@ test('Comunidad completa: permisos, referentes, planes, encuestas, preguntas pri
   await t.test('El contenido diario queda fijo y las preferencias y partidas son de cada persona',async()=>{
    await login(3);const daily=(await boot()).daily;assert(daily.reference);assert(daily.phrase);await action('preferences',{birthday_public:true,daily_push:true});
    await action('save_game',{id:id(99),kind:'order',difficulty:'easy',score:100,won:true,lives:2,duration:30});await action('save_game',{id:id(99),kind:'order',difficulty:'easy',score:100,won:true,lives:2,duration:30});assert.equal((await boot()).games[0].plays,1);
-   await login(4);assert.deepEqual((await boot()).daily,daily);assert.equal((await boot()).games.length,0);assert.equal((await boot()).preferences.daily_push,false);assert.equal((await boot()).birthdays.length,1);
+   await login(4);assert.deepEqual((await boot()).daily,daily);assert.equal((await boot()).games.length,0);assert.equal((await boot()).preferences.daily_push,false);assert.equal((await boot()).birthdays.length,5);assert.equal((await boot()).community_size,5);
   });
   await t.test('Las personas deshabilitadas y visitantes no pueden ejecutar acciones',async()=>{
    await db.exec(`reset role;update public.tnt_accounts set enabled=false where person_id='${id(5)}';`);await login(5);await assert.rejects(boot(),/perfil completo/);await assert.rejects(action('request_welcome'),/perfil/);

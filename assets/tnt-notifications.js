@@ -5,7 +5,7 @@
  N.portrait=note=>note.data?.sender_id||note.data?.sender_name?U().avatar({full_name:note.data.sender_name||note.title},{avatar_url:note.data.sender_avatar||''}):'<span class="tnt-note-general" aria-hidden="true">'+U().icon('bell')+'</span>';
  N.context=note=>{const d=note.data||{},parts=[d.task_title||d.thread_title,d.event_name,d.event_date?U().date(d.event_date,{weekday:'short',day:'numeric',month:'short'}):''].filter(Boolean);return parts.length?'<small class="tnt-note-context">'+parts.map(U().esc).join(' · ')+'</small>':'';};
  N.preview=note=>{
-  if(document.hidden||!note.data?.sender_id&&!note.data?.sender_name||note.read_at||note.dismissed_at||note.resolved)return;
+  if(document.hidden||window.TNTNavigation?.isVisible?.()===false||!note.data?.sender_id&&!note.data?.sender_name||note.read_at||note.dismissed_at||note.resolved)return;
   if(U().topOverlay()?.querySelector('.tnt-notifications-root'))return;
   if(note.data.thread_id&&document.body.dataset.tntActiveThread===note.data.thread_id)return;
   if(note.task_id&&document.body.dataset.tntActiveActivity===note.task_id)return;

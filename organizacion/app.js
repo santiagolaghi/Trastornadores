@@ -505,7 +505,7 @@ async function moveTemplateItem(templateId,id,dir){const top=$('#modal .sheet')?
 
 
 
-function openDeepLink(){const q=new URLSearchParams(location.search);if(q.get('task')&&taskBy(q.get('task')))taskDetailModal(q.get('task'),q.get('tab')==='team'?'team':null,q.get('comment'));else if(q.get('event')&&eventBy(q.get('event'))){const id=q.get('event');openEncounter(id);if(q.get('item')&&S.items.some(i=>i.id===q.get('item')&&!i.archived_at&&dayBy(i.day_id)?.event_id===id))scheduleItemDetailModal(q.get('item'));else if(q.get('program')==='1'&&eventBy(id).status!=='cancelled')quickScheduleModal(id);}else if(q.get('person')&&pBy(q.get('person')))personResponsibilitiesModal(q.get('person'));}
+function openDeepLink(){const q=new URLSearchParams(location.search);if(q.get('next_saturday')==='1'){const next=S.events.filter(e=>e.kind==='saturday'&&e.status!=='cancelled'&&e.end_date>=today()).sort((a,b)=>a.start_date.localeCompare(b.start_date))[0];if(next){openSchedule(next.id);quickScheduleModal(next.id);}else{navigateView('saturdays');toast('Todavía no hay un sábado próximo preparado.');}return;}if(q.get('task')&&taskBy(q.get('task')))taskDetailModal(q.get('task'),q.get('tab')==='team'?'team':null,q.get('comment'));else if(q.get('event')&&eventBy(q.get('event'))){const id=q.get('event');openEncounter(id);if(q.get('item')&&S.items.some(i=>i.id===q.get('item')&&!i.archived_at&&dayBy(i.day_id)?.event_id===id))scheduleItemDetailModal(q.get('item'));else if(q.get('program')==='1'&&eventBy(id).status!=='cancelled')quickScheduleModal(id);}else if(q.get('person')&&pBy(q.get('person')))personResponsibilitiesModal(q.get('person'));}
 
 function avatars(ids,max=5){return U.avatarStack(ids,S.people,S.accounts,currentPersonId(),max);}
 
@@ -617,7 +617,7 @@ async function taskDetailModal(id,requestedTab=null,focusComment=null){
  async function changeComment(button,values,commentId){button.disabled=true;try{const r=await sb.from('tnt_task_comments').update(values).eq('id',commentId).select().single();if(r.error)throw r.error;await refreshConversation();button.disabled=false;}catch(error){toast(errMsg(error),true);button.disabled=false;}}
  let refreshing=false;
  async function refreshConversation(){
-  if(refreshing||document.hidden||!dialog.isConnected||TNT.blocked)return;refreshing=true;
+  if(refreshing||document.hidden||window.TNTNavigation?.isVisible?.()===false||!dialog.isConnected||TNT.blocked)return;refreshing=true;
   try{const r=await sb.from('tnt_task_comments').select('*').eq('task_id',id).order('created_at');if(r.error)throw r.error;const next=r.data||[];if(JSON.stringify(next)!==JSON.stringify(comments)||sheet.querySelector('.activity-team-messages [role=alert]')){comments=next;const messages=sheet.querySelector('.activity-team-messages'),oldTop=messages.scrollTop;messages.innerHTML=conversation();messages.scrollTop=oldTop;bindConversation();}}catch(error){console.warn('TNT activity conversation',errMsg(error));}finally{refreshing=false;}
  }
  const onConversationData=event=>{if((event.detail?.tables||[]).some(table=>['tnt_task_comments','tnt_notifications'].includes(table)))refreshConversation();};
@@ -709,7 +709,7 @@ function quickScheduleModal(id){
  $$('[data-program-open]').forEach(b=>b.onclick=()=>{const [kind,target]=b.dataset.programOpen.split('|');if(kind==='task')taskDetailModal(target);else scheduleItemDetailModal(target);});$('#program-go').onclick=async()=>{await closeModal();openSchedule(id);};$('#program-add')?.addEventListener('click',()=>taskEditModal(null,id));
 }
 
-function startOrgUpdates(){let busy=false;const refresh=async()=>{if(busy||document.hidden||TNT.blocked||window.TNTScheduleOrder?.busy)return;busy=true;const selected=S.selectedEvent;try{await loadAll();if(selected&&!eventBy(selected))clearOrgModal();render();}finally{busy=false;}};const timer=setInterval(refresh,30000);document.addEventListener('visibilitychange',refresh);window.addEventListener('focus',refresh);document.addEventListener('tnt:data',refresh);document.addEventListener('tnt:permissions',()=>{S.account=TNT.account;S.person=TNT.person;refresh();});window.addEventListener('pagehide',()=>{clearInterval(timer);document.removeEventListener('visibilitychange',refresh);window.removeEventListener('focus',refresh);document.removeEventListener('tnt:data',refresh);},{once:true});}
+function startOrgUpdates(){let busy=false;const refresh=async()=>{if(busy||document.hidden||window.TNTNavigation?.isVisible?.()===false||TNT.blocked||window.TNTScheduleOrder?.busy)return;busy=true;const selected=S.selectedEvent;try{await loadAll();if(selected&&!eventBy(selected))clearOrgModal();render();}finally{busy=false;}};const timer=setInterval(refresh,30000);document.addEventListener('visibilitychange',refresh);window.addEventListener('focus',refresh);document.addEventListener('tnt:data',refresh);document.addEventListener('tnt:permissions',()=>{S.account=TNT.account;S.person=TNT.person;refresh();});window.addEventListener('pagehide',()=>{clearInterval(timer);document.removeEventListener('visibilitychange',refresh);window.removeEventListener('focus',refresh);document.removeEventListener('tnt:data',refresh);},{once:true});}
 
 
 async function archiveActivities(ids,restore=false){

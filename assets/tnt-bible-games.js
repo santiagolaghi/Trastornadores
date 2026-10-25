@@ -76,7 +76,7 @@
   ];
   function shuffle(items,random=Math.random){const a=[...items];for(let i=a.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
   function rounds(kind,level,random,options={}){
-    if(kind==='order')return Array.from({length:3},()=>{const n=level.count,start=Math.floor(random()*(books.length-n+1)),answer=books.slice(start,start+n);return {question:'¿En qué orden van?',answer:answer.map(b=>b.id),choices:shuffle(answer,random),reference:'Orden de los libros en la Biblia',explanation:answer.map(b=>b.name).join(' → ')};});
+    if(kind==='order')return Array.from({length:3},(_,round)=>{const n=level.count,start=options.startFrom==='beginning'?round*n:Math.floor(random()*(books.length-n+1)),answer=books.slice(start,start+n);return {question:'¿En qué orden van?',answer:answer.map(b=>b.id),choices:shuffle(answer,random),reference:'Orden de los libros en la Biblia',explanation:answer.map(b=>b.name).join(' → ')};});
     if(kind==='timeline')return shuffle(timelines,random).slice(0,3).map(t=>({question:t.name,answer:t.events.map((_,i)=>String(i)),choices:shuffle(t.events.map((name,i)=>({id:String(i),name})),random),reference:t.reference,explanation:t.events.join(' → ')}));
     if(kind==='pairs')return Array.from({length:3},()=>{const selected=shuffle(associations,random).slice(0,level.pairs);return{question:'Encontrá las parejas',pairs:selected,choices:shuffle(selected.flatMap(([person,object,reference],i)=>[{id:'p'+i,name:person,match:String(i),reference},{id:'o'+i,name:object,match:String(i),reference}]),random),reference:'Personas e historias',explanation:selected.map(([a,b])=>a+' · '+b).join(' / ')};});
     if(kind==='quiz')return shuffle(options.questions||[],random).slice(0,10).map(q=>({question:q.question,answer:q.answer,choices:shuffle([q.answer,...q.wrong].map(name=>({id:name,name})),random),reference:q.reference||'',explanation:q.explanation||'La respuesta es '+q.answer+'.'}));
@@ -116,8 +116,8 @@
       return {correct:true,complete,reference:q.reference,explanation:q.explanation};
     }
     releasePair(){this.flipped=[];this.pairLocked=false;}
-    hint(){if(this.status!=='playing'||this.pending||this.hintUsed)return null;this.hintUsed=true;const q=this.current;return this.kind==='pairs'?q.choices.find(c=>!this.matched.includes(c.id))?.id:this.ordered?q.answer[this.position]:q.answer;}
-    next(){this.tick();if(this.status!=='playing'||!this.pending)return false;this.round++;this.position=0;this.pending=false;this.flipped=[];this.matched=[];this.pairLocked=false;this.deadline=this.now()+this.remainingMs;return true;}
+    hint(){if(this.status!=='playing'||this.pending||this.hintUsed||this.pairLocked)return null;this.hintUsed=true;const q=this.current;if(this.kind==='pairs'){const flipped=q.choices.find(c=>c.id===this.flipped[0]);return q.choices.find(c=>!this.matched.includes(c.id)&&(!flipped||c.match===flipped.match&&c.id!==flipped.id))?.id;}return this.ordered?q.answer[this.position]:q.answer;}
+    next(){this.tick();if(this.status!=='playing'||!this.pending)return false;this.round++;this.position=0;this.pending=false;this.hintUsed=false;this.flipped=[];this.matched=[];this.pairLocked=false;this.deadline=this.now()+this.remainingMs;return true;}
 
   }
   return {books,levels,Game,shuffle,characters,associations,timelines};

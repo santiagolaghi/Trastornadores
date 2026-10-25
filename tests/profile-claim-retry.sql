@@ -38,6 +38,9 @@ do $$declare u uuid:=gen_random_uuid();v uuid:=gen_random_uuid();src uuid;dst uu
  insert into public.tnt_profile_private_fields(person_id,dni) values(dst,'12345679') on conflict(person_id) do update set dni=excluded.dni;
  perform public.tnt_apply_profile_answers(dst,'{"studies":"Trabajo","dreams":"Aprender","health":"Ninguna","interests":["Música"],"efe_group":"none","leadership_strengths":{"Acompañar jóvenes":50,"Acompañar adolescentes":50,"Enseñar":50,"Escuchar":50,"Organizar equipos":50,"Comunicar":50}}');
  insert into public.tnt_saturday_attendance(person_id,saturday_date,status) values(src,'2020-01-04','present'),(dst,'2020-01-04','absent'),(dst,'2020-01-11','present');
+ insert into public.tnt_personal_preferences(person_id,favorite_version) values(src,149),(dst,128);
+ insert into public.tnt_reader_marks(person_id,book,chapter,verse,color) values(src,'JHN',3,16,'lime'),(src,'JHN',3,17,'blue'),(dst,'JHN',3,16,'pink');
+ insert into public.tnt_reader_days(person_id,day) values(src,tnt_actions.community_today()-1),(dst,tnt_actions.community_today());
  perform set_config('tnt.claim.uid',u::text,true);perform set_config('tnt.claim.primary_uid',v::text,true);perform set_config('tnt.claim.src',src::text,true);perform set_config('tnt.claim.dst',dst::text,true);
 end $$;
 select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('tnt.claim.uid'),'role','authenticated')::text,true);
@@ -62,6 +65,8 @@ do $$begin
  if not exists(select 1 from public.tnt_accounts where person_id=current_setting('tnt.claim.src')::uuid and not enabled) then raise exception 'Secondary login remains enabled';end if;
  if not exists(select 1 from public.tnt_accounts where person_id=current_setting('tnt.claim.dst')::uuid and auth_user_id=current_setting('tnt.claim.primary_uid')::uuid and enabled and system_role='admin' and avatar_url='https://example.invalid/primary.jpg') then raise exception 'Primary account changed';end if;
  if (select count(*) from public.tnt_saturday_attendance where person_id=current_setting('tnt.claim.dst')::uuid)<>2 then raise exception 'Shared attendance was not consolidated';end if;
+ if (select favorite_version from public.tnt_personal_preferences where person_id=current_setting('tnt.claim.dst')::uuid)<>128 or (select count(*) from public.tnt_reader_marks where person_id=current_setting('tnt.claim.dst')::uuid)<>2 or (select color from public.tnt_reader_marks where person_id=current_setting('tnt.claim.dst')::uuid and verse=16)<>'pink' or (select count(*) from public.tnt_reader_days where person_id=current_setting('tnt.claim.dst')::uuid)<>2 then raise exception 'Personal data was lost or primary choice was replaced';end if;
+ if exists(select 1 from public.tnt_reader_marks where person_id=current_setting('tnt.claim.src')::uuid) then raise exception 'Secondary reader data was not consolidated';end if;
 end $$;
 rollback;
 select 'claim retry, phone normalization, unclaimed accounts, history and two-Google review passed' as verification;

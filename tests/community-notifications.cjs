@@ -42,5 +42,11 @@ test('Los avisos de Comunidad respetan destinatarios, privacidad, cierre, reinte
   await t.test('Una cuenta común no ejecuta la preparación ni lee el diagnóstico de envíos',async()=>{
    await login(3);await assert.rejects(db.query('select public.tnt_community_prepare_notifications()'),/permission denied/);await assert.rejects(db.query('select public.tnt_community_delivery_status()'),/Administración/);await login(1);const diagnostics=(await rows('select public.tnt_community_delivery_status() result'))[0].result;assert.equal(diagnostics.devices,1);assert(!JSON.stringify(diagnostics).includes('push.test'));
   });
+  await t.test('Acompañamiento identifica quién pidió ayuda, sin mostrar el aviso a otras cuentas',async()=>{
+   await login(3);await action('request_welcome',{person_id:id(4)});await root();const notice=(await rows("select * from tnt_notifications where data->>'welcome_person'=$1 and title like '%pidió acompañamiento'",[id(3)]))[0];assert(notice);assert(notice.title.includes('Persona 3'));assert(notice.href.includes('person='+id(3)));assert.equal(notice.data.sender_id,id(3));
+   await db.query("update tnt_notifications set title='Una persona pidió acompañamiento',href='/comunidad?module=welcome&manage=1',data=data-'sender_id'-'sender_name'-'sender_avatar' where id=$1",[notice.id]);
+   await login(1);const recovered=(await rows('select public.tnt_my_notifications(true) note')).map(r=>r.note).find(n=>n.id===notice.id);assert(recovered.title.includes('Persona 3'));assert.equal(recovered.data.sender_name,'Persona 3');
+   await login(4);assert(!(await rows('select public.tnt_my_notifications(true) note')).some(r=>r.note.id===notice.id));
+  });
  }finally{await db.close();}
 });

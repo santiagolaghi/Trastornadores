@@ -1150,3 +1150,19 @@ test('El visto fallido se reintenta, persiste al refrescar y deja pendientes los
 test('Una foto del chat no repite el nombre como documento y mantiene el visor con descarga',async()=>{
  const id='00000000-0000-4000-8000-000000000060';const a=await app('chat','?thread='+id,w=>w.__fixtureDB.tnt_chat_messages.push({id:'legacy-photo',thread_id:id,person_id:'00000000-0000-4000-8000-000000000002',body:'',created_at:w.TNTUI.dateKey()+'T20:36:00Z',attachments:[{path:'tnt-chat-files/photo.jpg',name:'123456789.jpg',type:''}]}));try{await until(()=>a.d.querySelector('#message-legacy-photo .message-media img'));assert.equal(a.d.querySelector('#message-legacy-photo .message-attachment'),null);a.d.querySelector('#message-legacy-photo .message-media img').click();await until(()=>a.d.querySelector('dialog[aria-label=Foto] #download-media'));assert(!a.d.querySelector('dialog[aria-label=Foto]').textContent.includes('123456789.jpg'));assert.deepEqual(a.errors,[]);}finally{a.close();}
 });
+
+
+test('Un chat abierto en un módulo oculto conserva el borrador y no marca mensajes como leídos',async()=>{
+ const id='00000000-0000-4000-8000-000000000060',a=await app('chat','?thread='+id);
+ try{
+  await until(()=>a.d.querySelector('#chat-app').classList.contains('room-open'));
+  await until(()=>a.w.__fixtureCalls.some(c=>c.rpc==='tnt_mark_chat_read'));
+  const input=a.d.querySelector('#chat-text');input.value='Mi borrador entre módulos';input.dispatchEvent(new a.w.Event('input',{bubbles:true}));
+  a.d.dispatchEvent(new a.w.CustomEvent('tnt:workspace-visibility',{detail:{visible:false}}));
+  const before=a.w.__fixtureCalls.filter(c=>c.rpc==='tnt_mark_chat_read').length;
+  a.w.__fixtureDB.tnt_chat_messages.push({id:'workspace-message',thread_id:id,person_id:'00000000-0000-4000-8000-000000000002',body:'Mensaje mientras mirabas otro módulo',created_at:a.w.TNTUI.dateKey()+'T23:59:00Z'});
+  a.d.dispatchEvent(new a.w.CustomEvent('tnt:data',{detail:{tables:['tnt_chat_messages']}}));await until(()=>a.d.querySelector('[data-thread="'+id+'"] .thread-unread'));
+  assert.equal(a.w.__fixtureCalls.filter(c=>c.rpc==='tnt_mark_chat_read').length,before);assert.equal(input.value,'Mi borrador entre módulos');
+  a.d.dispatchEvent(new a.w.CustomEvent('tnt:workspace-visibility',{detail:{visible:true}}));await until(()=>a.w.__fixtureCalls.filter(c=>c.rpc==='tnt_mark_chat_read').length>before);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});

@@ -20,11 +20,17 @@ async function database(){
  create function public.tnt_notification_resolved(p_note public.tnt_notifications) returns boolean language sql stable as $$select false$$;
  create table public.tnt_push_subscriptions(person_id uuid,endpoint text unique,subscription jsonb,updated_at timestamptz default now());
  create table public.tnt_push_outbox(id uuid primary key default gen_random_uuid(),source_key text,person_id uuid,endpoint text,payload jsonb,status text default 'pending',attempts int default 0,available_at timestamptz default now(),created_at timestamptz default now(),sent_at timestamptz,last_error text,unique(source_key,endpoint));
- create table public.tnt_notification_state(notification_id uuid,person_id uuid,read_at timestamptz,dismissed_at timestamptz);
+ create table public.tnt_notification_state(notification_id uuid,person_id uuid,read_at timestamptz,dismissed_at timestamptz,purged_at timestamptz);
  `);
  for(let n=1;n<=5;n++)await db.query('insert into public.tnt_people(id,full_name,birthday) values($1,$2,$3)',[id(n),'Persona '+n,'2000-10-22']);
  for(let n=1;n<=5;n++)await db.query('insert into public.tnt_accounts(person_id,auth_user_id,staff_status,system_role) values($1,$1,$2,$3)',[id(n),n<=2?'approved':'community',n===1?'admin':'user']);
  for(const file of fs.readdirSync(path.join(__dirname,'../../supabase/migrations')).filter(f=>/^\d+_community_(life_|notifications_and_daily|worker_schema_access)/.test(f)).sort((a,b)=>{const rank=f=>f.includes('_worker_schema_access')?7:f.includes('_schema')?1:f.includes('_permissions')?2:f.includes('_handler_')?3:f.includes('_actions')?4:f.includes('_bootstrap')?5:6;return rank(a)-rank(b)||a.localeCompare(b);}))await db.exec(read('supabase/migrations/'+file));
+ const update=read('supabase/migrations/20261025220637_responsive_personal_reading.sql');
+ const part=(a,b)=>update.slice(update.indexOf(a),b?update.indexOf(b,update.indexOf(a)):undefined);
+ await db.exec(part('CREATE OR REPLACE FUNCTION tnt_actions.community_bootstrap()','alter policy efe_meetings_read'));
+ await db.exec(part('create table public.tnt_personal_preferences','CREATE OR REPLACE FUNCTION public.tnt_review_profile_link'));
+ await db.exec("create function public.tnt_profile_is_complete() returns boolean language sql as $$select tnt_actions.community_active_person(public.tnt_current_person_id())$$;");
+ await db.exec(part('-- Identify older accompaniment requests'));
  const login=n=>db.exec(`reset role;set request.jwt.claim.sub='${id(n)}';set role authenticated;`);
  const action=async(name,data={})=>(await db.query('select public.tnt_community_action($1,$2::jsonb) as result',[name,JSON.stringify(data)])).rows[0].result;
  const boot=async()=>(await db.query('select public.tnt_community_bootstrap() as result')).rows[0].result;

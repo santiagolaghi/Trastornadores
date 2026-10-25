@@ -7,6 +7,11 @@ test('Los 66 libros conservan el orden y la separación de testamentos',()=>{
  assert.equal(books.filter(b=>b.testament==='old').length,39);
  assert.equal(books[38].id,'MAL');assert.equal(books[39].id,'MAT');assert.equal(books.at(-1).id,'REV');
 });
+test('Ordenar comienza en Génesis o en otro punto y renueva la pista en cada ronda',()=>{
+ const start=new Game('order','easy',{startFrom:'beginning',random:()=>.8});start.start();assert.equal(start.current.answer[0],'GEN');assert.equal(start.hint(),'GEN');assert.equal(start.hint(),null);for(const id of start.current.answer)start.choose(id);assert(start.next());assert.equal(start.current.answer[0],books[start.level.count].id);assert.equal(start.hint(),start.current.answer[0]);
+ const random=new Game('order','easy',{startFrom:'random',random:()=>.8});assert.notEqual(random.current.answer[0],'GEN');
+ const pairs=new Game('pairs','easy',{random:()=>.4});pairs.start();const first=pairs.current.choices[0];pairs.choose(first.id);const match=pairs.hint();assert.notEqual(match,first.id);assert.equal(pairs.current.choices.find(c=>c.id===match).match,first.match);
+});
 test('Ordenar permite recuperarse de un error, evita duplicados y termina las tres rondas',()=>{
  const game=new Game('order','easy');game.start();
  assert.equal(game.choose(game.current.answer[1]).correct,false);assert.equal(game.lives,2);

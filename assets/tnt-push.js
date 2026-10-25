@@ -1,6 +1,7 @@
 (() => {
  'use strict';
- const VERSION='20261024h';
+ const VERSION='20261025b';
+ const isEmbedded=window.parent!==window&&new URLSearchParams(location.search).get('tnt_embed')==='1';
  const PUBLIC_KEY='BF3EVnNKTFBmSHImqA-PpYPylaHMG9L-A-gomiSB20084j_mNWWAT_Gm282-ovE5fXBN6fkPT_QyuXSx4H8r1hI';
  const ICON='/icons/dynamite-app-192.png?v='+VERSION,BADGE='/icons/notification-badge.png?v='+VERSION;
  const receipts=new Map();let registered,lastCheck=0,installPrompt=null,setupClosing=false;
@@ -9,7 +10,7 @@
  const installState=()=>{const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),android=/Android/i.test(navigator.userAgent);return{ios,android,mobile:ios||android,installed:!!navigator.standalone||!!window.matchMedia?.('(display-mode: standalone)').matches,embedded:/FBAN|FBAV|Instagram|Line\/|MicroMessenger|; wv\)/i.test(navigator.userAgent)};};
  // Public forms remain available from their shared links. The TNT app itself
  // starts with installation; only the OS display mode confirms it is open as an app.
- const appEntry=()=>!/^\/campamento\/inscripcion(?:\/|$)/.test(location.pathname)&&!/^\/perfiles\/?$/.test(location.pathname);
+ const appEntry=()=>!isEmbedded&&!/^\/campamento\/inscripcion(?:\/|$)/.test(location.pathname)&&!/^\/perfiles\/?$/.test(location.pathname);
  const setupSkipped=()=>{try{return sessionStorage.getItem('tnt-phone-unsupported:'+owner())==='yes';}catch{return false;}};
  window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;refreshSetup();});
  window.addEventListener('appinstalled',()=>{installPrompt=null;refreshSetup();});
@@ -18,7 +19,8 @@
   return `<section class="tnt-install-guide">${installed?'<p>TNT ya está abierta como app. Podés activar los avisos desde el centro de notificaciones.</p>':`${embedded?'<p class="tnt-install-browser-note">Estás dentro de otra app. Usá su menú para abrir este enlace en '+(ios?'Safari':'tu navegador')+', o copiá la dirección de abajo.</p>':''}<ol>${ios?'<li>Abrí el enlace de TNT en <b>Safari</b>.</li><li>Tocá <b>Compartir</b> en el menú de Safari.</li><li>Elegí <b>Agregar a pantalla de inicio</b>. Si no aparece, bajá hasta <b>Editar acciones</b> y agregá esa opción.</li><li>Si aparece <b>Abrir como app web</b>, dejalo activado. Tocá <b>Agregar</b>.</li>':'<li>Abrí TNT en el navegador de tu teléfono.</li><li>En su menú, elegí <b>Instalar app</b> o <b>Agregar a pantalla de inicio</b>.</li>'}<li>Abrí el nuevo ícono de <b>TNT</b>. Desde ahí podés iniciar sesión y activar los avisos.</li></ol><label>Enlace para instalar<input readonly aria-label="Enlace de TNT para instalar" value="${TNTUI.esc(url)}" data-install-url></label><button type="button" class="tnt-button" data-copy-install>Copiar enlace de TNT</button><p role="status" data-install-status aria-live="polite"></p>`}</section>`;
  }
  function bindInstallGuide(host){host.querySelector('[data-copy-install]')?.addEventListener('click',async()=>{const input=host.querySelector('[data-install-url]'),status=host.querySelector('[data-install-status]');try{if(!navigator.clipboard?.writeText)throw Error();await navigator.clipboard.writeText(input.value);status.textContent='Enlace copiado. Pegalo en '+(installState().ios?'Safari':'tu navegador')+'.';}catch{input.focus();input.select();input.setSelectionRange(0,input.value.length);status.textContent='Mantené presionado el enlace seleccionado y elegí Copiar.';}});}
- function openInstall(){const dialog=TNTUI.modal(installState().ios?'Instalar TNT en iPhone o iPad':'Instalar TNT',installInstructions());bindInstallGuide(dialog);return dialog;}
+ function openInstall(){const prompt=installPrompt;if(prompt&&!installState().installed){installPrompt=null;prompt.prompt().then(()=>prompt.userChoice).then(choice=>{TNTUI.toast(choice.outcome==='accepted'?'Abrí TNT desde el nuevo ícono para continuar.':'Podés instalar TNT desde el menú del navegador.');}).catch(()=>showInstallGuide());return;}return showInstallGuide();}
+ function showInstallGuide(){const dialog=TNTUI.modal(installState().ios?'Agregar TNT al inicio · iPhone':'Agregar TNT al inicio',installInstructions());bindInstallGuide(dialog);return dialog;}
  const owner=()=>window.TNT?.account?.auth_user_id||window.TNT?.person?.id||'';
  const consentKey=()=> 'tnt-phone-enabled:'+owner();
  const pausedKey=()=> 'tnt-phone-paused:'+owner();
@@ -93,6 +95,7 @@
   };
  }
  function maybePrompt(){
+  if(isEmbedded)return;
   const device=installState();
   if(appEntry()&&device.mobile&&!device.installed){showSetup('install');return;}
   if(document.getElementById('tnt-phone-setup')?.dataset.step==='install'){closeSetup().then(maybePrompt);return;}
