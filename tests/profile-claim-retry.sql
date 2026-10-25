@@ -33,7 +33,10 @@ do $$declare u uuid:=gen_random_uuid();v uuid:=gen_random_uuid();src uuid;dst uu
  perform public.tnt_ensure_account_for_user(u);perform public.tnt_ensure_account_for_user(v);
  select person_id into src from public.tnt_accounts where auth_user_id=u;select person_id into dst from public.tnt_accounts where auth_user_id=v;
  update public.tnt_people set first_name='Dos',last_name=substr(label,5),full_name=label,birthday='2000-01-02',phone='1112345678',sex='M' where id in(src,dst);
- update public.tnt_accounts set system_role='admin',staff_status='approved',avatar_url='https://example.invalid/primary.jpg' where person_id=dst;
+ update public.tnt_people set instagram='No tengo',profile_consent=true where id=dst;
+ update public.tnt_accounts set system_role='admin',staff_status='approved',onboarding_completed_at=now(),avatar_url='https://example.invalid/primary.jpg' where person_id=dst;
+ insert into public.tnt_profile_private_fields(person_id,dni) values(dst,'12345679') on conflict(person_id) do update set dni=excluded.dni;
+ perform public.tnt_apply_profile_answers(dst,'{"studies":"Trabajo","dreams":"Aprender","health":"Ninguna","interests":["Música"],"efe_group":"none","leadership_strengths":{"Acompañar jóvenes":50,"Acompañar adolescentes":50,"Enseñar":50,"Escuchar":50,"Organizar equipos":50,"Comunicar":50}}');
  insert into public.tnt_saturday_attendance(person_id,saturday_date,status) values(src,'2020-01-04','present'),(dst,'2020-01-04','absent'),(dst,'2020-01-11','present');
  perform set_config('tnt.claim.uid',u::text,true);perform set_config('tnt.claim.primary_uid',v::text,true);perform set_config('tnt.claim.src',src::text,true);perform set_config('tnt.claim.dst',dst::text,true);
 end $$;
@@ -48,7 +51,10 @@ end $$;
 reset role;
 select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('tnt.claim.primary_uid'),'role','authenticated')::text,true);
 set local role authenticated;
-select public.tnt_resolve_profile_link(current_setting('tnt.claim.request')::uuid,true);
+do $$begin
+ if not public.tnt_is_admin() then raise exception 'Synthetic administrator profile is incomplete';end if;
+ perform public.tnt_resolve_profile_link(current_setting('tnt.claim.request')::uuid,true);
+end $$;
 reset role;
 select set_config('request.jwt.claims','{}',true);
 do $$begin
