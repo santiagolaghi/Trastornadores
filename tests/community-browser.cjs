@@ -142,6 +142,22 @@ async function mockAPI(page,actor=1){
   await page.setViewportSize({width:390,height:844});await page.evaluate(()=>{__fixtureDB.tnt_people=__fixtureDB.tnt_people.filter((p,i,all)=>all.findIndex(x=>x.id===p.id)===i);__fixtureDB.tnt_people[0].full_name='Nora Pérez';__fixtureDB.tnt_people[1].full_name='Bruno Díaz';TNT.setTheme('light');});
   console.log('Entrada: solo Google, instalación Android/iPhone antes del ingreso, aviso tras el toque y guardado sintético, buscador con retratos circulares, seis anchos, dos temas y horizontal: OK');
  }
+ async function attendanceResumeFlow(){
+  const saved=new Map();
+  await page.route('**/rest/v1/tnt_saturday_attendance?*',r=>r.fulfill({json:[...saved.values()]}));
+  await page.route('**/rest/v1/rpc/tnt_mark_attendance',async r=>{const a=r.request().postDataJSON();saved.set(a.p_person,{person_id:a.p_person,saturday_date:a.p_date,status:a.p_status});await r.fulfill({json:null});});
+  await visit('/asistencia/?mode=sabados','#startDeck');await page.locator('#startDeck').click();const first=await page.locator('#swipeCard h2').innerText();await page.locator('[data-deck-answer=present]').tap();await page.waitForFunction(n=>document.querySelector('#swipeCard h2')?.textContent!==n,first);const next=await page.locator('#swipeCard h2').innerText();await page.locator('#deckClose').tap();await page.locator('#startDeck').tap();assert.equal(await page.locator('#swipeCard h2').innerText(),next);
+  await page.reload();await page.locator('#startDeck').waitFor();if(await page.locator('[data-phone-invite-later]').count())await page.locator('[data-phone-invite-later]').click();await page.locator('#startDeck').tap();assert.equal(await page.locator('#swipeCard h2').innerText(),next);assert((await page.locator('.deck-head small').innerText()).includes('1 de 5 registradas'));
+  for(const theme of ['light','dark'])for(const width of [320,360,390,412,768,1280]){
+   await page.setViewportSize({width,height:844});await page.evaluate(t=>TNT.setTheme(t),theme);
+   assert(await page.locator('#swipeCard').evaluate(n=>{const b=n.getBoundingClientRect();return b.width<=362&&b.height<450&&b.left>=11&&b.right<=innerWidth-11&&b.top>=0&&b.bottom<=innerHeight;}),'Compact card '+width);
+   assert(await page.locator('#swipeCard .big-avatar').evaluate(n=>{const b=n.getBoundingClientRect();return Math.abs(b.width-b.height)<1&&b.width<=141;}));
+   if(width===390)await page.screenshot({animations:'disabled',path:path.join(out,'attendance-compact-'+theme+'.png')});
+  }
+  await page.setViewportSize({width:844,height:390});assert(await page.locator('#swipeCard').evaluate(n=>{const b=n.getBoundingClientRect();return b.top>=0&&b.bottom<=innerHeight;}));await page.screenshot({animations:'disabled',path:path.join(out,'attendance-landscape.png')});await page.setViewportSize({width:390,height:844});
+  for(let i=0;i<4;i++){await page.locator('[data-deck-answer=absent]').tap();await page.waitForTimeout(300);}await page.locator('.deck-finish').waitFor();await page.locator('#deckDone').tap();await page.locator('#startDeck').tap();assert.equal(await page.locator('#swipeCard').count(),0);assert.equal(saved.size,5);
+  console.log('Asistencia: retoma al cerrar y recargar, sólo pendientes, sin repetir al terminar, tarjeta compacta; seis anchos, ambos temas y horizontal: OK');
+ }
  async function startupPerformanceFlow(){
   const requests=[],scripts=[];const track=req=>{const u=new URL(req.url());if(u.pathname.includes('/rest/v1/'))requests.push({name:u.pathname.split('/').at(-1),args:req.method()==='POST'?req.postDataJSON():null});if(u.origin===base&&u.pathname.endsWith('.js'))scripts.push(u.pathname);};page.on('request',track);
   let releaseHome,releaseNotes,releaseCatalog;
@@ -407,6 +423,7 @@ async function mockAPI(page,actor=1){
   console.log('Enlaces externos: tres destinos directos y dos tras comprobar la licencia, toque/teclado, referencia actual, NVIS solo NT, seis anchos, horizontal y ambos temas: OK');
  }
  try{
+  if(process.env.TNT_TEST_ATTENDANCE_ONLY==='1'){await attendanceResumeFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   if(process.env.TNT_TEST_ENTRY_ONLY==='1'){await entryFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   if(process.env.TNT_TEST_INLINE_ONLY==='1'){await inlineLicenseFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   if(process.env.TNT_TEST_STARTUP_ONLY==='1'){await startupPerformanceFlow();assert.equal(errors.length,0,errors.join('\n'));return;}

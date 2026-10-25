@@ -216,3 +216,11 @@ Para ejecutar las pruebas en navegador, instalar `playwright-core`, proporcionar
 - Inspección visual y geometría del buscador, guía iPhone/Android y permiso: 320/360/390/412/768/1280, claro/oscuro y horizontal. Comprueba fotos circulares, tarjetas sin desborde, homónimos conservados y etiqueta «Tu perfil».
 - `phone-client.cjs` prueba cancelación del instalador, permiso denegado/recuperado, fallo de suscripción, dispositivos sin soporte y formularios públicos. Una preferencia de desactivación no se convierte en consentimiento. `regression.cjs` comprueba reintento de OAuth y el historial de los pasos obligatorios.
 - Recursos modificados y SW: `20261024g`. Se retiró el flujo de enlace por email de la interfaz; no se modificaron proveedores del servicio Auth ni cuentas existentes.
+
+## Asistencia y continuidad de perfiles · 24 de octubre de 2026
+
+- `TNT_TEST_ATTENDANCE_ONLY=1` comprueba cerrar/reabrir, recargar con datos del servidor, terminar la lista y volver a entrar sin repetir marcados. La tarjeta compacta conserva controles táctiles y retrato circular en seis anchos, ambos temas y horizontal.
+- El alta espera una búsqueda por nombre antes del guardado y muestra la coincidencia en un paso visible. Una búsqueda con error conserva el borrador; «No soy yo» rechaza sólo la coincidencia elegida. Perfil ofrece una recuperación explícita aunque se hubiera omitido antes.
+- `profile-claim-database.cjs` ejecuta SQL en PGlite: sintaxis de la migración, nombre corregido, teléfono argentino con/sin prefijo y derivación de dos Google a revisión. La transferencia final está sustituida por un registro de llamadas en esa prueba: no certifica conservación de todas las relaciones reales.
+- `profile-claim-retry.sql` prepara una prueba de esquema completo con usuarios sintéticos y rollback: cuenta sin Google, historial, permisos y reunión administrativa de dos Google. Su ejecución remota quedó bloqueada por la confirmación de Supabase; no se presenta como pasada.
+- Pasaron 294 pruebas automatizadas y el recorrido completo de `community-browser.cjs`, además del recorrido específico de asistencia. La migración `20261024232426_profile_claim_retry` debe aplicarse y verificarse antes de publicar el cliente. No se modificaron las cuentas reales para probar esta implementación.

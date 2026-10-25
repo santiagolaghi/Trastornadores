@@ -241,6 +241,19 @@ test('Perfiles une las fotos de las cuentas con los registros y abre el resultad
 function swipeFixture(w){
  w.__fixtureDB.tnt_saturday_members=w.__fixtureDB.tnt_people.map(p=>({person_id:p.id,active:true}));w.__fixtureDB.tnt_saturday_attendance=[];
 }
+test('El swipe retoma pendientes y no vuelve a pasar a quienes ya están marcados',async()=>{
+ const a=await inlinePage('asistencia/index.html',swipeFixture);try{
+  a.w.eval(fs.readFileSync(path.join(root,'assets/tnt-attendance.js'),'utf8'));await until(()=>a.d.querySelector('#startDeck'));a.d.querySelector('#startDeck').click();
+  const first=a.d.querySelector('#swipeCard h2').textContent;a.d.querySelector('[data-deck-answer=present]').click();await until(()=>a.d.querySelector('#swipeCard h2')?.textContent!==first);const next=a.d.querySelector('#swipeCard h2').textContent;a.d.querySelector('#deckClose').click();a.d.querySelector('#startDeck').click();assert.equal(a.d.querySelector('#swipeCard h2').textContent,next);assert(a.d.querySelector('.deck-head small').textContent.includes('1 de 5 registradas'));
+  for(let i=0;i<4;i++){a.d.querySelector('[data-deck-answer=absent]').click();await sleep(20);}assert(a.d.querySelector('.deck-finish'));a.d.querySelector('#deckDone').click();a.d.querySelector('#startDeck').click();assert(a.d.querySelector('.deck-finish'));assert.equal(a.d.querySelector('#swipeCard'),null);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
+test('El guardado espera coincidencias y vuelve al paso visible para confirmar el perfil',async()=>{
+ const a=await inlinePage('index.html',w=>Object.assign(w.__fixtureDB.tnt_accounts[0],{system_role:'user',staff_status:'community',onboarding_completed_at:null}),true);
+ try{await a.w.TNT.ready;a.w.eval(fs.readFileSync(path.join(root,'assets/tnt-hub.js'),'utf8'));await until(()=>a.d.querySelector('form.profile-completion'));const form=a.d.querySelector('form.profile-completion');form.elements.first_name.value='Santiago';form.elements.last_name.value='Laghi';form.elements.birthday.value='1999-01-01';const resolves=[],rpc=a.w.TNT.sb.rpc;a.w.TNT.sb.rpc=(n,args)=>{if(n==='tnt_match_profile_names'){assert.equal(args.p_birthday,null);return new Promise(resolve=>resolves.push(resolve));}return rpc(n,args);};form.querySelector('.profile-section').hidden=true;form.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>resolves.length);assert.equal(a.w.__fixtureCalls.some(c=>c.rpc==='tnt_finish_onboarding'),false);for(const resolve of resolves)resolve({data:[{id:'existing',full_name:'Santiago Laghi'}],error:null});await until(()=>a.d.querySelector('[data-claim]'));assert.equal(form.querySelector('.profile-section').hidden,false);assert.equal(a.w.__fixtureCalls.some(c=>c.rpc==='tnt_finish_onboarding'),false);assert.equal(form.elements.last_name.value,'Laghi');assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
 test('Agregar desde Perfiles a un EFE muestra la foto de una cuenta que ya se registró',async()=>{
  const a=await inlinePage('asistencia/index.html',w=>{
   w.TNT.grants=[{module:'efe',scope:'varones',access_level:'manage',enabled:true}];
