@@ -1,5 +1,19 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');const {JSDOM,VirtualConsole}=require('jsdom');const root=path.resolve(__dirname,'..');
 
+test('El ingreso ofrece solo Google y permite reintentar si falla OAuth',async()=>{
+ const calls=[];const a=await inlinePage('index.html',w=>{w.TNT.identity=null;w.TNT.ready=Promise.resolve(null);w.TNT.sb.auth.signInWithOAuth=async args=>{calls.push(args);return{error:calls.length===1?{message:'Conexión interrumpida'}:null}};w.TNT.sb.auth.signInWithOtp=()=>{throw Error('No se debe solicitar ingreso por email')};});
+ try{await a.w.TNT.ready;a.w.eval(fs.readFileSync(path.join(root,'assets/tnt-hub.js'),'utf8'));await until(()=>a.d.querySelector('#google'));assert.equal(a.d.querySelector('#email-form'),null);assert.equal(a.d.querySelector('input[type=email]'),null);a.d.querySelector('#google').click();await until(()=>!a.d.querySelector('#google').disabled);assert(a.d.querySelector('#login-message').textContent.includes('Conexión interrumpida'));a.d.querySelector('#google').click();await until(()=>calls.length===2);assert.equal(calls[1].provider,'google');assert.equal(calls[1].options.redirectTo,a.w.location.origin+'/');assert.equal(calls[1].options.queryParams.prompt,'select_account');assert.deepEqual(a.errors,[]);}finally{a.close();}
+});
+
+test('Buscar distingue tu perfil, conserva homónimos y evita repetir la misma persona',async()=>{
+ const a=await app('hub','',w=>{const people=w.__fixtureDB.tnt_people;people[0].full_name=people[1].full_name='Santiago Laghi';people.push({...people[0]},{...people[2],id:'inactive',full_name:'Santiago Laghi',active:false});});
+ try{const input=a.d.querySelector('#hub-query');input.value='santiago laghi';input.form.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));const rows=[...a.d.querySelectorAll('.hub-search-result')];assert.equal(rows.length,2);assert(rows[0].href.includes(a.w.TNT.person.id));assert.equal(rows[0].querySelector('small').textContent,'Tu perfil');assert.equal(rows[1].querySelector('small').textContent,'Perfil de TNT');assert.equal(rows[0].querySelector('.hub-result-copy b').textContent,'Santiago Laghi');assert.equal(rows[0].querySelectorAll(':scope>.tnt-person-avatar').length,1);assert.deepEqual(a.errors,[]);}finally{a.close();}
+});
+
+test('El paso obligatorio conserva historial, Escape y Atrás; terminarlo permite seguir',async()=>{
+ const a=await app('hub');try{const U=a.w.TNTUI,d=U.modal('Preparar TNT','<button>Instalar TNT</button>',false,{required:true});assert.equal(d.querySelector('.tnt-close'),null);a.d.dispatchEvent(new a.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));assert(d.isConnected);d.dispatchEvent(new a.w.Event('cancel',{cancelable:true}));assert(d.isConnected);d.dispatchEvent(new a.w.MouseEvent('click',{bubbles:true}));assert(d.isConnected);a.w.history.back();await sleep(30);assert(d.isConnected);assert(a.w.history.state.tntLayerStack.includes(d._tntLayerId));await U.closeModal(d);assert.equal(d.isConnected,false);const normal=U.modal('Buscar','<p>Listo</p>');a.d.dispatchEvent(new a.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await sleep(30);assert.equal(normal.isConnected,false);assert.deepEqual(a.errors,[]);}finally{a.close();}
+});
+
 test('La foto de Google se renueva cuando está habilitada y respeta una foto propia o la sincronización apagada',async()=>{
  for(const [source,sync,expected] of [['google',true,true],['google',false,false],['custom',true,false]]){
   const a=await inlinePage('index.html',w=>{
@@ -227,6 +241,19 @@ test('Perfiles une las fotos de las cuentas con los registros y abre el resultad
 function swipeFixture(w){
  w.__fixtureDB.tnt_saturday_members=w.__fixtureDB.tnt_people.map(p=>({person_id:p.id,active:true}));w.__fixtureDB.tnt_saturday_attendance=[];
 }
+test('El swipe retoma pendientes y no vuelve a pasar a quienes ya están marcados',async()=>{
+ const a=await inlinePage('asistencia/index.html',swipeFixture);try{
+  a.w.eval(fs.readFileSync(path.join(root,'assets/tnt-attendance.js'),'utf8'));await until(()=>a.d.querySelector('#startDeck'));a.d.querySelector('#startDeck').click();
+  const first=a.d.querySelector('#swipeCard h2').textContent;a.d.querySelector('[data-deck-answer=present]').click();await until(()=>a.d.querySelector('#swipeCard h2')?.textContent!==first);const next=a.d.querySelector('#swipeCard h2').textContent;a.d.querySelector('#deckClose').click();a.d.querySelector('#startDeck').click();assert.equal(a.d.querySelector('#swipeCard h2').textContent,next);assert(a.d.querySelector('.deck-head small').textContent.includes('1 de 5 registradas'));
+  for(let i=0;i<4;i++){a.d.querySelector('[data-deck-answer=absent]').click();await sleep(20);}assert(a.d.querySelector('.deck-finish'));a.d.querySelector('#deckDone').click();a.d.querySelector('#startDeck').click();assert(a.d.querySelector('.deck-finish'));assert.equal(a.d.querySelector('#swipeCard'),null);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
+test('El guardado espera coincidencias y vuelve al paso visible para confirmar el perfil',async()=>{
+ const a=await inlinePage('index.html',w=>Object.assign(w.__fixtureDB.tnt_accounts[0],{system_role:'user',staff_status:'community',onboarding_completed_at:null}),true);
+ try{await a.w.TNT.ready;a.w.eval(fs.readFileSync(path.join(root,'assets/tnt-hub.js'),'utf8'));await until(()=>a.d.querySelector('form.profile-completion'));const form=a.d.querySelector('form.profile-completion');form.elements.first_name.value='Santiago';form.elements.last_name.value='Laghi';form.elements.birthday.value='1999-01-01';const resolves=[],rpc=a.w.TNT.sb.rpc;a.w.TNT.sb.rpc=(n,args)=>{if(n==='tnt_match_profile_names'){assert.equal(args.p_birthday,null);return new Promise(resolve=>resolves.push(resolve));}return rpc(n,args);};form.querySelector('.profile-section').hidden=true;form.dispatchEvent(new a.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>resolves.length);assert.equal(a.w.__fixtureCalls.some(c=>c.rpc==='tnt_finish_onboarding'),false);for(const resolve of resolves)resolve({data:[{id:'existing',full_name:'Santiago Laghi'}],error:null});await until(()=>a.d.querySelector('[data-claim]'));assert.equal(form.querySelector('.profile-section').hidden,false);assert.equal(a.w.__fixtureCalls.some(c=>c.rpc==='tnt_finish_onboarding'),false);assert.equal(form.elements.last_name.value,'Laghi');assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
 test('Agregar desde Perfiles a un EFE muestra la foto de una cuenta que ya se registró',async()=>{
  const a=await inlinePage('asistencia/index.html',w=>{
   w.TNT.grants=[{module:'efe',scope:'varones',access_level:'manage',enabled:true}];
@@ -470,6 +497,17 @@ test('Las opciones externas son enlaces HTTPS seguros y conservan la selección 
   await until(()=>parent.querySelector('.tnt-select-trigger'));const select=parent.querySelector('select');let changes=0;select.addEventListener('change',()=>changes++);parent.querySelector('.tnt-select-trigger').click();const picker=a.d.querySelector('.tnt-select-dialog'),link=picker.querySelector('a[data-option="1"]');
   assert.equal(link.getAttribute('href'),'https://www.bible.com/bible/127/MAT.5.14-16');assert.equal(link.target,'_blank');assert(link.rel.includes('noopener'));assert(link.rel.includes('noreferrer'));assert.equal(picker.querySelectorAll('a').length,1);assert(picker.querySelector('[data-option="4"]').disabled);
   link.addEventListener('click',e=>e.preventDefault());link.click();await until(()=>!picker.isConnected);assert.equal(select.value,'local');assert.equal(changes,0);assert(parent.isConnected);assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
+
+test('Una opción que recibió acceso interno mientras el menú estaba abierto conserva su valor y evita el enlace viejo',async()=>{
+ const a=await app('hub');try{
+  const parent=a.w.TNTUI.modal('Lectura','<label>Traducción<select><option value="1909">Local</option><option value="128" data-tnt-href="https://www.bible.com/bible/128/GEN.1">NVI</option></select></label>');
+  await until(()=>parent.querySelector('.tnt-select-trigger'));const select=parent.querySelector('select');let changed=false;select.addEventListener('change',()=>changed=true);parent.querySelector('.tnt-select-trigger').click();
+  const picker=a.d.querySelector('.tnt-select-dialog'),oldLink=picker.querySelector('a[data-option="1"]');
+  select.innerHTML='<option value="1909">Local</option><option value="147">Otra versión</option><option value="128">NVI habilitada</option>';
+  const event=new a.w.MouseEvent('click',{bubbles:true,cancelable:true});oldLink.dispatchEvent(event);assert.equal(event.defaultPrevented,true);
+  await until(()=>changed);assert.equal(select.value,'128');assert(!picker.isConnected);assert(parent.isConnected);assert.deepEqual(a.errors,[]);
  }finally{a.close();}
 });
 

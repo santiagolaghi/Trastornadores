@@ -1,3 +1,10 @@
+## NVI dentro del lector y actualización de licencias · 24 de octubre de 2026
+
+- Una traducción con licencia pendiente o catálogo desconocido aparece en «Comprobar acceso en TNT». Elegir NVI desde el menú real actualiza su acceso y solicita el pasaje dentro del lector. Las versiones que el proveedor confirma como no ofrecidas conservan sus enlaces nativos; para NVI, Bible.com queda como acción explícita después de un error.
+- Si el catálogo cambia con el selector abierto, la elección conserva el valor de la traducción. Un enlace anterior se comprueba otra vez antes de salir. El gateway consulta directamente el acceso al contenido de las ediciones solicitadas, conserva autenticación y créditos, y distingue un pasaje inexistente de una traducción ausente mediante sus metadatos.
+- Pasaron 283 comprobaciones unitarias, DOM, permisos, PWA y SQL aislado, y el recorrido completo de `community-browser.cjs`. `TNT_TEST_INLINE_ONLY=1` reproduce una licencia aceptada con la página abierta, selección durante el catálogo pendiente, catálogo caído con pasaje autorizado y cero pestañas externas. El recorrido externo comprueba los tres enlaces directos y los dos enlaces explícitos de respaldo, seis anchos, horizontal y ambos temas. Se revisaron capturas.
+- Las respuestas de YouVersion en estas pruebas son sintéticas; no certifican texto NVI real con la sesión del usuario en producción. No se modificaron cuentas ni datos personales. Recursos modificados, cliente push y service worker: `20261024f`.
+
 ## Apertura directa de Bible.com · 24 de octubre de 2026
 
 - Se reprodujo el problema desde el selector real: elegir una opción externa no abría su destino, sino que cambiaba a una pantalla de aviso. Ahora esas opciones son enlaces HTTPS nativos que abren la lectura con el gesto del usuario y conservan el marcador interno. El cierre del selector ocurre después de activar el enlace.
@@ -202,3 +209,18 @@ Para ejecutar las pruebas en navegador, instalar `playwright-core`, proporcionar
 - El build agrupa los 16 scripts compartidos en orden en la misma URL de `tnt-experience.js`. El service worker deja de precargar copias individuales del paquete. Versión de recursos modificados y SW: `20261024e`.
 - Pasaron las 281 pruebas unitarias, DOM, SQL, permisos y PWA, y el recorrido completo de `community-browser.cjs`. `TNT_TEST_STARTUP_ONLY=1` aísla la prueba con actividades, avisos y catálogo retenidos: inicio utilizable, una consulta de identidad, un paquete compartido, un único pedido de avisos y conservación de la interacción. Incluye fallo/reintento y navegación sin resincronizar la cuenta.
 - Se verificaron las consultas nuevas en la base real, dentro de una transacción de solo lectura con rol `authenticated`; no se alteraron datos personales. La revisión de seguridad no agregó hallazgos. Los recorridos de navegador usan SDK oficial, respuestas HTTP sintéticas y PostgreSQL aislado; no representan una sesión Google real ni una medición del teléfono del usuario.
+
+## Entrada móvil y búsqueda · 24 de octubre de 2026
+
+- `TNT_TEST_ENTRY_ONLY=1` ejecuta en `community-browser.cjs` el ingreso con SDK oficial: único botón Google, redirección OAuth al proveedor correcto, instalación previa en Android/iPhone, apertura en modo app y alta de avisos sólo después de un toque. Instalador, permiso del sistema y endpoint push son sintéticos; no certifican instalación o recepción en un teléfono físico.
+- Inspección visual y geometría del buscador, guía iPhone/Android y permiso: 320/360/390/412/768/1280, claro/oscuro y horizontal. Comprueba fotos circulares, tarjetas sin desborde, homónimos conservados y etiqueta «Tu perfil».
+- `phone-client.cjs` prueba cancelación del instalador, permiso denegado/recuperado, fallo de suscripción, dispositivos sin soporte y formularios públicos. Una preferencia de desactivación no se convierte en consentimiento. `regression.cjs` comprueba reintento de OAuth y el historial de los pasos obligatorios.
+- Recursos modificados y SW: `20261024g`. Se retiró el flujo de enlace por email de la interfaz; no se modificaron proveedores del servicio Auth ni cuentas existentes.
+
+## Asistencia y continuidad de perfiles · 24 de octubre de 2026
+
+- `TNT_TEST_ATTENDANCE_ONLY=1` comprueba cerrar/reabrir, recargar con datos del servidor, terminar la lista y volver a entrar sin repetir marcados. La tarjeta compacta conserva controles táctiles y retrato circular en seis anchos, ambos temas y horizontal.
+- El alta espera una búsqueda por nombre antes del guardado y muestra la coincidencia en un paso visible. Una búsqueda con error conserva el borrador; «No soy yo» rechaza sólo la coincidencia elegida. Perfil ofrece una recuperación explícita aunque se hubiera omitido antes.
+- `profile-claim-database.cjs` ejecuta SQL en PGlite: sintaxis de la migración, nombre corregido, teléfono argentino con/sin prefijo y derivación de dos Google a revisión. La transferencia final está sustituida por un registro de llamadas en esa prueba: no certifica conservación de todas las relaciones reales.
+- `profile-claim-retry.sql` prepara una prueba de esquema completo con usuarios sintéticos y rollback: cuenta sin Google, historial, permisos y reunión administrativa de dos Google. Su ejecución remota quedó bloqueada por la confirmación de Supabase; no se presenta como pasada.
+- Pasaron 294 pruebas automatizadas y el recorrido completo de `community-browser.cjs`, además del recorrido específico de asistencia. La migración `20261024232426_profile_claim_retry` debe aplicarse y verificarse antes de publicar el cliente. No se modificaron las cuentas reales para probar esta implementación.

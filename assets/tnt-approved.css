@@ -89,6 +89,82 @@ body .hub-activity-copy>em svg { width:15px;height:15px; }
 .activity-person-list { display:flex;flex-wrap:wrap;align-items:center;gap:9px 14px;margin-top:12px;min-width:0; }
 .activity-person { display:flex;align-items:center;gap:8px;min-width:0;max-width:100%; }
 .activity-person>.tnt-person-avatar { width:32px;height:32px;flex:none; }
+
+/* Search results keep a fixed circular portrait and one flexible text column. */
+.hub-result>.tnt-person-avatar { width:48px;height:48px;flex:0 0 48px;aspect-ratio:1;border-radius:50%; }
+.hub-search-summary { display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:2px 0 22px; }
+.hub-search-summary>span { flex:none;border-radius:8px;padding:7px 10px;background:var(--tnt-lilac);color:#302447;font-size:12px;font-weight:750; }
+.hub-search-summary p { min-width:0;margin:3px 0 0;text-align:right;font-size:13px;line-height:1.6;color:var(--tnt-muted);overflow-wrap:anywhere; }
+.hub-search-summary p b { color:var(--tnt-text);font-weight:650; }
+.hub-search-results { gap:10px; }
+.hub-search-dialog .tnt-sheet-head::before,.tnt-setup .tnt-sheet-head::before { inset:0; }
+.hub-search-result { min-height:86px;padding:15px;gap:14px;border:1px solid var(--tnt-line);border-radius:16px;background:var(--tnt-panel);transition:background .15s,border-color .15s; }
+.hub-search-result:hover,.hub-search-result:focus-visible { background:var(--tnt-panel2);border-color:var(--tnt-edge);outline:2px solid var(--tnt-style-accent,var(--tnt-lilac));outline-offset:2px; }
+.hub-search-result>.hub-result-copy { flex:1;min-width:0; }
+.hub-result-copy>b { display:block;font-size:16px;line-height:1.35;overflow-wrap:anywhere; }
+.hub-result-copy>small { margin-top:5px;font-size:12px;line-height:1.4; }
+.hub-search-result>.hub-result-arrow { display:grid;place-items:center;flex:0 0 30px;width:30px;height:30px;border-radius:50%;background:var(--tnt-panel2); }
+.hub-result-arrow>.tnt-icon { width:18px;height:18px; }
+.hub-search-result>.hub-search-symbol { display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;border-radius:14px;background:var(--tnt-lilac);color:#302447; }
+.hub-search-empty { display:grid;justify-items:center;text-align:center;padding:22px 12px 16px; }
+.hub-search-empty>.tnt-icon { width:40px;height:40px;color:var(--tnt-muted); }
+.hub-search-empty h3 { margin:18px 0 8px;font-size:19px; }
+.hub-search-empty p { max-width:300px;margin:0;color:var(--tnt-muted);font-size:14px;line-height:1.6; }
+.login .google .google-mark { width:30px;height:30px;flex:none;padding:4px!important; }
+.login-card .login-google-help { margin:18px 0 0;font-size:13px;line-height:1.6; }
+
+/* Mobile setup follows the approved TNT geometry and uses the system prompts. */
+.tnt-setup .tnt-sheet-head h2 { font-size:clamp(22px,5vw,30px)!important; }
+.tnt-setup-steps { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 22px;padding:0;list-style:none; }
+.tnt-setup-steps li { display:flex;align-items:center;gap:6px;font-size:11px;font-weight:650;color:var(--tnt-muted); }
+.tnt-setup-steps li>b { display:grid;place-items:center;width:25px;height:25px;flex:none;border:1px solid var(--tnt-line);border-radius:50%;font-size:11px; }
+.tnt-setup-steps [aria-current] { color:var(--tnt-text); }
+.tnt-setup-steps [aria-current]>b,.tnt-setup-steps .is-done>b { background:var(--tnt-lilac);color:#302447;border-color:#302447; }
+.tnt-setup-hero { display:flex;align-items:center;gap:18px;padding:18px;border-radius:18px;border:1px solid var(--tnt-edge);background:var(--tnt-peach);color:#29221e; }
+.tnt-setup-hero img { flex:none;border-radius:18px; }
+.tnt-setup-hero>span { max-width:180px;font:400 clamp(22px,5vw,30px)/1.05 var(--tnt-display);letter-spacing:-1px; }
+.tnt-setup-intro { margin:20px 0;font-size:15px;line-height:1.65;color:var(--tnt-muted); }
+.tnt-setup .tnt-install-guide { font-size:14px; }
+.tnt-setup .tnt-install-guide ol { display:grid;gap:8px;margin:18px 0;padding-left:22px; }
+.tnt-setup .tnt-install-guide li { padding:0 0 0 4px; }
+.tnt-setup .tnt-install-guide label { margin-top:18px; }
+.tnt-setup [data-setup-install],.tnt-setup [data-setup-enable] { width:100%;min-height:52px;white-space:normal; }
+.tnt-setup [hidden] { display:none!important; }
+.tnt-setup-notice { display:flex;align-items:flex-start;gap:12px;padding:16px;border:1px solid var(--tnt-line);border-radius:14px;margin-bottom:20px;background:var(--tnt-panel2); }
+.tnt-setup-notice>.tnt-icon { width:24px;height:24px;flex:none; }
+.tnt-setup-notice p { margin:0;font-size:14px;line-height:1.6; }
+.tnt-setup-exit { display:block;margin:20px auto 0;min-height:44px;padding:10px;border:0;background:transparent;color:var(--tnt-muted);text-decoration:underline;font-size:13px; }
+.tnt-setup-status,.tnt-setup-small { margin:15px 0 0;font-size:13px;line-height:1.6;overflow-wrap:anywhere;color:var(--tnt-muted); }
+.tnt-setup-status:empty { display:none; }
+/* Compact attendance card; the saved cursor stays separate from attendance data. */
+body .deck-screen .deck-stage { padding:16px!important;min-height:0;overflow:auto;touch-action:pan-y; }
+body .deck-screen .swipe-card { width:min(100%,360px);max-height:none;flex:none; }
+.deck-screen .swipe-card>div { padding:20px 20px 16px; }
+body .deck-screen .swipe-card .big-avatar { width:clamp(84px,17dvh,140px)!important;height:clamp(84px,17dvh,140px)!important;margin:0 auto 16px!important;border-radius:50%!important; }
+body .deck-screen .big-avatar>.tnt-person-avatar.portrait { width:100%!important;height:100%!important;border-radius:50%!important;font-size:44px; }
+body .deck-screen .swipe-card .big-avatar img { object-fit:cover!important; }
+body .deck-screen .swipe-card h2 { font-size:clamp(21px,4.8vw,26px)!important;line-height:1.2!important;margin:0 0 12px!important;overflow-wrap:anywhere; }
+body .deck-screen .deck-person-kicker { font-size:9px; }
+.deck-screen .swipe-card .person-tags span { font-size:11px!important;padding:5px 8px!important; }
+body .deck-screen .swipe-card footer { padding:12px 16px!important; }
+.deck-screen .deck-buttons { width:100%;max-width:460px;margin-inline:auto; }
+@media(max-height:520px) {
+ body .deck-screen .deck-stage { padding:8px 16px!important; }
+ body .deck-screen .swipe-card { width:min(100%,560px); }
+ .deck-screen .swipe-card>div { display:grid;grid-template-columns:80px minmax(0,1fr);gap:8px 16px;padding:12px; }
+ body .deck-screen .swipe-card .big-avatar { grid-row:1/4;width:80px!important;height:80px!important;margin:0!important; }
+ body .deck-screen .swipe-card h2 { margin:0!important;font-size:20px!important; }
+ .deck-screen .swipe-card .person-tags { align-self:start; }
+ .deck-screen .swipe-card footer { display:none; }
+}
+@media(max-width:360px) {
+ .hub-search-result { gap:10px;padding:12px; }
+ .hub-search-result>.tnt-person-avatar,.hub-search-result>.hub-search-symbol { width:42px;height:42px;flex-basis:42px; }
+ .hub-result-copy>b { font-size:15px; }
+ .hub-search-result>.hub-result-arrow { width:24px;height:24px;flex-basis:24px; }
+ .tnt-setup-hero { gap:12px;padding:14px; }
+ .tnt-setup-hero img { width:58px;height:58px; }
+}
 .activity-person>span:last-child { display:grid;min-width:0;gap:1px; }
 .activity-person small { font:500 10px/1.4 var(--tnt-font);opacity:.8; }
 .activity-person b { font:750 12px/1.4 var(--tnt-font);overflow-wrap:break-word; }
@@ -246,6 +322,9 @@ html[data-tnt-style] body :is(.activity-card,.agenda-card).is-featured .activity
 .life-page>.c-groups+[data-community-daily] { margin-top:28px; }
 
 /* External reading choices are native links, activated directly by touch or keyboard. */
+.tnt-select-list button[data-option] { height:max-content; }
+.tnt-select-list button[data-option]>span { flex:1;min-width:0; }
+.tnt-select-list button[data-option]>svg { flex:none; }
 .tnt-select-list a[data-option] { display:flex;align-items:center;justify-content:space-between;gap:10px;height:max-content;min-height:52px;width:100%;padding:10px 14px;border:1px solid var(--tnt-line);border-radius:13px;background:var(--tnt-panel2);color:var(--tnt-text);text-align:left;text-decoration:none;font:inherit;font-size:16px;overflow-wrap:anywhere; }
 .tnt-select-list a[data-option]>span { flex:1;min-width:0; }
 .tnt-select-list a[data-option] small { display:block;margin-top:4px;font-size:12px;line-height:1.4;font-weight:500;color:var(--tnt-muted); }
