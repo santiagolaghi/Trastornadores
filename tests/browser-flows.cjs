@@ -229,6 +229,17 @@ async function mockAPI(page){
   console.log('Original TNT identity: logo and dynamic deck restored; native touch, keyboard, selected module, menu, calendar dates and schedule actions verified at 320/390/412/768/1280 in both themes.');
  }
  try{
+  if(process.env.TNT_TEST_REPAIR_ONLY==='1'){
+   await page.setViewportSize({width:390,height:844});await visit('/organizacion/','.org-nav');
+   await page.evaluate(()=>eventMembersModal(S.events[0].id));await page.locator('#membersForm').waitFor();const row=page.locator('[data-member-row]').nth(1);await row.locator('[name=person]').check();await row.getByText('Coordina',{exact:true}).click();
+   await page.evaluate(()=>__fixtureFailures['rpc:tnt_save_event_members']='Error de prueba al guardar');await page.locator('#membersForm [type=submit]').click();await page.getByRole('status').filter({hasText:'Error de prueba al guardar'}).waitFor();assert(await row.locator('[value=organizer]').isChecked());assert.equal(await page.locator('#membersForm [type=submit]').isEnabled(),true);
+   await page.evaluate(()=>delete __fixtureFailures['rpc:tnt_save_event_members']);await page.locator('#membersForm [type=submit]').click();await page.locator('#membersForm').waitFor({state:'detached'});assert.equal(await page.locator('dialog:modal').count(),0);
+   const call=await page.evaluate(()=>__fixtureCalls.filter(c=>c.rpc==='tnt_save_event_members').at(-1));assert(call.args.p_members.some(m=>m.event_role==='organizer'));
+   await page.evaluate(()=>{modal(sheetHead('Ventana de origen')+'<button type="button" id="repair-parent-button">Seguir trabajando</button>');document.querySelector('#repair-parent-button').onclick=()=>window.__parentWorked=true;modal(sheetHead('Ventana secundaria')+'<p>Otra selección</p>');});
+   await page.keyboard.press('Escape');await page.locator('#repair-parent-button').waitFor();assert(await page.locator('#repair-parent-button').evaluate(n=>n.closest('dialog').matches(':modal')));await page.locator('#repair-parent-button').click();assert.equal(await page.evaluate(()=>__parentWorked),true);await page.locator('#modal [data-close]').click();await page.locator('dialog:modal').waitFor({state:'detached'});
+   for(const [width,height] of [[320,740],[390,844],[768,1024],[844,390],[1366,593],[1920,1080]]){await page.setViewportSize({width,height});await page.evaluate(()=>eventMembersModal(S.events[0].id));assert(await page.locator('#membersForm').isVisible());if(width===390||width===1366)await page.screenshot({animations:'disabled',path:path.join(out,'repair-coordinators-'+width+'.png')});await page.locator('#modal [data-close]').click();}
+   assert.deepEqual(errors,[]);console.log('Coordinator save error/retry, nested dialogs restored to the modal layer, touch actions and six viewports: OK');return;
+  }
   if(process.env.TNT_TEST_STYLE_ONLY==='1'){await restoredIdentityFlow();assert.deepEqual(errors,[]);return;}
   if(process.env.TNT_TEST_ROLES_ONLY==='1'){await rolesCommunityFlow();assert.deepEqual(errors,[]);return;}
   if(process.env.TNT_TEST_ORGANIZATION_ONLY==='1'){await organizationUpgradeFlow();await reportedRefinementsFlow();assert.deepEqual(errors,[]);return;}

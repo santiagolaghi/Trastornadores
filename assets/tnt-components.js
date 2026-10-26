@@ -4,6 +4,7 @@
   const personName = value => String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('es').replace(/(^|[\s’\x27-])\p{L}/gu, part => part.toLocaleUpperCase('es'));
   const paths = {
     heart:'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z',play:'M8 4l12 8-12 8Z',
+    star:'m12 3 2.8 5.7 6.3.9-4.6 4.4 1.1 6.3-5.6-3-5.6 3 1.1-6.3L3 9.6l6.2-.9L12 3Z',grid:'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',gift:'M3 8h18v5H3zM5 13v8h14v-8M12 8v13M12 8H8a3 3 0 1 1 3-3l1 3Zm0 0h4a3 3 0 1 0-3-3l-1 3Z',
     home:'M3 10.5 12 3l9 7.5M5 9v12h5v-7h4v7h5V9',
     user:'M20 21v-2a7 7 0 0 0-14 0v2M13 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8',
     upload:'M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5',
@@ -109,7 +110,13 @@
   function backOverlay(){return new Promise(resolve=>{pendingOverlayBack.push(resolve);root.history.back();});}
   const overlayNodes=[];
   const topOverlay=()=>overlayNodes.filter(node=>node.isConnected&&node._tntLayerActive).at(-1)||null;
-  function revealOverlay(node){if(!node?.isConnected)return;node.style.removeProperty('display');node.removeAttribute('inert');node.removeAttribute('aria-hidden');node._tntOnRestore?.();}
+  function revealOverlay(node){
+    if(!node?.isConnected)return;
+    node.style.removeProperty('display');node.removeAttribute('inert');node.removeAttribute('aria-hidden');node._tntOnRestore?.();
+    // Safari removes a native dialog from the top layer when it is reparented.
+    // Restoring its CSS alone leaves an open, inert screen behind the backdrop.
+    if(node.tagName==='DIALOG'&&node.showModal&&!node.matches(':modal')){node.removeAttribute('open');node.showModal();}
+  }
   function modal(title, body, wide=false, options={}) {
     const top=topOverlay(),old=top?.matches('.tnt-overlay')&&(options.replace||options.stack===false||top.getAttribute('aria-label')===title)?top:null;
     const dialog=root.document.createElement('dialog');dialog.className='tnt-overlay';dialog.setAttribute('aria-label',title);
