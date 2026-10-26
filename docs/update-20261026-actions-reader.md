@@ -26,3 +26,5 @@ Las ventanas de Organización salen de la capa modal nativa antes de ocultarse o
 Validación: 227 regresiones DOM/SQL/cache/privacidad; recorrido completo de Comunidad con HTML compilado y SDK Supabase oficial; pruebas específicas de destinos exactos, fecha fija, repetición de atajos, EFE revocado, chat general, creación/edición de sábado y coordinadores anidados dentro del workspace. Capturas en claro/oscuro y 320/360/390/412/768/1280, escritorio 1366/1440/1920, horizontal y vista equivalente a zoom de 200 %. Lectura y selección verificadas con un capítulo público real RVR 1909 y con HTML sintético que reproduce los hitos REST y párrafos poéticos. Estas pruebas no certifican licencias NVI/NTV ni sustituyen una prueba física en Safari/iOS o Android.
 
 Versión de recursos y service worker: `20261026r2`. Actualización sin borrar sesiones, marcas ni preferencias.
+
+La migración `20261026214008_action_shortcuts_reader.sql` está aplicada en el proyecto TNT. Se verificaron la columna, ambas funciones de preferencias/transferencia, validación de grupos y fechas, RLS activo y ausencia de permisos de escritura directa o ejecución anónima.
