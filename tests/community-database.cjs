@@ -3,6 +3,14 @@ const {database,id}=require('./fixtures/community-db.cjs');
 test('Comunidad completa: permisos, referentes, planes, encuestas, preguntas privadas, familias, bautismos y contenido diario',async t=>{
  const {db,login,action,boot}=await database();let plan,poll,question,family;
  try{
+  await t.test('Solo Comunidad solicita acompañamiento; staff y administración no crean solicitudes ni avisos',async()=>{
+   for(const actor of [1,2]){await login(actor);await assert.rejects(action('request_welcome',{staff_status:'community',person_id:id(3)}),/personas de Comunidad/);}
+   await db.exec('reset role');assert.equal((await db.query("select count(*)::int n from tnt_community_history where action='request_welcome'")).rows[0].n,0);assert.equal((await db.query('select count(*)::int n from tnt_community_accompaniment')).rows[0].n,0);
+   await login(3);await action('request_welcome',{person_id:id(4)});assert.equal((await boot()).accompaniment[0].person_id,id(3));
+   await db.exec('reset role');assert.equal((await db.query("select subject_id from tnt_community_history where action='request_welcome'")).rows[0].subject_id,id(3));
+   await db.query('update tnt_accounts set staff_status=$1 where person_id=$2',['approved',id(3)]);await login(3);await assert.rejects(action('request_welcome'),/personas de Comunidad/);assert.equal((await boot()).accompaniment[0].person_id,id(3));
+   await db.exec('reset role');await db.query('update tnt_accounts set staff_status=$1 where person_id=$2',['community',id(3)]);
+  });
   await t.test('Comunidad no administra y los permisos de módulo no conceden funciones de Admin',async()=>{
    await login(3);await assert.rejects(action('save_module',{module:'baptisms',version:1,title:'Cambio'}),/permiso/);
    await assert.rejects(db.exec("update public.tnt_community_modules set title='Cambio'"),/permission denied/);

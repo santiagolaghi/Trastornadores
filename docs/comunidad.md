@@ -4,8 +4,8 @@ Los nueve espacios se agrupan en Camino de fe, Vida en comunidad y Familias TNT.
 
 | Espacio | Comunidad | Equipo autorizado |
 | --- | --- | --- |
-| Bienvenida | Pedir acompañamiento y ver registros compartidos | Administración elige el referente; la persona elegida debe aceptar. Registrar encuentros y distinguir notas privadas |
-| Cumpleaños y fechas | Compartir el cumpleaños de manera voluntaria; ver fechas publicadas | Publicar y editar fechas especiales |
+| Bienvenida | Pedir acompañamiento y ver registros compartidos | Líderes y demás staff participan como referentes y no pueden enviar esta solicitud. Administración elige el referente; la persona elegida debe aceptar. Registrar encuentros y distinguir notas privadas |
+| Cumpleaños y fechas | Ver los cumpleaños de la comunidad por mes, con próximos, recientes y edad | Publicar y editar fechas especiales |
 | Biblia y planes | Elegir versión, libro y capítulo; comenzar planes y marcar avances | Editar lecturas y consignas, publicar, programar y consultar avances |
 | Desafíos | Participar, registrar pasos y pausar | Preparar pasos, destinatarios y cierre de participación |
 | Preguntas de fe | Consultar en privado o proponer una pregunta para compartir | Responder y publicar únicamente las consultas propuestas para Comunidad |

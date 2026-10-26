@@ -9,6 +9,7 @@
  const C=window.TNTCommunity={definitions,groups,states,load,action,saveReading,mount,home,contentDetail,manage,cleanPassage,reference,referenceLabel,readLink,openReading,preferences,gameBank:()=>posts('games').filter(c=>c.config?.kind==='quiz'),gameSettings:()=>moduleInfo('games')?.config||{},get data(){return data;}};
  function moduleInfo(id){return data?.modules?.find(m=>m.id===id);}
  function can(id,level=1){return (moduleInfo(id)?.permission||0)>=level;}
+ const inTeam=()=>!!(TNT.isAdmin||TNT.isStaff||TNT.account?.system_role==='admin'||TNT.account?.staff_status==='approved');
  function posts(id){return (data?.content||[]).filter(c=>c.module===id&&['published','scheduled'].includes(c.status)&&(!c.starts_at||Date.parse(c.starts_at)<=Date.now()));}
  const person=id=>data?.people?.find(p=>p.id===id)?.name||'Persona TNT';
  const date=v=>v?new Intl.DateTimeFormat('es-AR',{timeZone:'America/Argentina/Buenos_Aires',day:'numeric',month:'short',year:'numeric'}).format(new Date(v.length===10?v+'T12:00:00Z':v)):'';
@@ -82,7 +83,7 @@
   return '<button type="button" class="c-content-card" data-c-content="'+c.id+'"><div>'+badge(c.module==='polls'?'Tu voz cuenta':enrollment?(states[enrollment.status]||'En curso'):c.module==='bible'?(c.config.steps?.length||0)+' días':c.module==='games'?'Para compartir':'Para esta semana')+'<h3>'+esc(c.title)+'</h3><p>'+esc(c.description)+'</p>'+(c.config?.meet_at||c.config?.date||c.starts_at||c.ends_at?'<small>'+(c.config?.meet_at?date(c.config.meet_at):c.config?.date?date(c.config.date):c.starts_at?date(c.starts_at):'')+(c.ends_at?' · Hasta '+date(c.ends_at):'')+'</small>':'')+(n?'<span class="c-progress"><i style="width:'+Math.round(done/n*100)+'%"></i></span><small>'+done+' de '+n+' pasos</small>':'')+'</div>'+icon('arrow')+'</button>';
  }
  function modulePage(id){
-  const m=moduleInfo(id);let body=title(m.title,'/comunidad?group='+definitions[id][2])+intro(m);
+  const m=moduleInfo(id);let body=title(m.title,'/comunidad?group='+definitions[id][2])+(id==='welcome'&&inTeam()?'<p class="life-lead">Un espacio para acompañar a las personas de nuestra comunidad.</p>':intro(m));
   if(can(id))body+='<div class="c-tools">'+button(icon('settings')+'Administrar','data-c-manage="'+id+'"',true)+'</div>';
   if(!m.enabled){layout(body+empty('Este espacio está en pausa. Sus datos están guardados.'));bind();return;}
   if(id==='daily'){body+='<section class="life-card"><h2>Tu momento de cada día</h2><p>El versículo y la frase del día te esperan en Inicio.</p><a class="life-button" href="/">Ir a Inicio</a></section>'+dailyPrefs();}
@@ -98,11 +99,14 @@
   const params=new URLSearchParams(location.search),item=params.get('item'),question=params.get('question');if(item&&data.content.some(c=>c.id===item))contentDetail(item);if(question&&data.questions.some(q=>q.id===question))questionDetail(question);
  }
  function welcomeHTML(){
-  const own=data.accompaniment.find(a=>a.person_id===TNT.person.id),assigned=data.accompaniment.filter(a=>a.referent_id===TNT.person.id&&['pending','accepted'].includes(a.status));
-  let html='<section class="life-card"><h2>Tu camino, acompañado</h2><p>'+esc(moduleInfo('welcome')?.config?.intro||'')+'</p>';
-  if(!own)html+=button('Quiero que me acompañen','data-c-action="request_welcome"');
-  else html+=badge(states[own.status])+'<p>'+(own.status==='accepted'?'Tu referente es <strong>'+esc(own.referent_name)+'</strong>.':own.status==='pending'?'El equipo está esperando la confirmación de tu referente.':'El equipo está organizando quién puede acompañarte.')+'</p>';
-  html+='</section>';
+  const own=data.accompaniment.find(a=>a.person_id===TNT.person.id),assigned=data.accompaniment.filter(a=>a.referent_id===TNT.person.id&&['pending','accepted'].includes(a.status)),team=inTeam();
+  let html=team?'<section class="life-card"><h2>Acompañamos juntos</h2><p>Acá encontrás tus invitaciones para ser referente y a las personas que acompañás.</p></section>':'';
+  if(!team||own){
+   html+='<section class="life-card"><h2>'+(team?'Tu acompañamiento registrado':'Tu camino, acompañado')+'</h2>'+(!team?'<p>'+esc(moduleInfo('welcome')?.config?.intro||'')+'</p>':'');
+   if(!own&&!team)html+=button('Quiero que me acompañen','data-c-action="request_welcome"');
+   else if(own)html+=badge(states[own.status])+'<p>'+(own.status==='accepted'?'Tu referente es <strong>'+esc(own.referent_name)+'</strong>.':own.status==='pending'?'El equipo está esperando la confirmación de tu referente.':'El equipo está organizando quién puede acompañarte.')+'</p>';
+   html+='</section>';
+  }
   for(const a of assigned)html+='<section class="life-card"><span class="life-eyebrow">'+(a.status==='pending'?'Una invitación para vos':'Acompañás a')+'</span><h2>'+esc(a.name)+'</h2>'+(a.status==='pending'?'<p>Administración te propone como referente. Confirmá si podés asumir este acompañamiento.</p><div class="life-actions">'+button('Aceptar','data-c-ref="'+a.person_id+'" data-accept="true"')+button('No puedo ahora','data-c-ref="'+a.person_id+'" data-accept="false"',true)+'</div>':button('Registrar un encuentro','data-c-followup="'+a.person_id+'"',true))+'</section>';
   const notes=data.followups.filter(f=>f.person_id===TNT.person.id&&f.shared);if(notes.length)html+='<h2 class="c-section-title">Lo que compartimos</h2>'+notes.map(f=>'<article class="life-card"><small>'+date(f.contact_on)+'</small><p class="c-prose">'+esc(f.note)+'</p></article>').join('');
   return html;
