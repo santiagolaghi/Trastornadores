@@ -1166,3 +1166,16 @@ test('Un chat abierto en un módulo oculto conserva el borrador y no marca mensa
   a.d.dispatchEvent(new a.w.CustomEvent('tnt:workspace-visibility',{detail:{visible:true}}));await until(()=>a.w.__fixtureCalls.filter(c=>c.rpc==='tnt_mark_chat_read').length>before);assert.deepEqual(a.errors,[]);
  }finally{a.close();}
 });
+
+test('Una vinculación pendiente de revisión permite continuar sin conceder permisos ni perder el formulario',async()=>{
+ const a=await inlinePage('index.html',w=>{
+  Object.assign(w.__fixtureDB.tnt_accounts[0],{system_role:'user',staff_status:'community',onboarding_completed_at:null});
+  const rpc=w.TNT.sb.rpc;w.TNT.sb.rpc=(n,args)=>n==='tnt_match_profile_names'?Promise.resolve({data:[{id:'existing-person',full_name:'Santiago Laghi',has_account:true}],error:null}):n==='tnt_continue_profile'&&args.p_confirm?Promise.resolve({data:{linked:false,pending_review:true,request_id:'review-id'},error:null}):rpc(n,args);
+ },true);
+ try{await a.w.TNT.ready;a.w.eval(fs.readFileSync(path.join(root,'assets/tnt-hub.js'),'utf8'));await until(()=>a.d.querySelector('[data-claim]'));
+  const form=a.d.querySelector('form.profile-completion');form.elements.first_name.value='Santiago';form.elements.last_name.value='Laghi';form.elements.phone.value='';
+  a.d.querySelector('[data-claim-birthday]').value='2001-02-23';a.d.querySelector('[data-claim-phone]').value='1112345678';a.d.querySelector('[data-claim]').click();
+  await until(()=>a.d.querySelector('[data-claim-continue]'));assert(a.d.querySelector('.profile-claim').textContent.includes('Tu solicitud ya está enviada'));assert.equal(a.w.TNT.account.staff_status,'community');assert.equal(a.w.TNT.isAdmin,false);assert.equal(form.elements.phone.value,'1112345678');
+  a.d.querySelector('[data-claim-continue]').click();assert.equal(a.d.querySelector('.profile-claim'),null);assert(form.isConnected);assert.equal(form.elements.first_name.value,'Santiago');assert.deepEqual(a.errors,[]);
+ }finally{a.close();}
+});
