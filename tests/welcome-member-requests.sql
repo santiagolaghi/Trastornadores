@@ -39,8 +39,16 @@ select public.tnt_community_action('assign_referent',jsonb_build_object('person_
 reset role;
 select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('tnt.welcome.uid2'),'role','authenticated')::text,true);
 set local role authenticated;
-select public.tnt_community_action('respond_referent',jsonb_build_object('person_id',current_setting('tnt.welcome.pid3'),'accept',true));
+do $$begin begin perform public.tnt_community_action('respond_referent',jsonb_build_object('person_id',current_setting('tnt.welcome.pid3'),'accept',false));raise exception 'The referent could decline an administrative assignment';exception when insufficient_privilege then null;end;end $$;
 select public.tnt_community_action('followup',jsonb_build_object('person_id',current_setting('tnt.welcome.pid3'),'note','Seguimiento sintético revertido','shared',true));
 reset role;
+do $$begin
+ if not exists(select 1 from public.tnt_community_accompaniment where person_id=current_setting('tnt.welcome.pid3')::uuid and status='accepted' and responded_at is null) then raise exception 'Assignment is not immediately active';end if;
+ -- Simulate a request left over before this person became a leader.
+ insert into public.tnt_community_accompaniment(person_id,status) values(current_setting('tnt.welcome.pid2')::uuid,'unassigned');
+ update public.tnt_accounts set staff_status='approved' where person_id=current_setting('tnt.welcome.pid2')::uuid;
+ if not exists(select 1 from public.tnt_community_accompaniment where person_id=current_setting('tnt.welcome.pid2')::uuid and status='closed') then raise exception 'Existing staff request remains active';end if;
+ if not exists(select 1 from public.tnt_community_history where subject_id=current_setting('tnt.welcome.pid2') and action='close_staff_welcome_request' and details->'before'->>'status'='unassigned') then raise exception 'Closing the request lost its history';end if;
+end $$;
 rollback;
-select 'PASS: leaders/admin denied, Community can request only for self, referent invitation and followup preserved; everything rolled back' verification;
+select 'PASS: leaders/admin denied, Community can request only for self, admin assignment immediate, no referent acceptance, staff requests closed and followup preserved; everything rolled back' verification;
