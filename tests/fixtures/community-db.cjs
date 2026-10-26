@@ -32,6 +32,7 @@ async function database(){
  await db.exec("create function public.tnt_profile_is_complete() returns boolean language sql as $$select tnt_actions.community_active_person(public.tnt_current_person_id())$$;");
  await db.exec(part('-- Identify older accompaniment requests'));
  await db.exec(read('supabase/migrations/20261026010032_community_welcome_member_requests.sql'));
+ await db.exec(read('supabase/migrations/20261026202636_action_shortcuts_reader.sql'));
  const login=n=>db.exec(`reset role;set request.jwt.claim.sub='${id(n)}';set role authenticated;`);
  const action=async(name,data={})=>(await db.query('select public.tnt_community_action($1,$2::jsonb) as result',[name,JSON.stringify(data)])).rows[0].result;
  const boot=async()=>(await db.query('select public.tnt_community_bootstrap() as result')).rows[0].result;

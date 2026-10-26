@@ -114,8 +114,8 @@ function clearOrgModal(){U.clearOverlays(node=>node.classList.contains('modal'))
 function modal(html,wide=false){
  const host=$('#modal'),old=host.querySelector('dialog'),fragment=document.createElement('template');fragment.innerHTML=html;const title=fragment.content.querySelector('.sheetHead h2')?.textContent||'';
  const replace=old&&old.querySelector('.sheetHead h2')?.textContent===title?old:null;
- if(old&&!replace){let archive=document.getElementById('org-dialog-history');if(!archive){archive=document.createElement('div');archive.id='org-dialog-history';document.body.append(archive);}if(archive.moveBefore)archive.moveBefore(old,null);else archive.append(old);}
- const dialog=document.createElement('dialog');dialog.className='modal';dialog.setAttribute('aria-label','Detalles de organización');dialog.innerHTML=`<section class="sheet ${wide?'wide':''}">${html}</section>`;host.append(dialog);
+ if(old&&!replace){U.suspendOverlay(old);let archive=document.getElementById('org-dialog-history');if(!archive){archive=document.createElement('div');archive.id='org-dialog-history';document.body.append(archive);}if(archive.moveBefore)archive.moveBefore(old,null);else archive.append(old);}
+ const dialog=document.createElement('dialog');dialog.className='modal';dialog.setAttribute('aria-label',title||'Detalles de organización');dialog.innerHTML=`<section class="sheet ${wide?'wide':''}">${html}</section>`;host.append(dialog);
  dialog._tntOnRestore=()=>{if(dialog.parentElement!==host){if(host.moveBefore)host.moveBefore(dialog,null);else host.append(dialog);}};
  U.trackOverlay(dialog,()=>dialog.remove(),{replace});if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');
  const close=()=>U.closeModal(dialog);dialog.addEventListener('cancel',event=>{event.preventDefault();close();});dialog.addEventListener('click',event=>{if(event.target===dialog)close();});$$('[data-close]',dialog).forEach(button=>button.onclick=close);
@@ -147,7 +147,7 @@ async function loadAll(){
  if(!eventBy(S.selectedEvent))S.selectedEvent=S.events.find(e=>e.end_date>=today()&&e.status!=='cancelled')?.id||S.events.find(e=>e.status!=='cancelled')?.id||null;
  if(!eventDays(S.selectedEvent).some(d=>d.id===S.selectedDay))S.selectedDay=eventDays(S.selectedEvent)[0]?.id||null;
 }
-function readDeepLink(){const q=new URLSearchParams(location.search);S.view=q.get('view')||'my';if(q.get('date'))S.calendarDate=/^\d{4}-\d{2}-\d{2}$/.test(q.get('date'))?q.get('date'):today();if(q.get('task'))S.view='activities';if(q.get('event')){S.view=q.get('view')==='schedule'?'schedule':'events';S.selectedEvent=q.get('event');}if(q.get('person'))S.view='team';if(S.calendarDate)S.calendarMonth=S.calendarDate.slice(0,7)+'-01';}
+function readDeepLink(search=location.search){const q=new URLSearchParams(search);S.view=q.get('view')||'my';if(q.get('date'))S.calendarDate=/^\d{4}-\d{2}-\d{2}$/.test(q.get('date'))?q.get('date'):today();if(q.get('task'))S.view='activities';if(q.get('event')){S.view=q.get('view')==='schedule'?'schedule':'events';S.selectedEvent=q.get('event');}if(q.get('person'))S.view='team';if(S.calendarDate)S.calendarMonth=S.calendarDate.slice(0,7)+'-01';}
 
 function navButtons(mobile=false){let arr=[...NAV];if(isAdmin())arr.push(['admin','⚙','Admin']);return arr.map(([id,ico,label])=>`<button class="navBtn ${S.view===id?'on':''} ${id==='admin'?'admin':''}" data-view="${id}"><span class="ni">${ico}</span><span>${label}</span></button>`).join('')}
 function shell(content,title){const nav=[['my','home','Mi TNT'],['saturdays','calendar','Encuentros'],['calendar','calendar','Calendario'],['schedule','clock','Cronograma'],['team','people','Equipo'],['templates','book','Plantillas'],['files','file','Archivos']];return `<div class="org-shell"><header class="org-heading"><div><div class="eyebrow">EQUIPO TNT</div><h1>${S.view==='my'?'Mi organización':esc(title)}</h1><p>${S.view==='my'?'Lo que compartimos y lo que te toca.':'Planificamos juntos lo que viene.'}</p></div><div class="actions"><button class="btn schedule-direct" data-quick-schedule>${U.icon('clock')}<span>Cronograma rápido</span></button><button class="btn" data-open-chat>${U.icon('chat')}<span>Chat</span></button></div></header><nav class="org-nav" aria-label="Organización"><div class="org-nav-track">${nav.map(([k,ico,l])=>`<button class="${(['activities','tasks','events'].includes(S.view)?'saturdays':S.view)===k?'on':''}" data-view="${k}" aria-current="${(['activities','tasks','events'].includes(S.view)?'saturdays':S.view)===k?'page':'false'}">${U.icon(ico)}<span>${l}</span><i aria-hidden="true"></i></button>`).join('')}</div></nav>${S.errors?.length?'<div class="tnt-error" role="alert">No pudimos actualizar algunos datos. <button class="btn" data-reload>Reintentar</button></div>':''}${S.recurringError?'<div class="tnt-error" role="alert">'+esc(S.recurringError)+'</div>':''}${content}</div>`;}
@@ -287,7 +287,7 @@ function eventDetailModal(id){
  `,true);
  $$('[data-task-open]').forEach(b=>b.onclick=()=>taskDetailModal(b.dataset.taskOpen));
  $$('[data-person-open]').forEach(b=>b.onclick=()=>personResponsibilitiesModal(b.dataset.personOpen));
- $('#manageEventMembers')?.addEventListener('click',()=>eventMembersModal(id));
+ $('#manageEventMembers',$('#modal dialog'))?.addEventListener('click',()=>eventMembersModal(id));
  $('#chooseTask')?.addEventListener('click',()=>activityChooserModal(id));
  $('#newTaskEmpty')?.addEventListener('click',()=>activityChooserModal(id));
  $('#newLogistics')?.addEventListener('click',()=>taskEditModal(null,id,null,{task_type:'logistics'}));
@@ -505,7 +505,20 @@ async function moveTemplateItem(templateId,id,dir){const top=$('#modal .sheet')?
 
 
 
-function openDeepLink(){const q=new URLSearchParams(location.search);if(q.get('next_saturday')==='1'){const next=S.events.filter(e=>e.kind==='saturday'&&e.status!=='cancelled'&&e.end_date>=today()).sort((a,b)=>a.start_date.localeCompare(b.start_date))[0];if(next){openSchedule(next.id);quickScheduleModal(next.id);}else{navigateView('saturdays');toast('Todavía no hay un sábado próximo preparado.');}return;}if(q.get('task')&&taskBy(q.get('task')))taskDetailModal(q.get('task'),q.get('tab')==='team'?'team':null,q.get('comment'));else if(q.get('event')&&eventBy(q.get('event'))){const id=q.get('event');openEncounter(id);if(q.get('item')&&S.items.some(i=>i.id===q.get('item')&&!i.archived_at&&dayBy(i.day_id)?.event_id===id))scheduleItemDetailModal(q.get('item'));else if(q.get('program')==='1'&&eventBy(id).status!=='cancelled')quickScheduleModal(id);}else if(q.get('person')&&pBy(q.get('person')))personResponsibilitiesModal(q.get('person'));}
+function nextSaturdayDate(){const date=today(),day=new Date(date+'T12:00:00Z').getUTCDay();return U.addDays(date,(6-day+7)%7);}
+function linkedSaturday(q){return S.events.filter(e=>e.kind==='saturday'&&e.status!=='cancelled'&&(q.get('when')==='date'?e.start_date===q.get('date'):e.end_date>=today())).sort((a,b)=>a.start_date.localeCompare(b.start_date))[0];}
+function openDeepLink(search=location.search){
+ const q=new URLSearchParams(search);
+ if(q.get('next_saturday')==='1'||q.get('action')==='prepare-saturday'){
+  const next=linkedSaturday(q),prepare=q.get('action')==='prepare-saturday';
+  if(prepare){
+   if(!(isAdmin()||TNT.canAction?.('organizacion','create_saturday','*'))){toast('No tenés permiso para preparar sábados.');return;}
+   if(next){openSchedule(next.id);editEvent(next.id);}else{const date=q.get('when')==='date'?q.get('date'):nextSaturdayDate();if(!/^\d{4}-\d{2}-\d{2}$/.test(date||'')){toast('Revisá la fecha del atajo.');return;}S.calendarDate=date;navigateView('saturdays');saturdayCreateModal();}
+  }else if(next){openSchedule(next.id);quickScheduleModal(next.id);}else{navigateView('saturdays');toast('Todavía no hay un sábado preparado para este atajo.');}
+  return;
+ }
+ if(q.get('task')&&taskBy(q.get('task')))taskDetailModal(q.get('task'),q.get('tab')==='team'?'team':null,q.get('comment'));else if(q.get('event')&&eventBy(q.get('event'))){const id=q.get('event');openEncounter(id);if(q.get('item')&&S.items.some(i=>i.id===q.get('item')&&!i.archived_at&&dayBy(i.day_id)?.event_id===id))scheduleItemDetailModal(q.get('item'));else if(q.get('program')==='1'&&eventBy(id).status!=='cancelled')quickScheduleModal(id);}else if(q.get('person')&&pBy(q.get('person')))personResponsibilitiesModal(q.get('person'));
+}
 
 function avatars(ids,max=5){return U.avatarStack(ids,S.people,S.accounts,currentPersonId(),max);}
 
@@ -761,3 +774,5 @@ function bindScheduleOrder(){
 function bulkActivities(){const e=eventBy(S.selectedEvent),rows=eventTasks(e.id);const o=U.modal('Actividades de '+e.name,`<p>Elegí las actividades que querés eliminar. Se conserva su historial y podés deshacer la acción.</p><form class="tnt-form" id="bulk-activities"><label><input type="checkbox" data-select-all> Seleccionar todas</label>${rows.map(t=>`<label class="tnt-bulk-row"><input name="activity" type="checkbox" value="${t.id}"><span><b>${esc(t.title)}</b><small>${taskPeople(t.id).map(displayName).join(', ')||'Sin responsable'}</small></span></label>`).join('')}<button class="tnt-button primary">Eliminar seleccionadas</button><p role="status"></p></form>`);o.querySelector('[data-select-all]').onchange=e=>o.querySelectorAll('[name=activity]').forEach(c=>c.checked=e.target.checked);o.querySelector('form').onsubmit=async event=>{event.preventDefault();const ids=[...o.querySelectorAll('[name=activity]:checked')].map(c=>c.value);if(!ids.length)return;o.querySelector('[type=submit]').disabled=true;await U.closeModal(o);await archiveActivities(ids);};}
 
 boot();
+
+window.addEventListener('tnt:shortcut',event=>{const search=new URL(event.detail.url,location.origin).search;U.clearOverlays();readDeepLink(search);render();openDeepLink(search);});

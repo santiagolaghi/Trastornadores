@@ -18,13 +18,14 @@ const status=id=>S.attendance.find(a=>a.person_id===id)?.status||'pending';
 const initials=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase();
 const phoneUrl=p=>{let d=String(p.phone||'').replace(/\D/g,'');if(!d)return'';if(d.startsWith('54'))d=d.slice(2);if(d.startsWith('9')&&d.length>10)d=d.slice(1);while(d.startsWith('0'))d=d.slice(1);if(d.length===10)d='549'+d;return d.length>=11?'https://wa.me/'+d:''};
 async function checked(q){const r=await q;if(r.error)throw r.error;return r.data||[]}
-function latestWednesday(){const d=new Date();const delta=(d.getDay()-3+7)%7;d.setDate(d.getDate()-delta);return U.dateKey(d)}
+function weekdayDate(day,next=false){const date=U.dateKey(),weekday=new Date(date+'T12:00:00Z').getUTCDay();return U.addDays(date,next?(day-weekday+7)%7:-((weekday-day+7)%7))}
+function latestWednesday(){return weekdayDate(3)}
 function saturdayDates(){return [...S.events].filter(e=>e.kind==='saturday'&&e.status!=='cancelled').sort((a,b)=>a.start_date.localeCompare(b.start_date))}
-function defaultSaturday(){const dates=saturdayDates(),today=U.dateKey();return dates.find(e=>e.start_date>=today)?.start_date||dates.at(-1)?.start_date||today}
+function defaultSaturday(){const dates=saturdayDates(),today=U.dateKey();return qs.get('when')==='latest'?dates.filter(e=>e.start_date<=today).at(-1)?.start_date||weekdayDate(6):dates.find(e=>e.start_date>=today)?.start_date||weekdayDate(6,true)}
 function groupMeetings(includeInactive=false){return S.meetings.filter(m=>m.group_id===S.group&&(includeInactive||m.active)).sort((a,b)=>a.meeting_date.localeCompare(b.meeting_date))}
 function defaultEfeDate(){
  const rows=groupMeetings(),today=U.dateKey(),past=rows.filter(m=>m.meeting_date<=today);
- return past.at(-1)?.meeting_date||rows[0]?.meeting_date||latestWednesday();
+ return qs.get('when')==='next'?rows.find(m=>m.meeting_date>=today)?.meeting_date||weekdayDate(3,true):past.at(-1)?.meeting_date||latestWednesday();
 }
 function monthKey(date){return String(date||'').slice(0,7)}
 function monthLabel(date){return U.date(date+'T12:00:00-03:00',{month:'long',year:'numeric'}).replace(/^./,x=>x.toUpperCase())}
@@ -39,7 +40,7 @@ async function loadMeetings(){
  const ensure=await sb.rpc('tnt_ensure_efe_wednesdays',{p_group:S.group,p_from:U.dateKey(from),p_to:U.dateKey(to)});
  if(ensure.error)throw ensure.error;
  S.meetings=await checked(sb.from('tnt_efe_meetings').select('*').eq('group_id',S.group).order('meeting_date'));
- if(!groupMeetings().some(m=>m.meeting_date===S.date))S.date=defaultEfeDate();
+ if(qs.get('when')!=='date'&&!groupMeetings().some(m=>m.meeting_date===S.date))S.date=defaultEfeDate();
 }
 function eligiblePeople(){
  if(S.mode==='sabados'){
@@ -69,10 +70,11 @@ async function loadBase(){
  if(!S.mode||!['efe','sabados'].includes(S.mode)||!modeAllowed(S.mode))S.mode=modeAllowed('efe')?'efe':modeAllowed('sabados')?'sabados':'';
  if(!S.mode){renderNoAccess();return}
  if(S.mode==='efe'){
-   const requested=qs.get('group');
-   S.group=S.groups.find(g=>g.code===requested&&has('efe',g.code))?.id||S.groups.find(g=>has('efe',g.code))?.id||null;
-   S.date=qs.get('date')||latestWednesday();
-   await loadMeetings();
+   const requested=qs.get('group')||TNT.profileContext?.values?.efe_group;
+   const chosen=requested?S.groups.find(g=>g.code===requested&&has('efe',g.code)):S.groups.find(g=>has('efe',g.code));
+   S.group=chosen?.id||S.groups.find(g=>has('efe',g.code))?.id;if(!chosen&&requested)U.toast('Ese EFE no está habilitado para tu cuenta. Elegimos uno de tus grupos disponibles.');
+   S.date=qs.get('date')||'';await loadMeetings();
+   if(!qs.get('date'))S.date=defaultEfeDate();
  }else S.date=qs.get('date')||defaultSaturday();
  await loadDate();render();
 }
@@ -119,7 +121,7 @@ function render(){
  const rows=eligiblePeople(),counts={present:0,absent:0,pending:0};rows.forEach(p=>counts[status(p.id)]++);
  const pct=rows.length?Math.round((counts.present+counts.absent)/rows.length*100):0;
  const context=S.mode==='efe'?group()?.name||'EFE':'Sábado TNT';
- const dateOptions=S.mode==='sabados'?saturdayDates():[];
+ const dateOptions=S.mode==='sabados'?saturdayDates():[];if(S.mode==='sabados'&&dateOptions.length&&!dateOptions.some(e=>e.start_date===S.date))dateOptions.push({name:'Sábado sin encuentro preparado',start_date:S.date});dateOptions.sort((a,b)=>a.start_date.localeCompare(b.start_date));
  app.innerHTML=topShell(`
  <section class="attendance-hero">
    <div class="hero-copy"><span class="context-pill">${S.mode==='efe'?'Encuentro EFE':'Encuentro general'}</span><h2>${E(context)}</h2><p>${S.mode==='efe'?'Acompañamiento, asistencia y contacto.':'Solo quienes forman parte de la lista de Sábados.'}</p></div>
@@ -388,6 +390,8 @@ function paintHistory(host){
 }
 function paintBirthdays(host){const rows=filteredRows().map(p=>({...p,avatar_url:S.accounts.find(a=>a.person_id===p.id)?.avatar_url||''}));host.innerHTML=TNTPersonal.birthdayCalendar(rows);}
 window.addEventListener('beforeunload',e=>{if(S.busy.size||S.failed.size){e.preventDefault();e.returnValue='';}});
+window.addEventListener('tnt:shortcut',event=>{const next=new URL(event.detail.url,location.origin);for(const key of [...qs.keys()])qs.delete(key);for(const [key,value] of next.searchParams)qs.set(key,value);S.mode=qs.get('mode')||'';U.clearOverlays();loadBase().catch(error=>{app.innerHTML='<div class="tnt-error" role="alert">'+E(error.message||'No pudimos abrir la lista.')+'</div>';});});
+
 loadBase().catch(e=>{console.error(e);app.innerHTML='<div class="tnt-error"><b>No pudimos cargar Asistencia TNT.</b><p>'+E(e.message)+'</p><button class="tnt-button" onclick="location.reload()">Reintentar</button></div>'});
 let attendanceLiveTimer;document.addEventListener('tnt:data',e=>{if(!(e.detail?.tables||[]).some(t=>t.startsWith('tnt_efe_')||t.startsWith('tnt_saturday_')||['tnt_people','tnt_accounts','tnt_events'].includes(t)))return;clearTimeout(attendanceLiveTimer);attendanceLiveTimer=setTimeout(async()=>{if(TNT.blocked||S.loading||S.busy.size)return;try{if(S.deck){S.accounts=await checked(sb.from('tnt_accounts').select('person_id,avatar_url,nickname'));}else if(!document.querySelector('dialog[open]')){const date=S.date,group=S.group;await loadBase();S.date=date;S.group=group;await loadDate();render();}}catch(e){console.warn('Attendance live update',e);}},150);});
 })();

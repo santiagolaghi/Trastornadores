@@ -110,6 +110,16 @@
   function backOverlay(){return new Promise(resolve=>{pendingOverlayBack.push(resolve);root.history.back();});}
   const overlayNodes=[];
   const topOverlay=()=>overlayNodes.filter(node=>node.isConnected&&node._tntLayerActive).at(-1)||null;
+  function suspendOverlay(node){
+    if(!node?.isConnected)return;
+    // A hidden native modal can keep its backdrop and make the next modal inert.
+    // Leave the top layer before archiving it, while retaining its form and history.
+    if(node.tagName==='DIALOG'&&node.open&&node.close){
+      node.addEventListener('close',event=>event.stopImmediatePropagation(),{capture:true,once:true});
+      node.close();
+    }
+    node.style.setProperty('display','none','important');node.setAttribute('inert','');node.setAttribute('aria-hidden','true');
+  }
   function revealOverlay(node){
     if(!node?.isConnected)return;
     node.style.removeProperty('display');node.removeAttribute('inert');node.removeAttribute('aria-hidden');node._tntOnRestore?.();
@@ -136,7 +146,7 @@
     const previous=root.document.activeElement,replacing=replace?._tntLayerActive;
     const id=replacing?replace._tntLayerId:'layer-'+Date.now()+'-'+Math.random().toString(36).slice(2);
     if(replacing){replace._tntDisposeBack();replace.remove();}
-    const parent=topOverlay();if(parent){parent.style.setProperty('display','none','important');parent.setAttribute('inert','');parent.setAttribute('aria-hidden','true');}
+    const parent=topOverlay();if(parent)suspendOverlay(parent);
     if(!replacing)root.history.pushState({...root.history.state,tntLayerStack:[...(root.history.state?.tntLayerStack||[]),id]},'');
     node._tntLayerId=id;node._tntLayerActive=true;node._tntRequired=!!required;overlayNodes.push(node);
     const dispose=()=>{node._tntLayerActive=false;root.document.removeEventListener('keydown',onKey);const index=overlayNodes.indexOf(node);if(index>=0)overlayNodes.splice(index,1);};
@@ -231,7 +241,7 @@
     const details=scope.matches?.('[data-tnt-collapse]')?[scope]:[...scope.querySelectorAll?.('[data-tnt-collapse]')||[]];
     for(const d of details){if(d.dataset.tntFoldBound)continue;d.dataset.tntFoldBound='true';const key=(root.TNT?.module||'home')+':'+d.dataset.tntCollapse;if(!foldState.has(key)){try{const saved=root.sessionStorage.getItem('tnt-fold:'+root.TNT?.person?.id+':'+key);if(saved!==null)foldState.set(key,saved==='true');}catch{}}if(foldState.has(key))d.open=foldState.get(key);d.addEventListener('toggle',()=>{foldState.set(key,d.open);try{root.sessionStorage.setItem('tnt-fold:'+root.TNT?.person?.id+':'+key,String(d.open));}catch{}});}
   }
-  const api={esc,personName,icon,safeUrl,resourceUrl,photoUrl,initials,avatar,avatarStack,namedPeople,eventTeam,dateKey,addDays,date,time,completed,modal,closeModal,startup,trackOverlay,topOverlay,clearOverlays,confirm,prompt,toast,enhanceSelects,backOverlay,accessInfo,snapshotView,restoreView,enhanceLists};
+  const api={esc,personName,icon,safeUrl,resourceUrl,photoUrl,initials,avatar,avatarStack,namedPeople,eventTeam,dateKey,addDays,date,time,completed,modal,closeModal,startup,trackOverlay,topOverlay,suspendOverlay,clearOverlays,confirm,prompt,toast,enhanceSelects,backOverlay,accessInfo,snapshotView,restoreView,enhanceLists};
   root.TNTUI=api;
   if(root.document){const init=()=>{enhanceSelects();enhanceLists();if(root.MutationObserver){new root.MutationObserver(records=>{for(const record of records){if(record.target?.parentElement?.classList.contains('tnt-list-fold'))enhanceLists(record.target);for(const node of record.addedNodes)if(node.nodeType===1){enhanceSelects(node);enhanceLists(node);}}}).observe(root.document.body,{childList:true,subtree:true});}root.document.addEventListener('invalid',e=>{for(let el=e.target.parentElement;el;el=el.parentElement)if(el.tagName==='DETAILS')el.open=true;},true);};if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init,{once:true});else init();}
   root.document?.addEventListener('error',e=>{if(e.target?.matches?.('.tnt-person-avatar img')){const avatar=e.target.parentElement;avatar.classList.remove('has-photo');avatar.classList.add('without-photo');e.target.remove();}},true);
