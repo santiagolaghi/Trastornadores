@@ -32,3 +32,14 @@ test('Racha usa días del servidor, no duplica lecturas y conserva datos en cons
   await db.exec("reset role;set role anon;set request.jwt.claim.sub=''");await assert.rejects(db.query('select public.tnt_personal_context()'),/permission denied/);
  }finally{await db.close();}
 });
+test('Atajos guardan acción, EFE y fecha privados; rechazan destinos arbitrarios y conservan la cuenta principal',async()=>{
+ const {db,login}=await personal();try{
+  const action=async data=>(await db.query("select public.tnt_personal_action('preferences',$1) r",[JSON.stringify(data)])).rows[0].r;
+  await login(3);const context={efe:{group:'mujeres18',when:'latest'},saturday:{when:'date',date:'2026-10-31'},prepare:{when:'next'}};
+  let r=await action({shortcuts:['efe','prepare','chat'],shortcut_context:context});assert.deepEqual(r.preferences.shortcut_context,context);assert.deepEqual(r.preferences.shortcuts,['efe','prepare','chat']);
+  for(const shortcut_context of [{efe:{group:'admin'}},{chat:{href:'https://example.test'}},{schedule:{when:'date',date:'2026-10-30'}},{efe:{when:'date',date:'2026-02-30'}},{saturday:{when:'date'}},{efe:{group:null}},[]])await assert.rejects(action({shortcut_context}),/grupo y la fecha/);
+  await login(4);r=(await db.query('select public.tnt_personal_context() r')).rows[0].r;assert(!r.preferences.shortcut_context||Object.keys(r.preferences.shortcut_context).length===0);assert.equal((await db.query('select count(*)::int n from public.tnt_personal_preferences')).rows[0].n,0);
+  await db.exec('reset role');await db.query('select tnt_actions.merge_personal_state($1,$2)',[id(3),id(4)]);await login(4);r=(await db.query('select public.tnt_personal_context() r')).rows[0].r;assert.deepEqual(r.preferences.shortcut_context,context);
+  await assert.rejects(db.query("update public.tnt_personal_preferences set shortcut_context='{}'"),/permission denied/);
+ }finally{await db.close();}
+});
