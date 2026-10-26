@@ -67,7 +67,8 @@ async function mockAPI(page,actor=1){
    return{data:object?rows[0]||null:rows,error:null};
   },{name,method:req.method(),args,params:[...url.searchParams],object:req.headers().accept?.includes('object')});
   await route.fulfill({status:result.error?403:200,json:result.error?{code:'42501',message:result.error.message}:result.data});
- }catch(error){if(/Execution context was destroyed|has been closed|Target page/.test(error.message)){await route.abort('aborted').catch(()=>{});return;}throw error;}
+ // A pending mock request may outlive navigation and reach the next document before its SDK fixture.
+ }catch(error){if(/Execution context was destroyed|has been closed|Target page|__fixtureDB is not defined|__fixtureSB is not defined/.test(error.message)){await route.abort('aborted').catch(()=>{});return;}throw error;}
  });
  if(page.routeWebSocket)await page.routeWebSocket(/supabase\.co/,ws=>ws.close());
 }
@@ -347,7 +348,25 @@ async function mockAPI(page,actor=1){
    for(const theme of ['light','dark'])for(const [width,height] of [[320,740],[360,740],[390,844],[412,900],[768,1024],[844,390],[1280,900],[1366,593],[1440,900],[1920,1080],[683,296]]){await a.p.setViewportSize({width,height});await a.p.evaluate(t=>TNT.setTheme(t),theme);assert(await a.p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Welcome fits role '+actor+' '+width);if(width===390||width===1366)await a.p.screenshot({animations:'disabled',path:path.join(out,'welcome-role-'+actor+'-'+theme+'-'+width+'.png')});}
    if(actor===3){await request.click();await a.p.getByText('El equipo está organizando quién puede acompañarte.',{exact:true}).waitFor();assert.equal(await request.count(),0);}
   }finally{await a.ctx.close();}}
-  console.log('Welcome request: Community can ask, leaders/admin cannot through UI or RPC, existing referent flow preserved, eleven responsive sizes and both themes: OK');
+  console.log('Welcome request: Community can ask, leaders/admin cannot through UI or RPC, direct administrative assignment follows, eleven responsive sizes and both themes: OK');
+ }
+ async function communityFocusRefreshFlow(){
+  await visit('/comunidad?module=bible&manage=1','[data-create]');let release,started;const waiting=new Promise(r=>started=r),gate=new Promise(r=>release=r);const hold=async route=>{started();await gate;await route.fallback();};await page.route('**/rpc/tnt_community_bootstrap',hold);
+  try{await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await waiting;await page.locator('[data-create]').click();assert.equal(await page.locator('dialog form [name=title]').count(),1,'An admin can open the editor while a focus refresh is pending; '+errors.join(' / '));await page.locator('dialog [name=title]').fill('Borrador conservado al recuperar foco');}
+  finally{release();await page.unroute('**/rpc/tnt_community_bootstrap',hold);}
+  await page.waitForFunction(()=>TNTCommunity.data?.modules);assert.equal(await page.locator('dialog [name=title]').inputValue(),'Borrador conservado al recuperar foco');await page.keyboard.press('Escape');await page.locator('dialog').waitFor({state:'hidden'});console.log('Returning focus keeps the current community data and editable draft while the refresh completes: OK');
+ }
+ async function directAccompanimentFlow(){
+  await serial(async()=>{await pg.db.exec('reset role');await pg.db.query("insert into tnt_community_accompaniment(person_id,referent_id,status,assigned_by,assigned_at) values($1,$2,'accepted',$1,now()),($2,null,'unassigned',null,null) on conflict(person_id) do update set status=excluded.status,referent_id=excluded.referent_id",[pid(1),pid(2)]);await pg.db.query("insert into tnt_community_followups(person_id,author_id,note) values($1,$2,'Historia del equipo conservada')",[pid(1),pid(2)]);await pg.db.query("update tnt_accounts set staff_status='approved' where person_id=$1",[pid(2)]);});
+  await visit('/comunidad?module=welcome&manage=1','[data-assign]');assert.deepEqual(new Set(await page.locator('[data-assign]').evaluateAll(ns=>ns.map(n=>n.dataset.assign))),new Set([pid(3),pid(4),pid(5)]));assert.equal(await page.locator('[data-assign="'+pid(1)+'"],[data-assign="'+pid(2)+'"]').count(),0);
+  const history=page.locator('details').filter({has:page.getByText('Acompañamientos anteriores del equipo',{exact:true})});await history.locator('summary').click();await history.getByText('Historia del equipo conservada',{exact:false}).waitFor();
+  await page.locator('[data-assign="'+pid(3)+'"]').click();await page.getByRole('button',{name:'Asignar referente',exact:true}).waitFor();assert(!(await page.locator('dialog').innerText()).includes('acepte'));assert.equal(await page.locator('dialog option').count(),3);
+  for(const theme of ['light','dark'])for(const [width,height] of [[320,740],[360,740],[390,844],[412,900],[768,1024],[844,390],[1280,900],[1366,593],[1440,900],[1920,1080],[683,296],[390,320]]){await page.setViewportSize({width,height});await page.evaluate(t=>TNT.setTheme(t),theme);assert(await page.locator('dialog .tnt-sheet').evaluate(n=>{const r=n.getBoundingClientRect();return r.left>=11&&r.right<=innerWidth-11&&r.top>=11&&r.bottom<=innerHeight-11&&n.scrollWidth<=n.clientWidth+1;}),'Direct assignment fits '+theme+' '+width+'x'+height);await page.locator('dialog [type=submit]').scrollIntoViewIfNeeded();if(width===390&&height===844||width===1366)await page.screenshot({animations:'disabled',path:path.join(out,'direct-assignment-'+theme+'-'+width+'.png')});}
+  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>TNT.setTheme('light'));await page.locator('dialog [name=referent_id]').selectOption(pid(2),{force:true});await page.locator('dialog [type=submit]').press('Enter');await page.locator('dialog').waitFor({state:'hidden'});await page.locator('.life-card').filter({has:page.locator('[data-assign="'+pid(3)+'"]')}).getByText('Referente asignado',{exact:true}).waitFor();
+  const ref=await actorPage(2);try{await ref.visit('/comunidad?module=welcome');await ref.p.getByRole('heading',{name:'Mara López',exact:true}).waitFor();assert.equal(await ref.p.locator('[data-c-ref]').count(),0);await ref.p.getByRole('button',{name:'Registrar un encuentro',exact:true}).click();await ref.p.locator('dialog [name=note]').fill('Encuentro disponible sin aceptación');await ref.p.locator('dialog [name=shared]').check();await ref.p.locator('dialog [type=submit]').click();await ref.p.locator('dialog').waitFor({state:'hidden'});await ref.p.screenshot({animations:'disabled',path:path.join(out,'direct-referent-mobile.png')});}finally{await ref.ctx.close();}
+  const member=await actorPage(3);try{await member.visit('/comunidad?module=welcome');await member.p.getByText('Tu referente es',{exact:false}).waitFor();await member.p.getByText('Encuentro disponible sin aceptación',{exact:true}).waitFor();assert.equal(await member.p.locator('[data-c-action=request_welcome],[data-assign],[data-c-ref]').count(),0);await member.p.screenshot({animations:'disabled',path:path.join(out,'direct-member-mobile.png')});}finally{await member.ctx.close();}
+  await serial(async()=>{await pg.db.exec('reset role');await pg.db.query('delete from tnt_community_followups where person_id in($1,$2)',[pid(1),pid(2)]);await pg.db.query('delete from tnt_community_accompaniment where person_id in($1,$2)',[pid(1),pid(2)]);});
+  console.log('Administrative assignment is immediate, no accept/decline, staff requests closed and excluded, earlier history retained, assigned referent records and member sees shared notes: OK');
  }
  async function correctedGamesFlow(){
   await visit('/juegos','[data-game=order]');await page.locator('[data-game=order]').click();assert(await page.locator('[name=start_from][value=beginning]').isChecked());await page.locator('[name=difficulty][value=easy]').check();await page.locator('[data-game-setup] [type=submit]').click();await page.locator('[data-answer=EXO]').click();await page.locator('.life-game-feedback.bad').waitFor();assert.equal(await page.locator('.life-game-feedback').evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(255, 232, 229)');
@@ -357,7 +376,8 @@ async function mockAPI(page,actor=1){
   console.log('Games distinguish wrong/correct, explain hints, advance automatically and renew the hint after beginning at Genesis: OK');
  }
  async function modulesAndCommunityFlow(){
-  await visit('/','.community-count');
+  // Leave the previous app document first: its pagehide handler persists open modules.
+  await page.goto(base+'/icons/dynamite-app.svg');
   await page.evaluate(()=>{for(const key of Object.keys(localStorage))if(key.startsWith('tnt:modules:'))localStorage.removeItem(key);});
   await visit('/','.community-count');assert.equal(await page.locator('.community-count b').innerText(),'Ya somos 5');
   for(const theme of ['light','dark'])for(const [width,height] of [[320,740],[360,740],[390,844],[412,900],[768,1024],[844,390],[1280,900],[1366,593],[1440,900],[1920,1080],[683,296],[960,540]]){await page.setViewportSize({width,height});await page.evaluate(t=>TNT.setTheme(t),theme);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Home fits '+width+' '+height);if([390,1366,1920].includes(width))await page.screenshot({animations:'disabled',path:path.join(out,'home-current-'+theme+'-'+width+'.png'),fullPage:true});}
@@ -383,6 +403,18 @@ async function mockAPI(page,actor=1){
   await page.evaluate(()=>{TNT.grants=TNT.grants.map(g=>g.module==='lista-sabados'?{...g,enabled:false,access_level:'none'}:g);TNT.account.system_role='user';TNT.isAdmin=false;document.dispatchEvent(new CustomEvent('tnt:permissions'));});assert.equal(await page.locator('iframe[title="Asistencia"]').count(),0);assert.equal(await page.locator('#tnt-main-nav a[href*="mode=sabados"]').count(),0);
   await page.evaluate(()=>{for(const key of Object.keys(localStorage))if(key.startsWith('tnt:modules:'))localStorage.removeItem(key);});
   console.log('Live modules retain forms, per-user shortcuts, current Saturday program, twelve birthday months and revoked access: OK');
+ }
+ async function coordinatorVideoFlow(){
+  await page.setViewportSize({width:360,height:800});await visit('/','.community-count');
+  await page.evaluate(()=>{const db=__fixtureDB;db.tnt_accounts.forEach(a=>a.staff_status='approved');for(let i=0;i<14;i++){const id='00000000-0000-4000-8000-'+String(200+i).padStart(12,'0');db.tnt_people.push({...db.tnt_people[0],id,full_name:'Persona de prueba '+String(i+1).padStart(2,'0')});db.tnt_accounts.push({...db.tnt_accounts[1],person_id:id,system_role:'user',staff_status:'approved',auth_user_id:null});}db.tnt_event_members=db.tnt_event_members.filter(m=>m.person_id===TNT.person.id);TNTNavigation.open('/organizacion/?next_saturday=1');});
+  const org=page.frameLocator('iframe[title="Organización"]');await org.locator('.tnt-program-hero').waitFor();await org.locator('#modal [data-close]').click();await org.locator('[data-schedule-options]').tap();await org.locator('#schedule-people').tap();await org.locator('#membersForm').waitFor();
+  for(const theme of ['light','dark'])for(const [width,height] of [[320,740],[360,800],[390,844],[412,900],[768,1024],[844,390],[1280,900],[1366,593],[1440,900],[1920,1080],[683,296],[390,320]]){
+   await page.setViewportSize({width,height});await page.evaluate(t=>TNT.setTheme(t),theme);const row=org.locator('[data-member-row]').nth(10);await row.scrollIntoViewIfNeeded();if(!await row.locator('[name=person]').isChecked())await row.locator('[name=person]').tap();await row.locator('label').filter({hasText:/^Coordina$/}).tap();
+   const info=await row.evaluate(n=>{const input=n.querySelector('[value=organizer]'),dialog=n.closest('dialog'),sheet=dialog.querySelector('.sheet'),b=sheet.getBoundingClientRect();return{checked:input.checked,modal:dialog.matches(':modal'),dialogScroll:dialog.scrollTop,top:b.top,bottom:b.bottom,left:b.left,right:b.right,width:innerWidth,height:innerHeight,overflow:sheet.scrollWidth>sheet.clientWidth+1};});assert(info.checked&&info.modal);assert(info.dialogScroll===0&&info.top>=10&&info.bottom<=info.height-10&&info.left>=10&&info.right<=info.width-10&&!info.overflow,'Scrolled coordinator stays visible '+theme+' '+JSON.stringify(info));
+   if(width===390&&height===844||width===1366)await page.screenshot({animations:'disabled',path:path.join(out,'coordinator-video-'+theme+'-'+width+'.png')});await row.locator('label').filter({hasText:/^Participa$/}).tap();assert(await row.locator('[value=participant]').isChecked());await row.locator('[value=participant]').press('ArrowRight');assert(await row.locator('[value=organizer]').isChecked());
+  }
+  await page.setViewportSize({width:360,height:800});
+  await org.locator('#membersForm [type=submit]').tap();await org.locator('#membersForm').waitFor({state:'detached'});assert.equal(await org.locator('dialog:modal').count(),0);console.log('Video regression: scrolled coordinator/participant stays on screen, touch and arrow keys work, long roster saves; both themes, mobile/desktop/landscape and reduced height: OK');
  }
  async function granularActionsFlow(){
   await visit('/','.community-count');await page.evaluate(()=>{for(const key of Object.keys(localStorage))if(key.startsWith('tnt:modules:'))localStorage.removeItem(key);});await visit('/','.community-count');
@@ -442,8 +474,10 @@ async function mockAPI(page,actor=1){
  async function inlineLicenseFlow(){licensed=false;await visit('/biblia?ref=GEN.1&v=128','[data-reading]');await page.locator('.reader-unavailable').waitFor();licensed=true;await page.locator('[data-reader-retry]').click();await page.getByText('Lectura sintética GEN.1',{exact:false}).waitFor();revoked=128;await page.locator('[data-next]').click();await page.locator('.reader-unavailable').waitFor();revoked=0;}
 
  try{
+  if(process.env.TNT_TEST_COMMUNITY_FOCUS_ONLY==='1'){await communityFocusRefreshFlow();assert.deepEqual(errors,[]);return;}
+  if(process.env.TNT_TEST_COORDINATOR_VIDEO==='1'){await coordinatorVideoFlow();assert.deepEqual(errors,[]);return;}
   if(process.env.TNT_TEST_APPEARANCE_ONLY==='1'){await approvedVisualFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
-  if(process.env.TNT_TEST_WELCOME_ONLY==='1'){await welcomeRequestFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
+  if(process.env.TNT_TEST_WELCOME_ONLY==='1'){await welcomeRequestFlow();await directAccompanimentFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   if(process.env.TNT_TEST_GAMES_ONLY==='1'){await correctedGamesFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   if(process.env.TNT_TEST_ACTIONS_ONLY==='1'){await granularActionsFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   if(process.env.TNT_TEST_MODULES_ONLY==='1'){await modulesAndCommunityFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
@@ -461,6 +495,9 @@ async function mockAPI(page,actor=1){
   if(process.env.TNT_TEST_LAYOUT_ONLY==='1'){assert.equal(errors.length,0,errors.join('\n'));return;}
   await approvedVisualFlow();
   await welcomeRequestFlow();
+  await directAccompanimentFlow();
+  await communityFocusRefreshFlow();
+  await coordinatorVideoFlow();
   await visit('/comunidad' ,'.c-groups');assert.equal(await page.locator('.c-group').count(),3);assert.equal(await page.locator('.daily-carousel').count(),0);await capture('community-new');
   await visit('/comunidad?module=bible&manage=1','[data-create]');await page.locator('[data-create]').click();let form=page.locator('dialog form');await form.locator('[name=title]').fill('Plan desde el equipo');await form.locator('[name=description]').fill('Dos momentos para compartir');await form.locator('[name=status]').selectOption('published',{force:true});await form.locator('[data-step-title]').fill('Descubrir el amor de Dios');await form.locator('[data-reference]').fill('Juan 3:16');await form.locator('[data-reflection]').fill('¿Cómo podés compartir ese amor hoy?');await form.locator('[data-add-step]').click();await form.locator('[data-step-title]').nth(1).fill('Caminar juntos');await form.locator('[data-reference]').nth(1).fill('Hechos 2:42-47');
   await page.evaluate(()=>window.__communityFailure='Conexión interrumpida de prueba');await form.locator('[type=submit]').click();await form.getByText('Conexión interrumpida de prueba').waitFor();assert.equal(await form.locator('[name=title]').inputValue(),'Plan desde el equipo');await form.locator('[type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByRole('heading',{name:'Plan desde el equipo',exact:true}).waitFor();await capture('staff-plans');
@@ -475,11 +512,11 @@ async function mockAPI(page,actor=1){
   await visit('/juegos','[data-game]');assert.equal(await page.locator('[data-game]').count(),5);await capture('games-new');await page.locator('[data-game=pairs]').click();await page.locator('[name=difficulty][value=easy]').check();await page.locator('[data-game-setup] [type=submit]').click();await page.locator('.g-pair-board').waitFor();await capture('game-pairs');
   for(let round=0;round<3;round++){const pairs=await page.locator('[data-answer]').evaluateAll(nodes=>nodes.filter(n=>n.dataset.answer[0]==='p').map(n=>[n.dataset.answer,'o'+n.dataset.answer.slice(1)]));for(const ids of pairs)for(const id of ids)await page.locator('[data-answer="'+id+'"]').click();if(round<2)await page.locator('[data-next-round]').click();}await page.getByText('¡Lo lograste!').waitFor();await page.getByText('Tu partida y tu marca quedaron guardadas en tu cuenta.').waitFor();await capture('game-result-new');
   assert(await serial(async()=>{await pg.db.exec('reset role');return(await pg.db.query("select count(*)::int n from tnt_community_game_runs where kind='pairs'")).rows[0].n===1;}));
-  // A second signed-in account accepts its invitation; a community member joins the actual plan.
-  const ref=await actorPage(2);await ref.visit('/comunidad?module=welcome');await ref.p.locator('[data-c-ref][data-accept=true]').click();await ref.p.getByText('Registrar un encuentro',{exact:true}).waitFor();await ref.ctx.close();
+  // The assigned referent can register immediately; a community member joins the actual plan.
+  const ref=await actorPage(2);await ref.visit('/comunidad?module=welcome');assert.equal(await ref.p.locator('[data-c-ref]').count(),0);await ref.p.getByText('Registrar un encuentro',{exact:true}).waitFor();await ref.ctx.close();
   const member=await actorPage(3);await member.visit('/comunidad?module=bible');assert.equal(await member.p.locator('[data-c-manage]').count(),0);await member.p.locator('[data-c-content="'+plan+'"]').click();await member.p.locator('dialog [data-join]').click();await member.p.locator('dialog [data-step="1"]').check();await member.p.getByText('1 de 2 pasos completados').waitFor();await member.p.screenshot({path:path.join(out,'member-plan.png')});await member.p.locator('dialog .tnt-close').click();await member.visit('/comunidad?module=welcome');await member.p.getByText('Tu referente es').waitFor();await member.ctx.close();
   await correctedGamesFlow();
   await modulesAndCommunityFlow();
-  assert.deepEqual(errors,[]);console.log('Comunidad con SQL real: staff publica y edita, referente acepta, miembro avanza, JPEG real, menú y scroll móviles, Biblia oficial/inline y 5 juegos. Capturas en 320/390/768/1280 y ambos temas: OK.');
- }finally{await browser.close();await new Promise(r=>server.close(r));await pg.db.close();}
+  assert.deepEqual(errors,[]);console.log('Comunidad con SQL real: staff publica y edita, referente registra sin aceptar, miembro avanza, JPEG real, menú y scroll móviles, Biblia oficial/inline y 5 juegos. Capturas en 320/390/768/1280 y ambos temas: OK.');
+ }catch(error){await page.screenshot({path:path.join(out,'community-failure.png')}).catch(()=>{});console.error('Browser page errors',errors);throw error;}finally{await browser.close();await new Promise(r=>server.close(r));await pg.db.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const {PGlite}=require('@electric-sql/pglite');
 const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 const read=f=>fs.readFileSync(path.join(__dirname,'..','..',f),'utf8');
-async function database(){
+async function database({beforeDirect}={}){
  const db=new PGlite();await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema tnt_actions;grant usage on schema auth to authenticated,service_role;grant usage on schema tnt_actions to authenticated;
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  create table public.tnt_people(id uuid primary key,full_name text,active boolean default true,birthday date);
@@ -14,7 +14,8 @@ async function database(){
  create function public.tnt_profile_missing_values(jsonb) returns jsonb language sql as $$select '[]'::jsonb$$;
  create function public.tnt_recipient_has_module(uuid,text) returns boolean language sql as $$select true$$;
  create function tnt_actions.activity_notification_member(uuid,uuid) returns boolean language sql as $$select false$$;
- create table public.tnt_chat_threads(id uuid,is_archived boolean,task_id uuid);create table public.tnt_chat_members(thread_id uuid,person_id uuid);create table public.tnt_chat_messages(id uuid,thread_id uuid,deleted_at timestamptz,audience_person_ids uuid[]);create table public.tnt_task_comments(id uuid,task_id uuid);
+ create table public.tnt_events(id uuid,status text);create table public.tnt_tasks(id uuid,status text,archived_at timestamptz);create table public.tnt_task_assignees(task_id uuid,person_id uuid,assignment_status text);create table public.tnt_staff_invitations(id uuid,status text);
+ create table public.tnt_chat_threads(id uuid,is_archived boolean,task_id uuid);create table public.tnt_chat_members(thread_id uuid,person_id uuid,last_read_at timestamptz);create table public.tnt_chat_messages(id uuid,thread_id uuid,deleted_at timestamptz,audience_person_ids uuid[]);create table public.tnt_task_comments(id uuid,task_id uuid);
  create table public.tnt_notifications(id uuid primary key default gen_random_uuid(),person_id uuid references public.tnt_people,scope text default 'general',event_id uuid,task_id uuid,title text,body text,href text,data jsonb default '{}',read_at timestamptz,created_at timestamptz default now());
  create function public.tnt_notification_visible_for(p_note public.tnt_notifications,p_person uuid) returns boolean language sql stable security definer as $$select p_note.person_id=p_person$$;
  create function public.tnt_notification_resolved(p_note public.tnt_notifications) returns boolean language sql stable as $$select false$$;
@@ -33,6 +34,8 @@ async function database(){
  await db.exec(part('-- Identify older accompaniment requests'));
  await db.exec(read('supabase/migrations/20261026010032_community_welcome_member_requests.sql'));
  await db.exec(read('supabase/migrations/20261026214008_action_shortcuts_reader.sql'));
+ if(beforeDirect)await beforeDirect(db);
+ await db.exec(read('supabase/migrations/20261026223709_direct_accompaniment_and_staff_requests.sql'));
  const login=n=>db.exec(`reset role;set request.jwt.claim.sub='${id(n)}';set role authenticated;`);
  const action=async(name,data={})=>(await db.query('select public.tnt_community_action($1,$2::jsonb) as result',[name,JSON.stringify(data)])).rows[0].result;
  const boot=async()=>(await db.query('select public.tnt_community_bootstrap() as result')).rows[0].result;

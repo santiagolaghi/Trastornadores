@@ -20,7 +20,7 @@ test('Los avisos de Comunidad respetan destinatarios, privacidad, cierre, reinte
    await root();let notices=await rows("select * from tnt_notifications where data->>'question_id'=$1",[question]);assert.deepEqual(new Set(notices.map(n=>n.person_id)),new Set([id(1),id(2)]));assert(notices.every(n=>!n.body.includes('Detalle')));
    await login(2);await action('answer',{id:question,status:'answered',answer:'Respuesta sensible'});await root();notices=await rows("select * from tnt_notifications where data->>'question_id'=$1",[question]);assert(notices.some(n=>n.person_id===id(3)));assert(notices.every(n=>!n.body.includes('sensible')));
   });
-  await t.test('La invitación al referente queda dirigida a la persona elegida y se invalida al cambiarla',async()=>{
+  await t.test('El aviso de asignación directa llega al referente elegido y se invalida al cambiarlo',async()=>{
    await login(1);await action('assign_referent',{person_id:id(3),referent_id:id(2)});await root();const invitation=(await rows("select * from tnt_notifications where person_id=$1 and data ? 'welcome_person'",[id(2)]))[0];assert(invitation);
    await login(1);await action('assign_referent',{person_id:id(3),referent_id:id(1)});await root();assert.equal((await rows('select public.tnt_notification_visible_for(n,$1) visible from tnt_notifications n where id=$2',[id(2),invitation.id]))[0].visible,false);
   });

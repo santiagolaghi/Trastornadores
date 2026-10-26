@@ -8,8 +8,8 @@ test('Comunidad completa: permisos, referentes, planes, encuestas, preguntas pri
    await db.exec('reset role');assert.equal((await db.query("select count(*)::int n from tnt_community_history where action='request_welcome'")).rows[0].n,0);assert.equal((await db.query('select count(*)::int n from tnt_community_accompaniment')).rows[0].n,0);
    await login(3);await action('request_welcome',{person_id:id(4)});assert.equal((await boot()).accompaniment[0].person_id,id(3));
    await db.exec('reset role');assert.equal((await db.query("select subject_id from tnt_community_history where action='request_welcome'")).rows[0].subject_id,id(3));
-   await db.query('update tnt_accounts set staff_status=$1 where person_id=$2',['approved',id(3)]);await login(3);await assert.rejects(action('request_welcome'),/personas de Comunidad/);assert.equal((await boot()).accompaniment[0].person_id,id(3));
-   await db.exec('reset role');await db.query('update tnt_accounts set staff_status=$1 where person_id=$2',['community',id(3)]);
+   await db.query('update tnt_accounts set staff_status=$1 where person_id=$2',['approved',id(3)]);await login(3);await assert.rejects(action('request_welcome'),/personas de Comunidad/);assert.equal((await boot()).accompaniment.length,0);
+   await db.exec('reset role');assert.equal((await db.query('select status from tnt_community_accompaniment where person_id=$1',[id(3)])).rows[0].status,'closed');await db.query('update tnt_accounts set staff_status=$1 where person_id=$2',['community',id(3)]);
   });
   await t.test('Comunidad no administra y los permisos de módulo no conceden funciones de Admin',async()=>{
    await login(3);await assert.rejects(action('save_module',{module:'baptisms',version:1,title:'Cambio'}),/permiso/);
@@ -18,11 +18,11 @@ test('Comunidad completa: permisos, referentes, planes, encuestas, preguntas pri
    await login(2);await assert.rejects(action('assign_referent',{person_id:id(3),referent_id:id(2)}),/Administración/);
    await assert.rejects(action('save_grant',{person_id:id(3),module:'bible',level:3}),/Administración/);
   });
-  await t.test('El referente queda pendiente, debe responder y solo acepta sus propias invitaciones',async()=>{
+  await t.test('Administración asigna directamente y el referente puede registrar sin aceptar',async()=>{
    await login(1);await action('assign_referent',{person_id:id(3),referent_id:id(2)});
-   await login(2);assert.equal((await boot()).accompaniment[0].status,'pending');await assert.rejects(action('followup',{person_id:id(3),note:'Antes de aceptar'}),/confirmado/);
-   await login(4);await assert.rejects(action('respond_referent',{person_id:id(3),accept:true}),/pendiente/);assert.equal((await boot()).accompaniment.length,0);
-   await login(2);await action('respond_referent',{person_id:id(3),accept:true});await action('followup',{person_id:id(3),note:'Nota privada'});await action('followup',{person_id:id(3),note:'Conversamos el sábado',shared:true});
+   await login(2);assert.equal((await boot()).accompaniment[0].status,'accepted');await assert.rejects(action('respond_referent',{person_id:id(3),accept:false}),/Administración/);
+   await login(4);await assert.rejects(action('followup',{person_id:id(3),note:'No soy referente'}),/referente/);assert.equal((await boot()).accompaniment.length,0);
+   await login(2);await action('followup',{person_id:id(3),note:'Nota privada'});await action('followup',{person_id:id(3),note:'Conversamos el sábado',shared:true});
    await login(3);assert.equal((await boot()).followups.length,1);assert.equal((await boot()).accompaniment[0].status,'accepted');
   });
   await t.test('Los planes guardan progreso por persona y conservan la edición que empezó a leer',async()=>{
