@@ -353,8 +353,16 @@ async function mockAPI(page,actor=1){
  async function communityFocusRefreshFlow(){
   await visit('/comunidad?module=bible&manage=1','[data-create]');let release,started;const waiting=new Promise(r=>started=r),gate=new Promise(r=>release=r);const hold=async route=>{started();await gate;await route.fallback();};await page.route('**/rpc/tnt_community_bootstrap',hold);
   try{await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await waiting;await page.locator('[data-create]').click();assert.equal(await page.locator('dialog form [name=title]').count(),1,'An admin can open the editor while a focus refresh is pending; '+errors.join(' / '));await page.locator('dialog [name=title]').fill('Borrador conservado al recuperar foco');}
-  finally{release();await page.unroute('**/rpc/tnt_community_bootstrap',hold);}
-  await page.waitForFunction(()=>TNTCommunity.data?.modules);assert.equal(await page.locator('dialog [name=title]').inputValue(),'Borrador conservado al recuperar foco');await page.keyboard.press('Escape');await page.locator('dialog').waitFor({state:'hidden'});console.log('Returning focus keeps the current community data and editable draft while the refresh completes: OK');
+  finally{const response=page.waitForResponse(r=>r.url().includes('/rpc/tnt_community_bootstrap'));release();await(await response).finished();await page.unroute('**/rpc/tnt_community_bootstrap',hold);}
+  await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));await page.waitForFunction(()=>TNTCommunity.data?.modules);assert.equal(await page.locator('dialog [name=title]').inputValue(),'Borrador conservado al recuperar foco');await page.keyboard.press('Escape');await page.locator('dialog').waitFor({state:'hidden'});console.log('Returning focus keeps the current community data and editable draft while the refresh completes: OK');
+ }
+ async function communitySavedRefreshFlow(){
+  await visit('/comunidad?module=welcome&manage=1','[data-assign]');let release,started,seen=0;const waiting=new Promise(r=>started=r),gate=new Promise(r=>release=r);
+  const hold=async route=>{if(seen++)return route.fallback();const snapshot=await serial(async()=>{await pg.db.exec(`reset role;set request.jwt.claim.sub='${pid(100)}';set role authenticated;`);return(await pg.db.query('select public.tnt_community_bootstrap() result')).rows[0].result;});started();await gate;await route.fulfill({json:snapshot});};await page.route('**/rpc/tnt_community_bootstrap',hold);
+  try{await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await waiting;await page.locator('[data-assign="'+pid(3)+'"]').click();await page.locator('dialog [name=referent_id]').selectOption(pid(1),{force:true});await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});assert.equal(await page.evaluate(person=>TNTCommunity.data.accompaniment.find(a=>a.person_id===person).referent_id,pid(3)),pid(1));
+   const response=page.waitForResponse(r=>r.url().includes('/rpc/tnt_community_bootstrap'));release();await(await response).finished();await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));assert.equal(await page.evaluate(person=>TNTCommunity.data.accompaniment.find(a=>a.person_id===person).referent_id,pid(3)),pid(1),'An older bootstrap must not replace a saved assignment');
+  }finally{release();await page.unroute('**/rpc/tnt_community_bootstrap',hold);}
+  console.log('A saved administrative assignment waits for its own fresh data and survives an older delayed bootstrap response: OK');
  }
  async function directAccompanimentFlow(){
   await serial(async()=>{await pg.db.exec('reset role');await pg.db.query("insert into tnt_community_accompaniment(person_id,referent_id,status,assigned_by,assigned_at) values($1,$2,'accepted',$1,now()),($2,null,'unassigned',null,null) on conflict(person_id) do update set status=excluded.status,referent_id=excluded.referent_id",[pid(1),pid(2)]);await pg.db.query("insert into tnt_community_followups(person_id,author_id,note) values($1,$2,'Historia del equipo conservada')",[pid(1),pid(2)]);await pg.db.query("update tnt_accounts set staff_status='approved' where person_id=$1",[pid(2)]);});
@@ -474,6 +482,7 @@ async function mockAPI(page,actor=1){
  async function inlineLicenseFlow(){licensed=false;await visit('/biblia?ref=GEN.1&v=128','[data-reading]');await page.locator('.reader-unavailable').waitFor();licensed=true;await page.locator('[data-reader-retry]').click();await page.getByText('Lectura sintética GEN.1',{exact:false}).waitFor();revoked=128;await page.locator('[data-next]').click();await page.locator('.reader-unavailable').waitFor();revoked=0;}
 
  try{
+  if(process.env.TNT_TEST_COMMUNITY_SAVE_ONLY==='1'){await communitySavedRefreshFlow();assert.deepEqual(errors,[]);return;}
   if(process.env.TNT_TEST_COMMUNITY_FOCUS_ONLY==='1'){await communityFocusRefreshFlow();assert.deepEqual(errors,[]);return;}
   if(process.env.TNT_TEST_COORDINATOR_VIDEO==='1'){await coordinatorVideoFlow();assert.deepEqual(errors,[]);return;}
   if(process.env.TNT_TEST_APPEARANCE_ONLY==='1'){await approvedVisualFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
@@ -497,6 +506,7 @@ async function mockAPI(page,actor=1){
   await welcomeRequestFlow();
   await directAccompanimentFlow();
   await communityFocusRefreshFlow();
+  await communitySavedRefreshFlow();
   await coordinatorVideoFlow();
   await visit('/comunidad' ,'.c-groups');assert.equal(await page.locator('.c-group').count(),3);assert.equal(await page.locator('.daily-carousel').count(),0);await capture('community-new');
   await visit('/comunidad?module=bible&manage=1','[data-create]');await page.locator('[data-create]').click();let form=page.locator('dialog form');await form.locator('[name=title]').fill('Plan desde el equipo');await form.locator('[name=description]').fill('Dos momentos para compartir');await form.locator('[name=status]').selectOption('published',{force:true});await form.locator('[data-step-title]').fill('Descubrir el amor de Dios');await form.locator('[data-reference]').fill('Juan 3:16');await form.locator('[data-reflection]').fill('¿Cómo podés compartir ese amor hoy?');await form.locator('[data-add-step]').click();await form.locator('[data-step-title]').nth(1).fill('Caminar juntos');await form.locator('[data-reference]').nth(1).fill('Hechos 2:42-47');

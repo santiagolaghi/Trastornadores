@@ -5,7 +5,7 @@
  const definitions={welcome:['Bienvenida y acompañamiento','people','vida'],birthdays:['Cumpleaños y fechas especiales','calendar','vida'],bible:['Biblia y planes','book','camino'],challenges:['Desafíos semanales','check','camino'],questions:['Preguntas de fe','help','vida'],families:['Familias TNT','people','familias'],baptisms:['Bautismos','heart','camino'],polls:['Encuestas y votaciones','tasks','vida'],games:['Dinámicas y juegos','play','vida'],daily:['Para hoy','sun','camino']};
  const groups={camino:['Camino de fe','Bautismos, Biblia, planes y desafíos para vivir tu fe.','book'],vida:['Vida en comunidad','Personas, encuentros y cosas para compartir.','people'],familias:['Familias TNT','Un espacio para las familias que acompañan.','home']};
  const states={draft:'Borrador',scheduled:'Programado',published:'Publicado',archived:'Archivado',pending:'Pendiente',accepted:'Confirmado',declined:'Declinada',unassigned:'Sin referente',verified:'Verificada',rejected:'Revisar con el equipo',interested:'Interesado/a',preparing:'En preparación',ready:'Listo/a para coordinar',completed:'Realizado',active:'En curso',left:'Pausado',closed:'Solicitud cerrada',open:'Por responder',answered:'Respondida'};
- let data=null,pending=null,renderVersion=0,homeVersion=0;
+ let data=null,pending=null,loadVersion=0,renderVersion=0,homeVersion=0;
  const C=window.TNTCommunity={definitions,groups,states,load,action,saveReading,mount,home,contentDetail,manage,cleanPassage,reference,referenceLabel,readLink,openReading,preferences,gameBank:()=>posts('games').filter(c=>c.config?.kind==='quiz'),gameSettings:()=>moduleInfo('games')?.config||{},get data(){return data;}};
  function moduleInfo(id){return data?.modules?.find(m=>m.id===id);}
  function can(id,level=1){return (moduleInfo(id)?.permission||0)>=level;}
@@ -16,11 +16,11 @@
  const date=v=>v?new Intl.DateTimeFormat('es-AR',{timeZone:'America/Argentina/Buenos_Aires',day:'numeric',month:'short',year:'numeric'}).format(new Date(v.length===10?v+'T12:00:00Z':v)):'';
  const localDateTime=v=>v?new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(v)).replace(' ','T'):'';
  function instant(v){if(!v)return null;const p=new Date(v+'Z'),z=new Date(localDateTime(p.toISOString())+'Z');return new Date(p.getTime()+p.getTime()-z.getTime()).toISOString();}
- async function load(force=false){
-  if(data?.daily?.day&&data.daily.day!==new Intl.DateTimeFormat('en-CA',{timeZone:'America/Argentina/Buenos_Aires'}).format(new Date()))data=null;if(data&&!force)return data;if(pending)return pending;
-  pending=(async()=>{const r=await TNT.sb.rpc('tnt_community_bootstrap');if(r.error)throw r.error;if(!r.data?.modules)throw Error('No pudimos cargar Comunidad. Volvé a intentar.');data=r.data;document.dispatchEvent(new CustomEvent('tnt:community',{detail:{loaded:true}}));return data;})().finally(()=>pending=null);return pending;
+ async function load(force=false,fresh=false){
+  if(data?.daily?.day&&data.daily.day!==new Intl.DateTimeFormat('en-CA',{timeZone:'America/Argentina/Buenos_Aires'}).format(new Date()))data=null;if(data&&!force)return data;if(pending&&!fresh)return pending;
+  const version=++loadVersion,request=(async()=>{const r=await TNT.sb.rpc('tnt_community_bootstrap');if(r.error)throw r.error;if(!r.data?.modules)throw Error('No pudimos cargar Comunidad. Volvé a intentar.');if(version===loadVersion){data=r.data;document.dispatchEvent(new CustomEvent('tnt:community',{detail:{loaded:true}}));}return r.data;})().finally(()=>{if(pending===request)pending=null;});pending=request;return request;
  }
- async function action(name,values={}){const r=await TNT.sb.rpc('tnt_community_action',{p_action:name,p_data:values});if(r.error)throw r.error;data=null;await load(true);document.dispatchEvent(new CustomEvent('tnt:community-change'));window.TNTNotifications?.load().catch(()=>{});return r.data;}
+ async function action(name,values={}){const r=await TNT.sb.rpc('tnt_community_action',{p_action:name,p_data:values});if(r.error)throw r.error;await load(true,true);document.dispatchEvent(new CustomEvent('tnt:community-change'));window.TNTNotifications?.load().catch(()=>{});return r.data;}
  async function saveReading(reading){
   const r=await TNT.sb.rpc('tnt_community_action',{p_action:'preferences',p_data:{reading}});if(r.error)throw r.error;
   TNT.readingPreference=reading;if(data){data.preferences||={};data.preferences.reading=reading;}return r.data;

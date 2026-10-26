@@ -35,7 +35,7 @@ async function database({beforeDirect}={}){
  await db.exec(read('supabase/migrations/20261026010032_community_welcome_member_requests.sql'));
  await db.exec(read('supabase/migrations/20261026214008_action_shortcuts_reader.sql'));
  if(beforeDirect)await beforeDirect(db);
- await db.exec(read('supabase/migrations/20261026223709_direct_accompaniment_and_staff_requests.sql'));
+ await db.exec(read('supabase/migrations/20261026230206_direct_accompaniment_and_staff_requests.sql'));
  const login=n=>db.exec(`reset role;set request.jwt.claim.sub='${id(n)}';set role authenticated;`);
  const action=async(name,data={})=>(await db.query('select public.tnt_community_action($1,$2::jsonb) as result',[name,JSON.stringify(data)])).rows[0].result;
  const boot=async()=>(await db.query('select public.tnt_community_bootstrap() as result')).rows[0].result;

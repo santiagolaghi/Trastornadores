@@ -572,4 +572,3 @@ begin
  end loop;
 end $cleanup$;
 notify pgrst,'reload schema';
-

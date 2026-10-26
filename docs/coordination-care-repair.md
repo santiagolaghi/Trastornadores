@@ -7,3 +7,7 @@ La reproducción usa el HTML compilado, el SDK oficial y una lista larga dentro 
 El mismo despliegue cambia acompañamientos a asignación administrativa directa y cierra los pedidos previos de líderes. El alcance y los controles de datos están documentados en `welcome-member-only.md`.
 
 Al recuperar el foco de la ventana, Comunidad borraba los datos con los que todavía funcionaban los botones mientras esperaba la nueva consulta. Abrir un editor en ese intervalo fallaba con `Cannot read properties of null`. La actualización conserva los datos visibles hasta recibir la respuesta; una prueba retiene esa consulta y comprueba que el editor abre y conserva el borrador.
+
+Un guardado fuerza su propia lectura posterior a la escritura. Cada consulta lleva una versión: las respuestas anteriores no reemplazan los datos nuevos ni limpian la consulta que sigue en curso. La prueba demora una respuesta anterior a la asignación, guarda un referente nuevo y entrega la respuesta vieja al final; la asignación visible y los datos actuales se conservan.
+
+Validación de la revisión: 251 pruebas automatizadas, navegador compilado completo, prueba de foco con respuesta demorada y prueba de ventanas de coordinación con guardado fallido/reintento. Las capturas de asignación y coordinación se revisaron en claro/oscuro, móvil y escritorio.

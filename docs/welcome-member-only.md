@@ -6,6 +6,8 @@ Líderes, staff aprobado y administradores no pueden solicitar acompañamiento n
 
 Las asignaciones pendientes de personas habilitadas de Comunidad pasan a estar activas si su referente sigue habilitado. Se conserva la fecha original, sin inventar una aceptación ni reenviar notificaciones. El rol de la cuenta real se comprueba en el servidor; permisos de edición de Comunidad no conceden facultades de Administración.
 
-Migración: `20261026223709_direct_accompaniment_and_staff_requests.sql`. Pruebas: `tests/direct-accompaniment.cjs` verifica limpieza de datos anteriores, historial, promoción de roles, asignación inmediata y privacidad; `tests/community-browser.cjs` recorre las tres cuentas y el formulario en claro/oscuro, móvil, escritorio, horizontal y altura reducida. `tests/welcome-member-requests.sql` deja disponible una comprobación sintética con rollback para instalaciones reales.
+Migración: `20261026230206_direct_accompaniment_and_staff_requests.sql`. Pruebas: `tests/direct-accompaniment.cjs` verifica limpieza de datos anteriores, historial, promoción de roles, asignación inmediata y privacidad; `tests/community-browser.cjs` recorre las tres cuentas y el formulario en claro/oscuro, móvil, escritorio, horizontal y altura reducida. `tests/welcome-member-requests.sql` deja disponible una comprobación sintética con rollback para instalaciones reales.
 
 Recursos y service worker de esta revisión: `20261026r3`.
+
+La migración está aplicada. La verificación de producción confirmó cero solicitudes activas de staff/administración, cierre auditado de los pedidos previos y RLS vigente. Las funciones auxiliares no se pueden ejecutar como visitante o usuario autenticado. Los diagnósticos de seguridad no añadieron avisos respecto del estado anterior.
