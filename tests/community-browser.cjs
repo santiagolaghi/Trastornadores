@@ -27,6 +27,9 @@ async function mockAPI(page,actor=1){
   const req=route.request(),url=new URL(req.url()),parts=url.pathname.split('/'),name=parts.at(-1),args=req.postDataJSON()||{};
   if(url.pathname.startsWith('/auth/')){await route.fulfill({json:{id:pid(99+actor),email:'demo@example.test',aud:'authenticated',role:'authenticated',user_metadata:{}}});return;}
   if(url.pathname.includes('/rpc/')){
+   if(name==='tnt_personal_context'||name==='tnt_personal_action'){
+    const result=await serial(async()=>{await pg.db.exec(`reset role;set request.jwt.claim.sub='${pid(99+actor)}';set role authenticated;`);try{return{data:(await pg.db.query(name==='tnt_personal_action'?'select public.tnt_personal_action($1,$2::jsonb) result':'select public.tnt_personal_context($1,$2) result',name==='tnt_personal_action'?[args.p_action,JSON.stringify(args.p_data)]:[args.p_book,args.p_chapter])).rows[0].result};}catch(e){return{error:{message:e.message}};}});await route.fulfill({status:result.error?400:200,json:result.error||result.data});return;
+   }
    if(name.startsWith('tnt_community_')&&name!=='tnt_community_home'){
     const failure=await page.evaluate(()=>window.__communityFailure||'');if(failure&&name==='tnt_community_action'){await page.evaluate(()=>window.__communityFailure='');await route.fulfill({status:400,json:{message:failure}});return;}
     const allowed=['tnt_community_bootstrap','tnt_community_action','tnt_community_delivery_status'];if(!allowed.includes(name))throw Error('Unexpected community RPC '+name);
@@ -34,15 +37,16 @@ async function mockAPI(page,actor=1){
     await route.fulfill({status:result.error?400:200,json:result.error||result.data});return;
    }
 
-   const r=await page.evaluate(async({name,args})=>{
+   const personal=name==='tnt_startup_context'?await serial(async()=>{await pg.db.exec(`reset role;set request.jwt.claim.sub='${pid(99+actor)}';set role authenticated;`);return(await pg.db.query('select public.tnt_personal_context() result')).rows[0].result.preferences;}):null;
+   const r=await page.evaluate(async({name,args,personal})=>{
     if(name==='tnt_set_profile_photo'){__fixtureCalls.push({rpc:name,args});if(__fixtureFailures['rpc:'+name])return{error:{message:__fixtureFailures['rpc:'+name]}};const photo=args.p_source==='google'?'https://lh3.googleusercontent.com/synthetic-photo':'https://oeodnnomgiddkblnlzay.supabase.co/storage/v1/object/public/tnt-profile-photos/'+args.p_path;const result={avatar_url:photo,avatar_source:args.p_source,avatar_sync:!!args.p_sync,avatar_google_url:'https://lh3.googleusercontent.com/synthetic-photo'};Object.assign(__fixtureDB.tnt_accounts[0],result);return{data:result,error:null};}if(name==='tnt_push_test'){__fixtureCalls.push({rpc:name,args});window.__phoneTest={id:'00000000-0000-4000-8000-000000009900',status:'sent',attempts:1};return{data:__phoneTest,error:null};}
     if(name==='tnt_push_test_status')return{data:__phoneTest,error:null};
     if(name==='tnt_save_org_template'){
      if(__fixtureFailures['rpc:'+name])return{error:{message:__fixtureFailures['rpc:'+name]}};
      __fixtureCalls.push({rpc:name,args});const db=__fixtureDB,id=args.p_id||crypto.randomUUID();let t=db.tnt_templates.find(t=>t.id===id);if(t)Object.assign(t,args.p_values,{version:(t.version||0)+1});else db.tnt_templates.push({id,...args.p_values,version:1});db.tnt_template_items=db.tnt_template_items.filter(i=>i.template_id!==id).concat(args.p_items.map((i,n)=>({...i,template_id:id,sort_order:n})));return{data:id,error:null};
     }
-    return __fixtureSB.rpc(name,args);
-   },{name,args});
+    const result=await __fixtureSB.rpc(name,args);if(name==='tnt_startup_context'&&result.data)result.data.personal=personal;return result;
+   },{name,args,personal});
    await route.fulfill({status:r.error?400:200,json:r.error?{code:'P0001',message:r.error.message}:r.data??null});return;
   }
   const result=await page.evaluate(({name,method,args,params,object})=>{
@@ -66,7 +70,7 @@ async function mockAPI(page,actor=1){
 }
 
 (async()=>{
- pg=await database();await pg.db.exec('reset role');for(let n=1;n<=5;n++)await pg.db.query('update tnt_accounts set auth_user_id=$1 where person_id=$2',[pid(99+n),pid(n)]);for(const [i,name] of ['Nora Pérez','Bruno Díaz','Mara López','Lucas Rey','Ana Paz'].entries())await pg.db.query('update tnt_people set full_name=$1 where id=$2',[name,pid(i+1)]);
+ pg=await database();await pg.db.exec('reset role');await pg.db.query("insert into tnt_personal_preferences(person_id,extra_versions) values($1,array[1909])",[pid(1)]);for(let n=1;n<=5;n++)await pg.db.query('update tnt_accounts set auth_user_id=$1 where person_id=$2',[pid(99+n),pid(n)]);for(const [i,name] of ['Nora Pérez','Bruno Díaz','Mara López','Lucas Rey','Ana Paz'].entries())await pg.db.query('update tnt_people set full_name=$1 where id=$2',[name,pid(i+1)]);
  fs.mkdirSync(out,{recursive:true});await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const base='http://127.0.0.1:'+server.address().port;
  const browser=await chromium.launch({executablePath:process.env.TNT_TEST_BROWSER,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu'],headless:true});
@@ -95,7 +99,7 @@ async function mockAPI(page,actor=1){
   if(action==='fonts')return route.fulfill({json:{css:''}});
   if(action==='version')return route.fulfill({json:{id,title:'NVI '+(id===128?'2025':'2015'),copyright:'Créditos sintéticos '+id}});
   if(action==='index'){if(deferredIndex===id){indexStarted();await new Promise(resolve=>releaseIndex=resolve);}return indexDown===id?route.fulfill({status:503,json:{error:'Índice sintético interrumpido'}}):route.fulfill({json:{books:[{id:'GEN',chapters:[{id:'1'},{id:'2'}]},{id:'EXO',chapters:[{id:'1'}]}]}});}
-  return route.fulfill({json:{id:p.get('passage'),content:'<p>Lectura sintética '+p.get('passage')+'</p>',copyright:'Créditos sintéticos '+id}});
+  return route.fulfill({json:{id:p.get('passage'),content:'<p><span data-usfm="'+p.get('passage').split('.').slice(0,2).join('.')+'.1"><sup class="verse-number">1</sup> Lectura sintética '+p.get('passage')+'</span></p>',copyright:'Créditos sintéticos '+id}});
  });
  async function visit(url,selector){await page.goto(base+url);await page.waitForFunction(()=>window.TNT?.identity&&!TNT.error);await page.locator(selector).first().waitFor();if(await page.locator('[data-phone-invite-later]').count())await page.locator('[data-phone-invite-later]').click();}
  async function capture(label){
@@ -143,9 +147,9 @@ async function mockAPI(page,actor=1){
   console.log('Entrada: solo Google, instalación Android/iPhone antes del ingreso, aviso tras el toque y guardado sintético, buscador con retratos circulares, seis anchos, dos temas y horizontal: OK');
  }
  async function attendanceResumeFlow(){
-  const saved=new Map();
+  const saved=new Map();let hold=false,releaseSave;
   await page.route('**/rest/v1/tnt_saturday_attendance?*',r=>r.fulfill({json:[...saved.values()]}));
-  await page.route('**/rest/v1/rpc/tnt_mark_attendance',async r=>{const a=r.request().postDataJSON();saved.set(a.p_person,{person_id:a.p_person,saturday_date:a.p_date,status:a.p_status});await r.fulfill({json:null});});
+  await page.route('**/rest/v1/rpc/tnt_mark_attendance',async r=>{const a=r.request().postDataJSON();if(hold)await new Promise(resolve=>releaseSave=resolve);saved.set(a.p_person,{person_id:a.p_person,saturday_date:a.p_date,status:a.p_status});await r.fulfill({json:null});});
   await visit('/asistencia/?mode=sabados','#startDeck');await page.locator('#startDeck').click();const first=await page.locator('#swipeCard h2').innerText();await page.locator('[data-deck-answer=present]').tap();await page.waitForFunction(n=>document.querySelector('#swipeCard h2')?.textContent!==n,first);const next=await page.locator('#swipeCard h2').innerText();await page.locator('#deckClose').tap();await page.locator('#startDeck').tap();assert.equal(await page.locator('#swipeCard h2').innerText(),next);
   await page.reload();await page.locator('#startDeck').waitFor();if(await page.locator('[data-phone-invite-later]').count())await page.locator('[data-phone-invite-later]').click();await page.locator('#startDeck').tap();assert.equal(await page.locator('#swipeCard h2').innerText(),next);assert((await page.locator('.deck-head small').innerText()).includes('1 de 5 registradas'));
   for(const theme of ['light','dark'])for(const width of [320,360,390,412,768,1280]){
@@ -156,6 +160,11 @@ async function mockAPI(page,actor=1){
   }
   await page.setViewportSize({width:844,height:390});assert(await page.locator('#swipeCard').evaluate(n=>{const b=n.getBoundingClientRect();return b.top>=0&&b.bottom<=innerHeight;}));await page.screenshot({animations:'disabled',path:path.join(out,'attendance-landscape.png')});await page.setViewportSize({width:390,height:844});
   for(let i=0;i<4;i++){await page.locator('[data-deck-answer=absent]').tap();await page.waitForTimeout(300);}await page.locator('.deck-finish').waitFor();await page.locator('#deckDone').tap();await page.locator('#startDeck').tap();assert.equal(await page.locator('#swipeCard').count(),0);assert.equal(saved.size,5);
+  await page.locator('#deckDone').tap();saved.clear();await page.reload();await page.locator('#startDeck').waitFor();await page.locator('#startDeck').tap();const skipped=[];
+  for(const direction of [-1,1]){const card=page.locator('#swipeCard');skipped.push(await card.locator('h2').innerText());const box=await card.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2,box.y+box.height/2+direction*100,{steps:5});await page.mouse.up();await page.waitForFunction(name=>document.querySelector('#swipeCard h2')?.textContent!==name,skipped.at(-1));}
+  for(let i=0;i<3;i++){if(i===2)hold=true;await page.locator('[data-deck-answer=absent]').tap();await page.waitForTimeout(300);}await page.locator('.deck-finish').waitFor();assert(await page.locator('[data-copy-absent]').isDisabled());hold=false;releaseSave();await page.waitForFunction(()=>!document.querySelector('[data-copy-absent]').disabled);assert((await page.locator('[data-deck-counts]').innerText()).includes('2 sin marcar'));const share=decodeURIComponent(await page.locator('a[data-deck-export]').getAttribute('href'));for(const name of skipped)assert(!share.includes(name),'Omitted people are not absentees');assert.equal(saved.size,3);
+  await context.grantPermissions(['clipboard-read','clipboard-write']);await page.locator('[data-copy-absent]').click();assert((await page.evaluate(()=>navigator.clipboard.readText())).includes('Ausentes'));
+  await page.screenshot({animations:'disabled',path:path.join(out,'attendance-share.png')});await page.locator('#deckDone').tap();await page.locator('#startDeck').tap();assert.equal(await page.locator('#swipeCard h2').innerText(),skipped[0]);await page.locator('#deckClose').tap();
   console.log('Asistencia: retoma al cerrar y recargar, sólo pendientes, sin repetir al terminar, tarjeta compacta; seis anchos, ambos temas y horizontal: OK');
  }
  async function startupPerformanceFlow(){
@@ -187,12 +196,13 @@ async function mockAPI(page,actor=1){
   // Let the actual reading-save debounce finish. It must not load the whole
   // Community dashboard or refetch all notifications just to save a bookmark.
   await page.waitForTimeout(850);assert.equal(requests.filter(r=>r.name==='tnt_community_bootstrap').length,communityBefore);
-  await page.screenshot({animations:'disabled',path:path.join(out,'reader-before-catalog.png')});releaseCatalog();await page.waitForFunction(()=>[...document.querySelector('[data-version]').options].some(o=>o.value==='3291'));
+  await page.screenshot({animations:'disabled',path:path.join(out,'reader-before-catalog.png')});releaseCatalog();await page.locator('[data-catalog]').waitFor({state:'attached'});
   await page.unroute('**/api/bible?action=versions',catalogueRoute);page.off('request',track);
   fs.writeFileSync(path.join(out,'startup-evidence.json'),JSON.stringify({identityRequestsPerPage:1,sharedScriptRequests:1,notificationRequestsDuringHomeAndDialog:1,localReaderWaitsForCatalogue:false,homeSurvivesActivityFailure:true,searchFocusDeckAndDailyPausePreserved:true},null,2));
   console.log('Carga: acceso en una consulta, paquete compartido único, inicio usable con actividades/avisos pendientes, foco/scroll/pausa conservados, reintento, navegación sin resinc y lectura local sin esperar catálogo: OK');
  }
  async function layoutSizingFlow(){
+  licensed=false;
   await visit('/','.daily-carousel');
   await page.evaluate(()=>{
    const event=__fixtureDB.tnt_events[0];
@@ -319,117 +329,67 @@ async function mockAPI(page,actor=1){
   }
   console.log('Approved design: 5 palettes, light/dark, 6 widths, custom color, named responsibles, persistent preference, deck navigation and centered tutorials: OK');
  }
+  async function actorPage(actor){const ctx=await browser.newContext({viewport:{width:390,height:844},isMobile:true,serviceWorkers:'block'});await ctx.addInitScript(({uid,key})=>{if(location.protocol!=='http:')return;const enc=v=>btoa(JSON.stringify(v)).replaceAll('=','').replaceAll('+','-').replaceAll('/','_'),user={id:uid,email:'demo@example.test',aud:'authenticated',role:'authenticated',user_metadata:{}},token=enc({alg:'HS256',typ:'JWT'})+'.'+enc({sub:uid,role:'authenticated',exp:Math.floor(Date.now()/1000)+86400})+'.test';localStorage.setItem(key,JSON.stringify({access_token:token,refresh_token:'synthetic-refresh',expires_at:Math.floor(Date.now()/1000)+86400,expires_in:86400,token_type:'bearer',user}));localStorage.setItem('tnt-theme','light');},{uid:pid(99+actor),key:'sb-oeodnnomgiddkblnlzay-auth-token'});const p=await ctx.newPage();p.on('pageerror',e=>errors.push(e.stack));await mockAPI(p,actor);await p.route('**/api/bible?*',r=>r.fulfill({status:403,json:{code:'LICENSE_REQUIRED'}}));return{ctx,p,visit:async url=>{await p.goto(base+url+(url.includes('?')?'&':'?')+'fixture-person='+actor);await p.waitForFunction(()=>window.TNT?.profileComplete);if(await p.locator('[data-phone-invite-later]').count())await p.locator('[data-phone-invite-later]').click();}};}
+ async function welcomeRequestFlow(){
+  for(const actor of [1,2,3]){const a=await actorPage(actor);try{
+   await a.visit('/comunidad?module=welcome');await a.p.locator('.life-page').waitFor();const request=a.p.locator('[data-c-action=request_welcome]');
+   if(actor<3){await a.p.getByRole('heading',{name:'Acompañamos juntos',exact:true}).waitFor();assert.equal(await request.count(),0);const result=await a.p.evaluate(()=>TNT.sb.rpc('tnt_community_action',{p_action:'request_welcome',p_data:{staff_status:'community'}}));assert(result.error?.message.includes('personas de Comunidad'));}
+   else{await request.waitFor();assert.equal(await request.count(),1);}
+   for(const theme of ['light','dark'])for(const [width,height] of [[320,740],[360,740],[390,844],[412,900],[768,1024],[844,390],[1280,900],[1366,593],[1440,900],[1920,1080],[683,296]]){await a.p.setViewportSize({width,height});await a.p.evaluate(t=>TNT.setTheme(t),theme);assert(await a.p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Welcome fits role '+actor+' '+width);if(width===390||width===1366)await a.p.screenshot({animations:'disabled',path:path.join(out,'welcome-role-'+actor+'-'+theme+'-'+width+'.png')});}
+   if(actor===3){await request.click();await a.p.getByText('El equipo está organizando quién puede acompañarte.',{exact:true}).waitFor();assert.equal(await request.count(),0);}
+  }finally{await a.ctx.close();}}
+  console.log('Welcome request: Community can ask, leaders/admin cannot through UI or RPC, existing referent flow preserved, eleven responsive sizes and both themes: OK');
+ }
+ async function correctedGamesFlow(){
+  await visit('/juegos','[data-game=order]');await page.locator('[data-game=order]').click();assert(await page.locator('[name=start_from][value=beginning]').isChecked());await page.locator('[name=difficulty][value=easy]').check();await page.locator('[data-game-setup] [type=submit]').click();await page.locator('[data-answer=EXO]').click();await page.locator('.life-game-feedback.bad').waitFor();assert.equal(await page.locator('.life-game-feedback').evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(255, 232, 229)');
+  await page.locator('[data-hint]').click();await page.locator('[data-answer=GEN].g-hint').waitFor();assert((await page.locator('.life-game-feedback').innerText()).includes('Génesis'));for(const id of ['GEN','EXO','LEV','NUM','DEU'])await page.locator('[data-answer='+id+']').click();await page.getByText('Ronda 2 de 3',{exact:true}).waitFor();assert(await page.locator('[data-hint]').isEnabled());assert.equal(await page.locator('[data-answer=GEN]').count(),0);
+  await page.locator('[data-hint]').click();assert((await page.locator('.life-game-feedback').innerText()).includes('Josué'));await page.screenshot({animations:'disabled',path:path.join(out,'game-order-hint.png')});
+  await visit('/juegos','[data-game=pairs]');await page.locator('[data-game=pairs]').click();await page.locator('[data-game-setup] [type=submit]').click();await page.locator('[data-answer=p0]').click();await page.locator('[data-answer=o1]').click();await page.locator('.life-game-feedback.bad').waitFor();await page.waitForTimeout(850);await page.locator('[data-answer=p0]').click();await page.locator('[data-hint]').click();await page.locator('[data-answer=o0].g-hint').waitFor();await page.locator('[data-answer=o0]').click();await page.locator('.life-game-feedback.good').waitFor();
+  console.log('Games distinguish wrong/correct, explain hints, advance automatically and renew the hint after beginning at Genesis: OK');
+ }
+ async function modulesAndCommunityFlow(){
+  await visit('/','.community-count');
+  await page.evaluate(()=>{for(const key of Object.keys(localStorage))if(key.startsWith('tnt:modules:'))localStorage.removeItem(key);});
+  await visit('/','.community-count');assert.equal(await page.locator('.community-count b').innerText(),'Ya somos 5');
+  for(const theme of ['light','dark'])for(const [width,height] of [[320,740],[360,740],[390,844],[412,900],[768,1024],[844,390],[1280,900],[1366,593],[1440,900],[1920,1080],[683,296],[960,540]]){await page.setViewportSize({width,height});await page.evaluate(t=>TNT.setTheme(t),theme);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Home fits '+width+' '+height);if([390,1366,1920].includes(width))await page.screenshot({animations:'disabled',path:path.join(out,'home-current-'+theme+'-'+width+'.png'),fullPage:true});}
+  await page.setViewportSize({width:683,height:296});await page.locator('[data-nav-spaces]').press('Enter');assert(await page.locator('dialog .tnt-sheet').evaluate(n=>{const r=n.getBoundingClientRect();return r.left>=10&&r.right<=innerWidth-10&&r.top>=10&&r.bottom<=innerHeight-10;}));await page.keyboard.press('Escape');
+  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>TNTNavigation.settings());await page.locator('dialog input[value=saturday]').check();await page.locator('dialog input[value=schedule]').check();await page.locator('dialog [type=submit]').click();await page.locator('#tnt-main-nav a[href*="mode=sabados"]').waitFor();
+  await page.locator('#tnt-main-nav a[href*="mode=sabados"]').click();const attendance=page.frameLocator('iframe[title="Asistencia"]');await attendance.locator('#startDeck').waitFor();await attendance.locator('#att-search').fill('Bruno');
+  await page.evaluate(()=>TNTNavigation.open('/biblia?ref=GEN.1&v=128'));const reader=page.frameLocator('iframe[title="Biblia"]');await reader.locator('[data-reading] p').first().waitFor();assert.equal(await reader.locator('#tnt-main-nav').count(),0);
+  await page.locator('.tnt-module-tabs [data-module="/asistencia"]').click();assert.equal(await attendance.locator('#att-search').inputValue(),'Bruno');assert.equal(await page.locator('iframe').count(),2);
+  await page.locator('#tnt-main-nav a[href*="next_saturday=1"]').click();const org=page.frameLocator('iframe[title="Organización"]');await org.locator('.tnt-program-hero').waitFor();
+  for(const theme of ['light','dark'])for(const [width,height] of [[320,740],[390,844],[844,390],[1366,593],[1920,1080]]){await page.setViewportSize({width,height});await page.evaluate(t=>TNT.setTheme(t),theme);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Module workspace fits '+width);assert(await page.locator('.tnt-module-tabs').evaluate(n=>{const r=n.getBoundingClientRect(),nav=document.querySelector('#tnt-main-nav').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=nav.top;}));if(width===390||width===1366)await page.screenshot({animations:'disabled',path:path.join(out,'modules-'+theme+'-'+width+'.png')});}
+  await page.evaluate(()=>TNTNavigation.open('/comunidad?module=birthdays'));const birthdays=page.frameLocator('iframe[title="Comunidad"]');await birthdays.locator('.birthday-month').first().waitFor();assert.equal(await birthdays.locator('.birthday-month').count(),12);assert.equal(await birthdays.locator('[name=birthday_public]').count(),0);await birthdays.locator('.birthday-next').waitFor();
+  await page.evaluate(()=>{TNT.grants=TNT.grants.map(g=>g.module==='lista-sabados'?{...g,enabled:false,access_level:'none'}:g);TNT.account.system_role='user';TNT.isAdmin=false;document.dispatchEvent(new CustomEvent('tnt:permissions'));});assert.equal(await page.locator('iframe[title="Asistencia"]').count(),0);assert.equal(await page.locator('#tnt-main-nav a[href*="mode=sabados"]').count(),0);
+  await page.evaluate(()=>{for(const key of Object.keys(localStorage))if(key.startsWith('tnt:modules:'))localStorage.removeItem(key);});
+  console.log('Live modules retain forms, per-user shortcuts, current Saturday program, twelve birthday months and revoked access: OK');
+ }
  async function bibleVersionsFlow(){
-  await visit('/biblia?ref=GEN.1&v=1909','[data-reading]');await page.getByText('EN el principio crió Dios los cielos y la tierra.',{exact:false}).waitFor();
-  assert.deepEqual(await page.locator('optgroup[label="Leer dentro de TNT"] option').evaluateAll(nodes=>nodes.map(n=>n.value)),['1909','147','3291','3365']);
-  assert.equal(await page.locator('optgroup[label="Lectura oficial en Bible.com"] option').count(),3);
-  assert.equal(await page.locator('optgroup[label="Comprobar acceso en TNT"] option').count(),2);
-  for(const id of [147,3291,3365]){
-   await page.locator('[data-version]').selectOption(String(id));await page.getByText('Lectura sintética GEN.1',{exact:true}).waitFor();
-   assert.equal(await page.locator('[data-attribution]').innerText(),'Créditos sintéticos '+id);
-   assert.deepEqual(await page.locator('[data-chapter] option').evaluateAll(nodes=>nodes.map(n=>n.value)),['1','2'],'String chapter IDs remain navigable');
-   await page.locator('[data-next]').click();await page.getByText('Lectura sintética GEN.2',{exact:true}).waitFor();
-   await page.locator('[data-next]').click();await page.getByText('Lectura sintética EXO.1',{exact:true}).waitFor();assert(await page.locator('[data-next]').isDisabled());
-   await page.locator('[name=reference]').fill('Génesis 1');await page.locator('.c-reader-jump [type=submit]').click();await page.getByText('Lectura sintética GEN.1',{exact:true}).waitFor();
-  }
-  await capture('reader-authorized');
-  // Changing book while an older index request finishes must not leave the version selector locked.
-  await page.locator('[data-version]').selectOption('147');await page.getByText('Lectura sintética GEN.1',{exact:true}).waitFor();
-  deferredIndex=3291;const pendingIndex=new Promise(resolve=>indexStarted=resolve);await page.locator('[data-version]').selectOption('3291');await pendingIndex;
-  await page.locator('[data-book]').selectOption('EXO');await page.getByText('Lectura sintética EXO.1',{exact:true}).waitFor();releaseIndex();deferredIndex=0;await page.waitForFunction(()=>!document.querySelector('[data-version]').disabled);
-  for(const id of [149,1782,127]){
-   await visit('/biblia?ref=MAT.5.14-16&v='+id,'[data-reading]');await page.getByText('Esta versión se lee en Bible.com.',{exact:false}).waitFor();
-   assert.equal(await page.locator('[data-version]').inputValue(),String(id));assert((await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href')).endsWith('/'+id+'/MAT.5.14-16'));
-  }
-  await capture('reader-ntv-status');
-  for(const id of [128,2664]){await page.locator('[data-version]').selectOption(String(id));await page.getByText('Esta traducción necesita que se habilite su licencia',{exact:false}).waitFor();assert.equal(await page.getByRole('link',{name:'Revisar licencia en YouVersion'}).count(),1);}
-  // A transient index failure must not turn an authorized version into an unavailable one.
-  indexDown=3291;await page.locator('[data-version]').selectOption('3291');await page.getByText('Lectura sintética MAT.5.14-16',{exact:true}).waitFor();assert.equal(await page.locator('[data-book] option').count(),66);indexDown=0;
-  // Refresh notices newly authorized content without a new build or clearing the reading bookmark.
-  await visit('/biblia?ref=GEN.1&v=128','[data-reading]');await page.getByText('Esta traducción necesita que se habilite su licencia',{exact:false}).waitFor();licensed=true;
-  await page.locator('[data-reader-retry]').click();await page.getByText('Lectura sintética GEN.1',{exact:true}).waitFor();assert.equal(await page.locator('optgroup[label="Leer dentro de TNT"] option[value="128"]').count(),1);
-  revoked=128;await page.locator('[data-next]').click();await page.getByText('Esta traducción necesita que se habilite su licencia',{exact:false}).waitFor();
-  licensed=false;revoked=0;catalogDown=true;passageDown=true;await visit('/biblia?ref=MAT.5.14-16&v=127','[data-reading]');await page.getByText('No pudimos conectar la lectura.',{exact:false}).waitFor();
-  catalogDown=false;passageDown=false;await page.locator('[data-reader-retry]').click();await page.getByText('Esta versión se lee en Bible.com.',{exact:false}).waitFor();await page.locator('[data-reader-local]').click();await page.locator('[data-reading] p').first().waitFor();assert.equal(await page.locator('[data-version]').inputValue(),'1909');
-  assert(apiCalls.some(c=>c.id===147&&c.action==='passage'));assert(apiCalls.some(c=>c.id===3291&&c.action==='passage'));assert(apiCalls.some(c=>c.id===3365&&c.action==='passage'));
-  console.log('Biblia: catálogo completo habilitado, capítulos con IDs de texto, navegación de todas las versiones, NTV/RVR/RVA no ofrecidas, NVI pendiente, fallo de índice, alta/revocación de licencia y recuperación: OK');
+  licensed=false;await visit('/biblia?ref=JHN.3.16&v=127','[data-reading]');await page.locator('.reader-unavailable').waitFor();assert.equal(await page.locator('[data-reading] a').count(),0);assert.equal(await page.locator('.reader-config').getAttribute('open'),null);
+  assert.deepEqual(await page.locator('[data-version] option').evaluateAll(ns=>ns.slice(0,5).map(n=>Number(n.value))),[128,127,1782,149,176]);
+  licensed=true;await visit('/biblia?ref=GEN.1&v=128','[data-reading]');await page.getByText('Lectura sintética GEN.1',{exact:false}).waitFor();await page.locator('[data-reading] [data-reader-verse]').first().click();await page.locator('[data-mark-open]').click();await page.locator('[data-mark-color=lime]').click();await page.locator('[data-reading] [data-mark=lime]').waitFor();
+  await page.locator('[data-config-toggle]').click();await page.locator('[data-favorite]').click();await page.getByText('Tu versión favorita',{exact:false}).waitFor();
+  await page.locator('[data-next]').click();await page.getByText('Lectura sintética GEN.2',{exact:false}).waitFor();await page.locator('[data-prev]').click();await page.locator('[data-reading] [data-mark=lime]').waitFor();
+  await page.locator('[data-catalog]').click();await page.locator('dialog input[value="147"]').check();await page.locator('dialog [type=submit]').click();await page.locator('[data-version]').selectOption('147',{force:true});await page.getByText('Créditos sintéticos 147',{exact:true}).waitFor();await page.locator('[data-reading] [data-mark=lime]').waitFor();assert.equal(await page.locator('[data-attribution]').innerText(),'Créditos sintéticos 147');
+  indexDown=128;await page.locator('[data-version]').selectOption('128',{force:true});await page.getByText('Lectura sintética GEN.1',{exact:false}).waitFor();indexDown=0;
+  passageDown=true;await page.locator('[data-next]').click();await page.locator('.reader-unavailable').waitFor();passageDown=false;await page.locator('[data-reader-retry]').click();await page.getByText('Lectura sintética GEN.2',{exact:false}).waitFor();
+  if(await page.locator('.reader-config').getAttribute('open')!==null)await page.locator('[data-config-toggle]').click();
+  for(const theme of ['light','dark'])for(const [width,height] of [[320,740],[360,740],[390,844],[412,900],[768,1024],[844,390],[1280,900],[1366,593],[1440,900],[1920,1080],[683,296],[960,540]]){await page.setViewportSize({width,height});await page.evaluate(t=>TNT.setTheme(t),theme);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Reader fits '+width);await page.locator('[data-reading]').scrollIntoViewIfNeeded();assert(await page.locator('[data-next]').isVisible());if([390,1366].includes(width))await page.screenshot({animations:'disabled',path:path.join(out,'reader-current-'+theme+'-'+width+'.png')});}
+  await page.setViewportSize({width:683,height:296});await page.locator('[data-config-toggle]').press('Enter');await page.locator('.reader-config[open]').waitFor();await page.locator('[data-config-toggle]').press('Enter');await page.locator('[data-reading] [data-reader-verse]').first().press('Enter');await page.locator('[data-mark-open]').press('Enter');assert(await page.locator('dialog .tnt-sheet').evaluate(n=>{const r=n.getBoundingClientRect();return r.left>=10&&r.right<=innerWidth-10&&r.top>=10&&r.bottom<=innerHeight-10;}));await page.keyboard.press('Escape');
+  console.log('Five principal translations, licensed extras, no external reading, canonical marks, favorite, retry, sticky navigation, keyboard and responsive reflow equivalent to 200% zoom: OK');
  }
- async function inlineLicenseFlow(){
-  const popups=[],track=popup=>popups.push(popup);context.on('page',track);
-  try{
-   licensed=false;await visit('/biblia?ref=GEN.1&v=1909','[data-reading]');await page.locator('option[value="147"]').waitFor({state:'attached'});
-   await page.getByRole('button',{name:'Traducción',exact:true}).click();
-   const nvi=page.locator('.tnt-select-dialog [data-option]').filter({hasText:'NVI ·'}).filter({hasNotText:'Simplificada'});
-   assert.equal(await nvi.evaluate(n=>n.tagName),'BUTTON','A pending NVI license must be checked inside TNT, rather than opening an external link');
-   licensed=true;await nvi.tap();await page.getByText('Lectura sintética GEN.1',{exact:true}).waitFor();
-   assert.equal(await page.locator('[data-version]').inputValue(),'128');assert.equal(await page.locator('[data-attribution]').innerText(),'Créditos sintéticos 128');assert.equal(popups.length,0);
-   assert.equal(await page.locator('optgroup[label="Leer dentro de TNT"] option[value="128"]').count(),1);
-   // The user can open the menu while the catalogue is still arriving. Its
-   // choice must keep its value when new versions change the option indices.
-   licensed=false;deferredCatalog=true;const started=new Promise(resolve=>catalogStarted=resolve);
-   await visit('/biblia?ref=GEN.1&v=1909','[data-reading]');await started;await page.locator('[data-reading] p').first().waitFor();
-   await page.getByRole('button',{name:'Traducción',exact:true}).click();const earlyNVI=page.locator('.tnt-select-dialog button[data-option]').filter({hasText:'NVI ·'}).filter({hasNotText:'Simplificada'});
-   await earlyNVI.waitFor();deferredCatalog=false;releaseCatalog();await page.locator('option[value="147"]').waitFor({state:'attached'});licensed=true;
-   await earlyNVI.press('Enter');await page.getByText('Lectura sintética GEN.1',{exact:true}).waitFor();assert.equal(await page.locator('[data-version]').inputValue(),'128');assert.equal(popups.length,0);
-   await page.locator('[data-next]').click();await page.getByText('Lectura sintética GEN.2',{exact:true}).waitFor();
-   // An unavailable catalogue does not deny text the provider authorizes.
-   catalogDown=true;await visit('/biblia?ref=GEN.1&v=1909','[data-reading]');await page.locator('[data-reading] p').first().waitFor();
-   await page.getByRole('button',{name:'Traducción',exact:true}).click();await page.locator('.tnt-select-dialog button[data-option]').filter({hasText:'NVI ·'}).filter({hasNotText:'Simplificada'}).tap();
-   await page.getByText('Lectura sintética GEN.1',{exact:true}).waitFor();assert.equal(await page.locator('[data-attribution]').innerText(),'Créditos sintéticos 128');assert.equal(popups.length,0);catalogDown=false;
-   await page.screenshot({path:path.join(out,'nvi-inline-after-license.png'),fullPage:true});
-  }finally{context.off('page',track);licensed=false;deferredCatalog=false;catalogDown=false;}
-  console.log('NVI: permiso nuevo desde el menú real, texto y créditos internos, cero pestañas externas y selección estable durante la carga del catálogo: OK');
- }
- async function externalReadingFlow(){
-  const destinations=[];
-  await context.route('https://www.bible.com/**',route=>{destinations.push(route.request().url());return route.fulfill({contentType:'text/html',body:'<!doctype html><html lang="es"><title>Destino oficial de prueba</title><body><h1>Enlace externo de prueba</h1></body></html>'});});
-  await visit('/biblia?ref=MAT.5.14-16&v=1909','[data-reading]');await page.locator('[data-reading] p').first().waitFor();
-  await page.locator('option[value="127"][data-tnt-href]').waitFor({state:'attached'});
-  await page.getByRole('button',{name:'Traducción',exact:true}).click();
-  for(const theme of ['light','dark'])for(const [width,height] of [[320,844],[360,740],[390,844],[412,900],[768,900],[1280,900],[844,360]]){
-   await page.evaluate(t=>TNT.setTheme(t),theme);await page.setViewportSize({width,height});
-   assert(await page.locator('.tnt-select-dialog').evaluate(n=>{const r=n.getBoundingClientRect();return r.left>=10&&r.right<=innerWidth-10&&r.top>=10&&r.bottom<=innerHeight-10;}),'External picker fits '+theme+' '+width);
-   for(const item of await page.locator('.tnt-select-dialog [data-option]').all()){await item.scrollIntoViewIfNeeded();assert(await item.evaluate(n=>{const r=n.getBoundingClientRect(),s=n.querySelector('span').getBoundingClientRect(),style=getComputedStyle(n);return r.width>=44&&r.height>=44&&r.left>=10&&r.right<=innerWidth-10&&s.top>=r.top+parseFloat(style.paddingTop)-1&&s.bottom<=r.bottom-parseFloat(style.paddingBottom)+1;}),'Each translation and its complete label fit without clipping');}
-   if(width===390){await page.locator('.tnt-select-list').evaluate(n=>n.scrollTop=0);await page.screenshot({path:path.join(out,'external-picker-'+theme+'.png')});}
-  }
-  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>TNT.setTheme('light'));await page.locator('.tnt-select-close').click();await page.locator('.tnt-select-dialog').waitFor({state:'hidden'});
-  for(const [id,name] of [[127,'NTV'],[149,'RVR 1960'],[1782,'RVA 2015']]){
-   await page.getByRole('button',{name:'Traducción',exact:true}).click();await page.locator('.tnt-select-dialog').waitFor();
-   const choice=page.locator('.tnt-select-dialog [data-option]').filter({hasText:name}).filter({has:page.locator('span')});
-   const item=id===128?choice.filter({hasNotText:'Simplificada'}):choice;
-   if(id===127){await page.locator('.tnt-select-search').fill('NTV');assert.equal(await page.locator('.tnt-select-dialog [data-option]:visible').count(),1);}
-   const opened=context.waitForEvent('page',{timeout:4000});if(id===127)await item.press('Enter');else await item.tap();const target=await opened;
-   await target.waitForURL('https://www.bible.com/bible/'+id+'/MAT.5.14-16');await target.getByRole('heading',{name:'Enlace externo de prueba'}).waitFor();await target.close();
-   await page.locator('.tnt-select-dialog').waitFor({state:'hidden'});assert.equal(await page.locator('[data-version]').inputValue(),'1909');
-   assert.equal(await page.locator('.c-reader-external').count(),0,'An external destination does not replace the internal reading with an error');
-  }
-  // Offered but not yet licensed translations check the provider inside TNT.
-  // Opening Bible.com is an explicit fallback action after that check fails.
-  for(const [id,name] of [[128,'NVI ·'],[2664,'NVI Simplificada']]){
-   await page.getByRole('button',{name:'Traducción',exact:true}).click();
-   await page.locator('.tnt-select-dialog button[data-option]').filter({hasText:name}).tap();await page.getByText('Esta traducción necesita que se habilite su licencia',{exact:false}).waitFor();
-   const opened=context.waitForEvent('page',{timeout:4000});await page.getByRole('link',{name:/Leer en Bible.com/}).tap();const target=await opened;
-   await target.waitForURL('https://www.bible.com/bible/'+id+'/MAT.5.14-16');await target.getByRole('heading',{name:'Enlace externo de prueba'}).waitFor();await target.close();
-   assert.equal(await page.locator('[data-version]').inputValue(),String(id));await page.locator('[data-reader-local]').click();await page.locator('[data-reading] p').first().waitFor();
-  }
-  // The destination must follow the current book, chapter and verse, rather than the initial reference.
-  await page.locator('[name=reference]').fill('Juan 3:16');await page.locator('.c-reader-jump [type=submit]').click();await page.getByRole('button',{name:'Traducción',exact:true}).click();
-  assert((await page.locator('.tnt-select-dialog a[data-option]').filter({hasText:'NTV'}).getAttribute('href')).endsWith('/127/JHN.3.16'));await page.keyboard.press('Escape');
-  await page.locator('[name=reference]').fill('Génesis 1');await page.locator('.c-reader-jump [type=submit]').click();await page.getByRole('button',{name:'Traducción',exact:true}).click();
-  await page.locator('.tnt-select-dialog button[data-option]').filter({hasText:'NVI Simplificada'}).tap();await page.getByText('NVI Simplificada incluye solo el Nuevo Testamento.',{exact:false}).waitFor();assert.equal(await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href'),'https://www.bible.com/versions/2664');
-  // Ordinary selections still load internally and consume only the selector's history entry.
-  await page.getByRole('button',{name:'Traducción',exact:true}).click();await page.locator('.tnt-select-dialog button[data-option]').filter({hasText:'VBL'}).tap();await page.getByText('Lectura sintética GEN.1',{exact:true}).waitFor();assert.equal(await page.locator('[data-version]').inputValue(),'3291');
-  assert.equal(destinations.length,5);await context.unroute('https://www.bible.com/**');
-  console.log('Enlaces externos: tres destinos directos y dos tras comprobar la licencia, toque/teclado, referencia actual, NVIS solo NT, seis anchos, horizontal y ambos temas: OK');
- }
+ async function inlineLicenseFlow(){licensed=false;await visit('/biblia?ref=GEN.1&v=128','[data-reading]');await page.locator('.reader-unavailable').waitFor();licensed=true;await page.locator('[data-reader-retry]').click();await page.getByText('Lectura sintética GEN.1',{exact:false}).waitFor();revoked=128;await page.locator('[data-next]').click();await page.locator('.reader-unavailable').waitFor();revoked=0;}
+
  try{
+  if(process.env.TNT_TEST_WELCOME_ONLY==='1'){await welcomeRequestFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
+  if(process.env.TNT_TEST_GAMES_ONLY==='1'){await correctedGamesFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
+  if(process.env.TNT_TEST_MODULES_ONLY==='1'){await modulesAndCommunityFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   if(process.env.TNT_TEST_ATTENDANCE_ONLY==='1'){await attendanceResumeFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   if(process.env.TNT_TEST_ENTRY_ONLY==='1'){await entryFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   if(process.env.TNT_TEST_INLINE_ONLY==='1'){await inlineLicenseFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   if(process.env.TNT_TEST_STARTUP_ONLY==='1'){await startupPerformanceFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   if(!process.env.TNT_TEST_EXTERNAL_ONLY&&!process.env.TNT_TEST_BIBLE_ONLY&&!process.env.TNT_TEST_LAYOUT_ONLY)await startupPerformanceFlow();
-  if(process.env.TNT_TEST_EXTERNAL_ONLY==='1'){await externalReadingFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
-  await externalReadingFlow();
+  if(process.env.TNT_TEST_EXTERNAL_ONLY==='1'){await bibleVersionsFlow();assert.equal(errors.length,0,errors.join('\n'));return;}
   await bibleVersionsFlow();
   await inlineLicenseFlow();
   if(process.env.TNT_TEST_BIBLE_ONLY==='1'){assert.equal(errors.length,0,errors.join('\n'));return;}
@@ -437,7 +397,8 @@ async function mockAPI(page,actor=1){
   await loadingAndRotationFlow();
   if(process.env.TNT_TEST_LAYOUT_ONLY==='1'){assert.equal(errors.length,0,errors.join('\n'));return;}
   await approvedVisualFlow();
-  await visit('/comunidad' ,'.c-groups');assert.equal(await page.locator('.c-group').count(),3);await capture('community-new');
+  await welcomeRequestFlow();
+  await visit('/comunidad' ,'.c-groups');assert.equal(await page.locator('.c-group').count(),3);assert.equal(await page.locator('.daily-carousel').count(),0);await capture('community-new');
   await visit('/comunidad?module=bible&manage=1','[data-create]');await page.locator('[data-create]').click();let form=page.locator('dialog form');await form.locator('[name=title]').fill('Plan desde el equipo');await form.locator('[name=description]').fill('Dos momentos para compartir');await form.locator('[name=status]').selectOption('published',{force:true});await form.locator('[data-step-title]').fill('Descubrir el amor de Dios');await form.locator('[data-reference]').fill('Juan 3:16');await form.locator('[data-reflection]').fill('¿Cómo podés compartir ese amor hoy?');await form.locator('[data-add-step]').click();await form.locator('[data-step-title]').nth(1).fill('Caminar juntos');await form.locator('[data-reference]').nth(1).fill('Hechos 2:42-47');
   await page.evaluate(()=>window.__communityFailure='Conexión interrumpida de prueba');await form.locator('[type=submit]').click();await form.getByText('Conexión interrumpida de prueba').waitFor();assert.equal(await form.locator('[name=title]').inputValue(),'Plan desde el equipo');await form.locator('[type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByRole('heading',{name:'Plan desde el equipo',exact:true}).waitFor();await capture('staff-plans');
   const plan=await serial(async()=>{await pg.db.exec('reset role');return(await pg.db.query("select id from tnt_community_content where title='Plan desde el equipo'")).rows[0].id;});
@@ -448,15 +409,14 @@ async function mockAPI(page,actor=1){
   // The account panel owns its scroll and fits above every viewport edge.
   await page.locator('[data-account]').click();await page.locator('#tnt-account-menu').waitFor();assert(await page.locator('#tnt-account-menu').evaluate(n=>{const r=n.getBoundingClientRect(),list=n.querySelector('.tnt-menu-actions'),s=getComputedStyle(list);return r.top>=0&&r.bottom<=innerHeight&&s.overflowY==='auto'&&n.scrollHeight<=n.clientHeight+1;}));await page.locator('.tnt-menu-actions').evaluate(n=>n.scrollTop=n.scrollHeight);assert(await page.locator('[data-logout]').isVisible());await page.screenshot({path:path.join(out,'account-scroll.png')});await page.keyboard.press('Escape');assert.equal(await page.locator('#tnt-account-menu').count(),0);assert.equal(await page.evaluate(()=>document.body.classList.contains('tnt-account-open')),false);
   await visit('/','[data-my-activity]');assert(await page.locator('.hub-activity-list').evaluate(n=>getComputedStyle(n).overflowY==='visible'&&getComputedStyle(n).maxHeight==='none'));await page.locator('.hub-activity-list').scrollIntoViewIfNeeded();const before=await page.evaluate(()=>scrollY);await page.mouse.move(190,550);await page.mouse.wheel(0,550);await page.waitForTimeout(250);assert(await page.evaluate(y=>scrollY>y,before));await page.screenshot({path:path.join(out,'home-new.png'),fullPage:true});
-  await visit('/biblia?ref=GEN.1&v=1909','[data-reading]');await page.getByText('EN el principio crió Dios los cielos y la tierra.',{exact:false}).waitFor();assert.equal(await page.locator('[data-version]').inputValue(),'1909');await page.screenshot({animations:'disabled',path:path.join(out,'reader-rv1909.png')});await page.locator('[data-version]').selectOption('128',{force:true});await page.getByRole('link',{name:/Leer en Bible.com/}).waitFor();assert((await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href')).includes('/128/GEN.1'));await page.locator('[data-version]').selectOption('149',{force:true});await page.getByRole('link',{name:/Leer en Bible.com/}).waitFor();assert((await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href')).includes('/149/'));await page.locator('[name=reference]').fill('Juan 3:16');await page.locator('.c-reader-jump [type=submit]').click();assert((await page.getByRole('link',{name:/Leer en Bible.com/}).getAttribute('href')).endsWith('JHN.3.16'));await capture('reader-fallback');
-  licensed=true;await visit('/biblia?v=128&ref=GEN.1','[data-reading]');await page.getByText('Lectura sintética GEN.1').waitFor();await page.locator('[data-next]').click();await page.getByText('Lectura sintética GEN.2').waitFor();await page.locator('[data-next]').click();await page.getByText('Lectura sintética EXO.1').waitFor();assert(await page.locator('[data-next]').isDisabled());await capture('reader-inline');
   await visit('/juegos','[data-game]');assert.equal(await page.locator('[data-game]').count(),5);await capture('games-new');await page.locator('[data-game=pairs]').click();await page.locator('[name=difficulty][value=easy]').check();await page.locator('[data-game-setup] [type=submit]').click();await page.locator('.g-pair-board').waitFor();await capture('game-pairs');
   for(let round=0;round<3;round++){const pairs=await page.locator('[data-answer]').evaluateAll(nodes=>nodes.filter(n=>n.dataset.answer[0]==='p').map(n=>[n.dataset.answer,'o'+n.dataset.answer.slice(1)]));for(const ids of pairs)for(const id of ids)await page.locator('[data-answer="'+id+'"]').click();if(round<2)await page.locator('[data-next-round]').click();}await page.getByText('¡Lo lograste!').waitFor();await page.getByText('Tu partida y tu marca quedaron guardadas en tu cuenta.').waitFor();await capture('game-result-new');
   assert(await serial(async()=>{await pg.db.exec('reset role');return(await pg.db.query("select count(*)::int n from tnt_community_game_runs where kind='pairs'")).rows[0].n===1;}));
   // A second signed-in account accepts its invitation; a community member joins the actual plan.
-  async function actorPage(actor){const ctx=await browser.newContext({viewport:{width:390,height:844},isMobile:true,serviceWorkers:'block'});await ctx.addInitScript(({uid,key})=>{if(location.protocol!=='http:')return;const enc=v=>btoa(JSON.stringify(v)).replaceAll('=','').replaceAll('+','-').replaceAll('/','_'),user={id:uid,email:'demo@example.test',aud:'authenticated',role:'authenticated',user_metadata:{}},token=enc({alg:'HS256',typ:'JWT'})+'.'+enc({sub:uid,role:'authenticated',exp:Math.floor(Date.now()/1000)+86400})+'.test';localStorage.setItem(key,JSON.stringify({access_token:token,refresh_token:'synthetic-refresh',expires_at:Math.floor(Date.now()/1000)+86400,expires_in:86400,token_type:'bearer',user}));localStorage.setItem('tnt-theme','light');},{uid:pid(99+actor),key:'sb-oeodnnomgiddkblnlzay-auth-token'});const p=await ctx.newPage();p.on('pageerror',e=>errors.push(e.stack));await mockAPI(p,actor);await p.route('**/api/bible?*',r=>r.fulfill({status:403,json:{code:'LICENSE_REQUIRED'}}));return{ctx,p,visit:async url=>{await p.goto(base+url+(url.includes('?')?'&':'?')+'fixture-person='+actor);await p.waitForFunction(()=>window.TNT?.profileComplete);if(await p.locator('[data-phone-invite-later]').count())await p.locator('[data-phone-invite-later]').click();}};}
   const ref=await actorPage(2);await ref.visit('/comunidad?module=welcome');await ref.p.locator('[data-c-ref][data-accept=true]').click();await ref.p.getByText('Registrar un encuentro',{exact:true}).waitFor();await ref.ctx.close();
   const member=await actorPage(3);await member.visit('/comunidad?module=bible');assert.equal(await member.p.locator('[data-c-manage]').count(),0);await member.p.locator('[data-c-content="'+plan+'"]').click();await member.p.locator('dialog [data-join]').click();await member.p.locator('dialog [data-step="1"]').check();await member.p.getByText('1 de 2 pasos completados').waitFor();await member.p.screenshot({path:path.join(out,'member-plan.png')});await member.p.locator('dialog .tnt-close').click();await member.visit('/comunidad?module=welcome');await member.p.getByText('Tu referente es').waitFor();await member.ctx.close();
+  await correctedGamesFlow();
+  await modulesAndCommunityFlow();
   assert.deepEqual(errors,[]);console.log('Comunidad con SQL real: staff publica y edita, referente acepta, miembro avanza, JPEG real, menú y scroll móviles, Biblia oficial/inline y 5 juegos. Capturas en 320/390/768/1280 y ambos temas: OK.');
  }finally{await browser.close();await new Promise(r=>server.close(r));await pg.db.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

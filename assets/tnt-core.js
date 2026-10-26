@@ -40,6 +40,7 @@ TNT.canAction=(mod,action,scope='*')=>{
  if(!TNT.hasAccess(mod,scope,'view'))return false;
  const override=permissionMatch(TNT.personPermissions||[],mod,scope,action);
  if(override)return !!override.allowed;
+ if(account.system_role==='admin')return true;
  const preset=permissionMatch(TNT.rolePermissions||[],mod,scope,action);
  if(preset)return !!preset.allowed;
  const editActions=new Set(['edit','attendance','send_message','update_own_activity','create_activity','edit_activity','assign_people','edit_people','sell','edit_stock']);
@@ -78,6 +79,7 @@ async function loadIdentity(session){
  TNT.rolePermissions=ctx.role_permissions||[];TNT.personPermissions=(ctx.person_permissions||[]).filter(x=>!x.archived_at);
  TNT.profileContext=ctx.profile;TNT.profileComplete=ctx.profile.complete===true;
  TNT.readingPreference=ctx.reading||{};
+ TNT.personalPreferences=ctx.personal||{favorite_version:128,extra_versions:[],shortcuts:[]};
  TNT.account=ar.data;TNT.person=pr.data;TNT.isAdmin=ar.data.system_role==='admin';TNT.isStaff=ar.data.staff_status==='approved';
  TNT.identity={person_id:pr.data.id,auth_user_id:session.user.id,email:session.user.email||ar.data.email||'',full_name:pr.data.full_name||'',nickname:ar.data.nickname||'',display_name:ar.data.nickname||pr.data.full_name||session.user.email||'TNT',system_role:ar.data.system_role,ministry_role:ar.data.ministry_role||'',avatar_url:ar.data.avatar_url||session.user.user_metadata?.avatar_url||session.user.user_metadata?.picture||''};
  if(window.TNTExperience&&!TNTExperience.editing){TNTExperience.config=ctx.experience?.config||{};TNTExperience.revision=Number(ctx.experience?.revision||0);TNTExperience.loaded=true;TNTExperience.paint();}
@@ -92,7 +94,7 @@ function renderShell(){
  el.innerHTML=`<button class="tnt-shell-home" data-tnt-home aria-label="${moduleName?'Volver al inicio TNT':'Inicio TNT'}">${moduleName?TNTUI.icon('back'):'<img class="tnt-brand-mark" src="/icons/dynamite-app.svg?v=20261013" alt="TNT">'}</button><div class="tnt-shell-brand"><b>${esc(moduleName?moduleLabel:'Inicio')}</b><small>${moduleName?'Trastornadores':'Hacemos TNT'}</small></div><nav class="tnt-shell-tools" aria-label="Mi cuenta y configuración">${TNT.isAdmin?`<a class="tnt-shell-icon" data-tnt-admin href="/admin/?tab=settings" aria-label="Configuración de TNT">${TNTUI.icon('settings')}</a>`:''}<button class="tnt-shell-icon" data-tnt-theme aria-label="Cambiar tema">${TNTUI.icon('sun')}</button><button class="tnt-shell-icon" data-tnt-notify aria-label="Notificaciones">${TNTUI.icon('bell')}</button><button class="tnt-shell-user" data-tnt-user aria-label="Abrir mi cuenta">${avatarHtml()}</button></nav>`;
  document.body.appendChild(el);
  const measure=()=>{document.documentElement.style.setProperty('--tnt-shell-h',el.getBoundingClientRect().height+'px');};if(window.ResizeObserver)new ResizeObserver(measure).observe(el);measure();
- $('[data-tnt-home]',el).onclick=()=>location.href='/';$('[data-tnt-notify]',el).onclick=()=>window.TNTNotifications?TNTNotifications.open():showNotifications();$('[data-tnt-theme]',el).onclick=()=>TNT.toggleTheme();$('[data-tnt-user]',el).onclick=toggleAccountMenu;
+ $('[data-tnt-home]',el).onclick=()=>window.TNTNavigation?TNTNavigation.open('/'):location.assign('/');$('[data-tnt-notify]',el).onclick=()=>window.TNTNotifications?TNTNotifications.open():showNotifications();$('[data-tnt-theme]',el).onclick=()=>TNT.toggleTheme();$('[data-tnt-user]',el).onclick=toggleAccountMenu;
  const syncTheme=()=>{const dark=document.documentElement.dataset.tntTheme==='dark',button=$('[data-tnt-theme]',el);button.innerHTML=TNTUI.icon(dark?'sun':'moon');button.setAttribute('aria-label',dark?'Usar modo claro':'Usar modo oscuro');};syncTheme();document.addEventListener('tnt:theme',syncTheme);
  document.addEventListener('tnt:profile',()=>{$('[data-tnt-user]',el).innerHTML=avatarHtml();});window.TNTNavigation?.mount();
 

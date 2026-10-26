@@ -1,7 +1,7 @@
 /* A bounded, authenticated gateway. The YouVersion credential never reaches the browser. */
 const SUPABASE='https://oeodnnomgiddkblnlzay.supabase.co';
 const PUBLIC_KEY='sb_publishable_X06jWDKqV6jgKbaa1PrrbQ_zto1XeTJ';
-const DESIRED=[128,2664,149,1782,127];
+const DESIRED=[128,149,1782,127,176];
 // Cache metadata only. Every passage still checks access with the provider.
 let catalogCache=null;
 // YouVersion returns null in both attribution fields for its authorized RVES (147).

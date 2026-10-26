@@ -1,3 +1,10 @@
+## Comunidad responsive y lectura personal · 25 de octubre de 2026
+
+- `personal-database.cjs` comprueba RLS, favorita, catálogo, atajos, marcas canónicas, fecha del servidor, racha, cuenta deshabilitada y conservación de datos en consolidación.
+- `responsive-personal-reading.sql` usa cuentas sintéticas y rollback para comprobar permisos EFE de Admin, RPC/RLS, preferencias privadas, startup, cumpleaños y avisos identificados. `profile-claim-retry.sql` verifica también el flujo de vinculación anterior con el nuevo esquema.
+- El navegador compilado y el SDK oficial comprueban cinco ediciones principales, catálogo opcional, ausencia de lectura externa, marcas entre ediciones, reintentos, omisión vertical, guardado antes de compartir, portapapeles, múltiples módulos con formularios conservados y accesos retirados. `TNT_TEST_BIBLE_ONLY=1`, `TNT_TEST_ATTENDANCE_ONLY=1` y `TNT_TEST_MODULES_ONLY=1` aíslan esos flujos.
+- Se agregan 1366×593, 1440×900 y 1920×1080 a móvil/tablet y horizontal, con capturas claras/oscuras. Las pruebas anteriores de enlaces externos quedan sustituidas por lectura interna y estados de habilitación.
+
 ## NVI dentro del lector y actualización de licencias · 24 de octubre de 2026
 
 - Una traducción con licencia pendiente o catálogo desconocido aparece en «Comprobar acceso en TNT». Elegir NVI desde el menú real actualiza su acceso y solicita el pasaje dentro del lector. Las versiones que el proveedor confirma como no ofrecidas conservan sus enlaces nativos; para NVI, Bible.com queda como acción explícita después de un error.

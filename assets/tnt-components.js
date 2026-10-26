@@ -86,6 +86,8 @@
   function accessInfo(account={}, grants=[], mod, scope='*', now=Date.now(), rolePermissions=[], personPermissions=[]) {
     const none={level:'none',source:'none'};
     if(account.enabled===false)return none;
+    const exactGrants=grants.filter(g=>g.module===mod&&g.scope===scope),scopedGrants=exactGrants.length?exactGrants:grants.filter(g=>g.module===mod&&g.scope==='*');
+    if(mod==='efe'&&scopedGrants.some(g=>g.enabled===false||g.access_level==='none'))return {level:'none',source:'grant'};
     if(account.system_role==='admin'&&mod!=='efe')return {level:'manage',source:'admin'};
     if(account.system_role!=='admin'&&account.staff_status!=='approved')return none;
     const match=rows=>rows.find(x=>x.module===mod&&x.scope===scope&&x.action==='view')||rows.find(x=>x.module===mod&&x.scope==='*'&&x.action==='view');

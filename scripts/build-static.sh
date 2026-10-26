@@ -14,7 +14,7 @@ import re
 loader = Path('assets/tnt-experience.js').read_text(encoding='utf-8')
 shared = re.search(r"const files=\[(.*?)\]\.map", loader).group(1)
 files = re.findall(r"'([^']+\.js)\?[^']*'", shared)
-if len(files) != 16 or len(set(files)) != len(files):
+if len(files) != 18 or len(set(files)) != len(files):
     raise SystemExit('Unexpected TNT shared script manifest')
 bundle = '\n;\n'.join('/* '+name+' */\n'+Path('assets', name).read_text(encoding='utf-8') for name in files)
 extra = re.search(r"if\(location.pathname.startsWith\('/buffet'\)\)(.*?);\n", loader).group(1)

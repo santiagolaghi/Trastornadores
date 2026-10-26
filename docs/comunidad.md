@@ -4,8 +4,8 @@ Los nueve espacios se agrupan en Camino de fe, Vida en comunidad y Familias TNT.
 
 | Espacio | Comunidad | Equipo autorizado |
 | --- | --- | --- |
-| Bienvenida | Pedir acompañamiento y ver registros compartidos | Administración elige el referente; la persona elegida debe aceptar. Registrar encuentros y distinguir notas privadas |
-| Cumpleaños y fechas | Compartir el cumpleaños de manera voluntaria; ver fechas publicadas | Publicar y editar fechas especiales |
+| Bienvenida | Pedir acompañamiento y ver registros compartidos | Líderes y demás staff participan como referentes y no pueden enviar esta solicitud. Administración elige el referente; la persona elegida debe aceptar. Registrar encuentros y distinguir notas privadas |
+| Cumpleaños y fechas | Ver los cumpleaños de la comunidad por mes, con próximos, recientes y edad | Publicar y editar fechas especiales |
 | Biblia y planes | Elegir versión, libro y capítulo; comenzar planes y marcar avances | Editar lecturas y consignas, publicar, programar y consultar avances |
 | Desafíos | Participar, registrar pasos y pausar | Preparar pasos, destinatarios y cierre de participación |
 | Preguntas de fe | Consultar en privado o proponer una pregunta para compartir | Responder y publicar únicamente las consultas propuestas para Comunidad |
@@ -29,9 +29,13 @@ Las lecturas iniciadas conservan una copia de sus pasos aunque después se edite
 
 ## Biblia
 
-El gateway `/api/bible` usa la variable sensible `YOUVERSION_APP_KEY` exclusivamente en el servidor. El lector incorpora todas las versiones españolas del catálogo autorizado y conserva la RVR 1909 local. El selector distingue «Leer dentro de TNT» de «Lectura oficial en Bible.com». El 24 de octubre de 2026 se verificó texto real de RVES (147), VBL (3291) y PdDpt (3365). NVI (128 y 2664) requiere aceptación de la licencia Biblica; NTV (127), RVR 1960 (149) y RVA 2015 (1782) no están ofrecidas por esta API. No se reemplazan silenciosamente por otra traducción. El botón de revisión actualiza catálogo e índice sin perder el lugar de lectura.
+El gateway `/api/bible` conserva la credencial en el servidor. Las cinco ediciones principales son NVI, NTV, RVA 2015, RVR 1960 y TLA. Otras ediciones se añaden desde el catálogo opcional. Toda lectura permanece dentro de TNT; una edición sin acceso muestra ese estado y conserva la referencia. Las marcas por referencia, favorita y racha son privadas por cuenta. La configuración comienza plegada y los controles de capítulo siguen accesibles. Los créditos vigentes se muestran discretamente, completos.
+
+Los cumpleaños ya no dependen del opt-out anterior: se muestran para perfiles activos con cuenta habilitada, agrupados por mes y con próximos, recientes y edad. Inicio muestra el contador de cuentas activas únicas. El versículo y la frase diarios aparecen únicamente allí.
 
 ## Avisos
+
+Las solicitudes de acompañamiento muestran nombre, foto y un enlace a la persona para quienes ya están autorizados a verlas. Los avisos antiguos se identifican al leerlos, sin volver a enviarlos.
 
 Cada aviso guardado en la app es la fuente para sus envíos a teléfonos. Las publicaciones usan sus destinatarios reales; el permiso de gestión por sí solo no suscribe a un anuncio privado. El worker vuelve a validar acceso, lectura y pertenencia antes de enviar, mantiene reintentos y descarta dispositivos vencidos. La activación de un dispositivo recupera hasta 30 avisos recientes sin duplicarlos por endpoint. Los avisos diarios son voluntarios.
 

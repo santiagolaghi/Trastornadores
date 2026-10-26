@@ -220,7 +220,7 @@ function localMark(id,value){const index=S.attendance.findIndex(a=>a.person_id==
 let auditTimer;
 function saveStatusHtml(){const failed=[...S.failed.values()];return failed.length?'<div class="attendance-save-status" role="alert"><span>'+failed.length+' '+(failed.length===1?'marca pendiente de guardar':'marcas pendientes de guardar')+'. Revisá la conexión.</span><button class="tnt-button" data-save-retry>Reintentar guardado</button></div>':'';}
 function retryMarks(){for(const record of [...S.failed.values()])queueMark(record.id,record.desired,record.context);}
-function paintDeckSync(){const pending=S.busy.size,failed=S.failed.size;document.querySelectorAll('[data-deck-sync]').forEach(el=>{el.innerHTML=failed?'<span>'+failed+' '+(failed===1?'marca no se pudo guardar':'marcas no se pudieron guardar')+'.</span> <button data-save-retry>Reintentar</button>':pending?'Guardando '+pending+' '+(pending===1?'marca…':'marcas…'):'Todo guardado';el.classList.toggle('has-error',!!failed);el.querySelector('[data-save-retry]')?.addEventListener('click',retryMarks);});const end=document.querySelector('.deck-finish h2');if(end)end.textContent=failed?'Revisá el guardado':pending?'Terminaste de pasar lista':'Lista terminada';}
+function paintDeckSync(){const pending=S.busy.size,failed=S.failed.size;document.querySelectorAll('[data-deck-sync]').forEach(el=>{el.innerHTML=failed?'<span>'+failed+' '+(failed===1?'marca no se pudo guardar':'marcas no se pudieron guardar')+'.</span> <button data-save-retry>Reintentar</button>':pending?'Guardando '+pending+' '+(pending===1?'marca…':'marcas…'):'Todo guardado';el.classList.toggle('has-error',!!failed);el.querySelector('[data-save-retry]')?.addEventListener('click',retryMarks);});const counts=document.querySelector('[data-deck-counts]');if(counts){const rows=eligiblePeople(),n=k=>rows.filter(p=>status(p.id)===k).length;counts.textContent=n('present')+' presentes · '+n('absent')+' ausentes · '+n('pending')+' sin marcar';}const end=document.querySelector('.deck-finish h2');if(end)end.textContent=failed?'Revisá el guardado':pending?'Guardando tu lista…':eligiblePeople().some(p=>status(p.id)==='pending')?'Recorrido terminado':'Lista terminada';document.querySelectorAll('[data-deck-export]').forEach(b=>{b.disabled=!!(pending||failed);if(b.tagName==='A'){b.setAttribute('aria-disabled',String(!!(pending||failed)));b.href='https://wa.me/?text='+encodeURIComponent(attendanceText('absent'));}});}
 function queueMark(id,value,context=markContext()){
  const key=[context.mode,context.group||'',context.date,id].join(':');
  let record=S.writes.get(key);if(!record){record={key,id,context,version:0,confirmed:sameContext(context)?status(id):'pending',tail:Promise.resolve()};S.writes.set(key,record);}
@@ -255,7 +255,7 @@ function startDeck(){
 function renderDeck(){
  const d=S.deck,p=d?.queue[d.index];if(!d)return render();
  document.querySelector('.deck-screen')?.remove();
- if(!p){const host=document.createElement('div');host.className='deck-screen';host.innerHTML='<div class="deck-finish"><div>✓</div><h2>Lista terminada</h2><p>Revisá el estado de guardado antes de salir.</p><div data-deck-sync role="status" aria-live="polite"></div><button id="deckDone">Ver resumen</button></div>';document.body.append(host);host.querySelector('#deckDone').onclick=()=>{host.remove();S.deck=null;render()};paintDeckSync();return}
+ if(!p){const host=document.createElement('div'),rows=eligiblePeople(),count=k=>rows.filter(p=>status(p.id)===k).length;host.className='deck-screen';host.innerHTML='<div class="deck-finish"><div>✓</div><h2>Lista terminada</h2><p data-deck-counts>'+count('present')+' presentes · '+count('absent')+' ausentes · '+count('pending')+' sin marcar</p><p>¿Compartimos los ausentes? Las personas omitidas siguen pendientes.</p><div data-deck-sync role="status" aria-live="polite"></div><div class="deck-share-actions"><button data-deck-export data-copy-absent>Copiar ausentes</button><a class="tnt-button primary" data-deck-export target="_blank" rel="noopener noreferrer">Compartir en WhatsApp</a></div><button id="deckDone">Omitir y ver resumen</button></div>';document.body.append(host);host.querySelector('[data-copy-absent]').onclick=()=>copyAttendance('absent');host.querySelector('a[data-deck-export]').onclick=e=>{if(S.busy.size||S.failed.size)e.preventDefault();};host.querySelector('#deckDone').onclick=()=>{host.remove();S.deck=null;render()};paintDeckSync();return}
  const old=document.querySelector('.deck-screen');old?.remove();
  const host=document.createElement('div');host.className='deck-screen '+S.mode;const st=status(p.id),rows=eligiblePeople(),done=rows.filter(p=>status(p.id)!=='pending'&&!failedMark(p.id)).length,pct=Math.round(done/Math.max(1,rows.length)*100);
  host.innerHTML=`<header class="deck-head"><button id="deckClose" aria-label="Salir del modo swipe">${U.icon('close')}</button><div><b>${S.mode==='efe'?E(group()?.name):'Sábado TNT'}</b><small>${d.index+1} de ${d.queue.length}</small></div><button aria-label="Deshacer última asistencia" id="deckUndo" ${!d.history.length?'disabled':''}>${U.icon('undo')}</button></header><div class="deck-bar"><i style="width:${pct}%"></i></div><main class="deck-stage"><article class="swipe-card" id="swipeCard"><span class="deck-swipe-stamp yes" aria-hidden="true">VINO</span><span class="deck-swipe-stamp no" aria-hidden="true">FALTÓ</span><div><div class="big-avatar">${U.avatar(p,S.accounts.find(a=>a.person_id===p.id)||{},'portrait')}</div><span class="deck-person-kicker">CADA PERSONA CUENTA</span><h2>${E(p.full_name)}</h2><div class="person-tags"><span>${age(p)??'—'} años</span>${S.mode==='efe'?'<span>'+E(membership(p.id)?.leader_name||'Sin responsable')+'</span>':''}${st!=='pending'?'<span>Antes: '+E(labels[st])+'</span>':''}</div></div><footer><span>← faltó</span><b>${E(p.phone||'Sin teléfono')}</b><span>vino →</span></footer></article></main><div class="deck-sync" data-deck-sync role="status" aria-live="polite"></div><div class="deck-buttons"><button class="deck-no" data-deck-answer="absent">← Faltó</button><button class="deck-yes" data-deck-answer="present">Vino →</button></div>`;
@@ -263,7 +263,9 @@ function renderDeck(){
  document.body.append(host);paintDeckSync();
  for(const next of d.queue.slice(d.index,d.index+3)){const a=S.accounts.find(a=>a.person_id===next.id)||{};const url=U.photoUrl(a.avatar_url||next.avatar_url,512);if(url&&!d.preloaded.has(url)){d.preloaded.add(url);const img=new Image();img.referrerPolicy='no-referrer';img.src=url;}}
  host.querySelector('#deckClose').onclick=()=>{rememberDeck();host.remove();S.deck=null;render()};
- host.querySelector('#deckUndo').onclick=()=>{if(!host.isConnected)return;const h=d.history.pop();if(!h)return;queueMark(h.id,h.prev);d.index=Math.max(0,d.index-1);rememberDeck();host.remove();renderDeck()};
+ const skip=document.createElement('button');skip.type='button';skip.className='deck-skip';skip.dataset.deckAnswer='skip';skip.textContent='↕ Omitir por ahora';host.querySelector('.deck-buttons').insertBefore(skip,host.querySelector('.deck-yes'));
+ const stamp=document.createElement('span');stamp.className='deck-swipe-stamp skip';stamp.textContent='OMITIR';stamp.setAttribute('aria-hidden','true');host.querySelector('#swipeCard').append(stamp);
+ host.querySelector('#deckUndo').onclick=()=>{if(!host.isConnected)return;const h=d.history.pop();if(!h)return;if(!h.skip)queueMark(h.id,h.prev);d.index=Math.max(0,d.index-1);rememberDeck();host.remove();renderDeck()};
  host.querySelectorAll('[data-deck-answer]').forEach(b=>b.onclick=()=>answerDeck(p,b.dataset.deckAnswer,host));
  const card=host.querySelector('#swipeCard');if(!matchMedia('(prefers-reduced-motion: reduce)').matches)card.animate?.([{opacity:.2,transform:'translateY(24px) scale(.96)'},{opacity:1,transform:'none'}],{duration:220,easing:'cubic-bezier(.2,.8,.2,1)'});
  bindSwipe(card,p,host);
@@ -271,25 +273,29 @@ function renderDeck(){
 
 async function answerDeck(p,value,host){
  const d=S.deck;if(!d||!host.isConnected||host.dataset.answered||d.queue[d.index]?.id!==p.id||!can('attendance'))return;
- host.dataset.answered='true';const prev=status(p.id);queueMark(p.id,value);d.history.push({id:p.id,prev});d.index++;rememberDeck();const card=host.querySelector('#swipeCard');host.querySelectorAll('[data-deck-answer]').forEach(b=>b.disabled=true);card.dataset.dir=value==='present'?'yes':'no';if(!matchMedia('(prefers-reduced-motion: reduce)').matches){const direction=value==='present'?1:-1;try{await card.animate?.([{transform:card.style.transform||'none',opacity:1},{transform:'translateX('+direction*Math.max(420,innerWidth)+'px) rotate('+direction*22+'deg)',opacity:0}],{duration:240,easing:'cubic-bezier(.3,.02,.7,.5)',fill:'forwards'})?.finished;}catch{}}if(S.deck!==d||!host.isConnected)return;host.remove();renderDeck();
+ host.dataset.answered='true';const prev=status(p.id);if(value!=='skip')queueMark(p.id,value);d.history.push({id:p.id,prev,skip:value==='skip'});d.index++;rememberDeck();const card=host.querySelector('#swipeCard');host.querySelectorAll('[data-deck-answer]').forEach(b=>b.disabled=true);card.dataset.dir=value==='skip'?'skip':value==='present'?'yes':'no';if(!matchMedia('(prefers-reduced-motion: reduce)').matches){const direction=value==='present'?1:-1;try{await card.animate?.([{transform:card.style.transform||'none',opacity:1},{transform:value==='skip'?'translateY(-100dvh)':'translateX('+direction*Math.max(420,innerWidth)+'px) rotate('+direction*22+'deg)',opacity:0}],{duration:240,easing:'cubic-bezier(.3,.02,.7,.5)',fill:'forwards'})?.finished;}catch{}}if(S.deck!==d||!host.isConnected)return;host.remove();renderDeck();
 }
 function bindSwipe(card,p,host){
- let sx=0,sy=0,x=0,drag=false,raf=0;card.style.touchAction='pan-y';
- card.onpointerdown=e=>{if(e.pointerType==='mouse'&&e.button!==0)return;drag=true;x=0;sx=e.clientX;sy=e.clientY;card.setPointerCapture?.(e.pointerId);};
- card.onpointermove=e=>{if(!drag)return;x=e.clientX-sx;if(Math.abs(e.clientY-sy)>Math.abs(x)+12){cancel();return;}cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>{card.style.transform='translate3d('+x+'px,0,0) rotate('+x/38+'deg)';card.dataset.dir=x>0?'yes':'no';});};
+ let sx=0,sy=0,x=0,y=0,drag=false,raf=0;card.style.touchAction='none';
+ card.onpointerdown=e=>{if(e.pointerType==='mouse'&&e.button!==0)return;drag=true;x=0;y=0;sx=e.clientX;sy=e.clientY;card.setPointerCapture?.(e.pointerId);};
+ card.onpointermove=e=>{if(!drag)return;x=e.clientX-sx;y=e.clientY-sy;cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>{const vertical=Math.abs(y)>Math.abs(x);card.style.transform=vertical?'translate3d(0,'+y+'px,0)':'translate3d('+x+'px,0,0) rotate('+x/38+'deg)';card.dataset.dir=vertical?'skip':x>0?'yes':'no';});};
  function cancel(){drag=false;cancelAnimationFrame(raf);card.style.transform='';delete card.dataset.dir;x=0;}
- card.onpointerup=()=>{if(!drag)return;const direction=x;drag=false;cancelAnimationFrame(raf);if(Math.abs(direction)>38)answerDeck(p,direction>0?'present':'absent',host);else cancel();};
+ card.onpointerup=()=>{if(!drag)return;const direction=x,vertical=Math.abs(y)>Math.abs(x);drag=false;cancelAnimationFrame(raf);if(vertical&&Math.abs(y)>45)answerDeck(p,'skip',host);else if(!vertical&&Math.abs(direction)>38)answerDeck(p,direction>0?'present':'absent',host);else cancel();};
  card.onpointercancel=cancel;
 }
 
-async function copyAttendance(kind){
+function attendanceText(kind){
  const rows=eligiblePeople().filter(p=>kind==='all'||status(p.id)===kind);
  const title=S.mode==='efe'?(group()?.name||'EFE'):'Sábado TNT';
  const lines=kind==='all'
    ? ['📋 '+title+' · '+U.date(S.date+'T12:00:00-03:00',{day:'numeric',month:'long',year:'numeric'}),'',...['present','absent','pending'].flatMap(k=>{const list=eligiblePeople().filter(p=>status(p.id)===k);return [labels[k]+' ('+list.length+')',...list.map(p=>'• '+p.full_name),'']})]
    : [(kind==='present'?'✅ Presentes':'❌ Ausentes')+' · '+title+' · '+U.date(S.date+'T12:00:00-03:00',{day:'numeric',month:'long'}),'',...rows.map(p=>'• '+p.full_name)];
- const value=lines.join('\n').trim();
- try{await navigator.clipboard.writeText(value)}catch(_){const ta=document.createElement('textarea');ta.value=value;document.body.append(ta);ta.select();document.execCommand('copy');ta.remove()}
+ return lines.join('\n').trim();
+}
+async function copyAttendance(kind){
+ if(S.busy.size||S.failed.size)return U.toast('Esperá a que se guarden las marcas antes de copiar.',true);
+ const value=attendanceText(kind);
+ try{await navigator.clipboard.writeText(value)}catch(_){const ta=document.createElement('textarea');ta.value=value;document.body.append(ta);ta.select();let copied=false;try{copied=document.execCommand('copy');}finally{ta.remove();}if(!copied)return U.toast('No pudimos copiar. Reintentá desde el botón.',true);}
  U.toast(kind==='all'?'Resumen copiado':(kind==='present'?'Presentes copiados':'Ausentes copiados'));
 }
 function paintPeople(host){
@@ -380,9 +386,7 @@ function paintHistory(host){
  const names=new Map(S.people.map(p=>[p.id,p.full_name]));
  host.innerHTML=`<div class="section-title"><div><span class="att-kicker">HISTORIAL</span><h3>Quién cambió qué</h3></div></div><div class="audit-list">${S.audit.map(a=>`<article><span class="audit-dot ${a.to_status}"></span><div><b>${E(names.get(a.person_id)||'Persona')}</b><small>${E(a.from_status?labels[a.from_status]||a.from_status:'Sin registrar')} → ${E(labels[a.to_status]||a.to_status)} · ${new Date(a.created_at).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small></div></article>`).join('')||'<div class="att-empty">Todavía no hay cambios registrados para este encuentro.</div>'}</div>`;
 }
-function paintBirthdays(host){
- const rows=filteredRows(),month=new Date().getMonth()+1;host.innerHTML=`<div class="section-title"><div><span class="att-kicker">CUMPLEAÑOS</span><h3>Fechas de tu gente</h3></div></div><div class="people-list">${rows.map(p=>`<article class="person-row ${Number(p.birthday?.slice(5,7))===month?'birthday-now':''}"><div class="person-avatar">🎂</div><div class="person-copy"><b>${E(p.full_name)}</b><small>${U.date(p.birthday+'T12:00:00-03:00',{day:'numeric',month:'long'})}</small></div></article>`).join('')||'<div class="att-empty">No hay cumpleaños cargados.</div>'}</div>`;
-}
+function paintBirthdays(host){const rows=filteredRows().map(p=>({...p,avatar_url:S.accounts.find(a=>a.person_id===p.id)?.avatar_url||''}));host.innerHTML=TNTPersonal.birthdayCalendar(rows);}
 window.addEventListener('beforeunload',e=>{if(S.busy.size||S.failed.size){e.preventDefault();e.returnValue='';}});
 loadBase().catch(e=>{console.error(e);app.innerHTML='<div class="tnt-error"><b>No pudimos cargar Asistencia TNT.</b><p>'+E(e.message)+'</p><button class="tnt-button" onclick="location.reload()">Reintentar</button></div>'});
 let attendanceLiveTimer;document.addEventListener('tnt:data',e=>{if(!(e.detail?.tables||[]).some(t=>t.startsWith('tnt_efe_')||t.startsWith('tnt_saturday_')||['tnt_people','tnt_accounts','tnt_events'].includes(t)))return;clearTimeout(attendanceLiveTimer);attendanceLiveTimer=setTimeout(async()=>{if(TNT.blocked||S.loading||S.busy.size)return;try{if(S.deck){S.accounts=await checked(sb.from('tnt_accounts').select('person_id,avatar_url,nickname'));}else if(!document.querySelector('dialog[open]')){const date=S.date,group=S.group;await loadBase();S.date=date;S.group=group;await loadDate();render();}}catch(e){console.warn('Attendance live update',e);}},150);});
