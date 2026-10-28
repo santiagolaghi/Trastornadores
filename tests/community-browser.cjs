@@ -482,6 +482,7 @@ async function mockAPI(page,actor=1){
  async function inlineLicenseFlow(){licensed=false;await visit('/biblia?ref=GEN.1&v=128','[data-reading]');await page.locator('.reader-unavailable').waitFor();licensed=true;await page.locator('[data-reader-retry]').click();await page.getByText('Lectura sintética GEN.1',{exact:false}).waitFor();revoked=128;await page.locator('[data-next]').click();await page.locator('.reader-unavailable').waitFor();revoked=0;}
 
  try{
+  if(process.env.TNT_VISUAL_CATALOG==='1'){await require('./visual-catalog.cjs')({page,actorPage,visit,base,browser,context,pg,pid,serial});return;}
   if(process.env.TNT_TEST_COMMUNITY_SAVE_ONLY==='1'){await communitySavedRefreshFlow();assert.deepEqual(errors,[]);return;}
   if(process.env.TNT_TEST_COMMUNITY_FOCUS_ONLY==='1'){await communityFocusRefreshFlow();assert.deepEqual(errors,[]);return;}
   if(process.env.TNT_TEST_COORDINATOR_VIDEO==='1'){await coordinatorVideoFlow();assert.deepEqual(errors,[]);return;}
