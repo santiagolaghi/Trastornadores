@@ -1,8 +1,13 @@
 {
   "project_id": "appgprj_6ae2b38b4eac8191981831fef999022f",
   "url": "https://catalogo-visual-tnt.tangyteal130.chatgpt.site",
-  "static_directory": "dist",
-  "entrypoint": "dist/index.html",
+  "entrypoint": "public/catalogo.html",
   "access": "owner-private",
-  "registry": "tests/visual-catalog.cjs"
+  "registry": "tests/visual-catalog.cjs",
+  "runtime": "vinext-worker",
+  "notes_api": "/api/notes",
+  "notes_mcp": "/mcp",
+  "notes_storage": "D1 / DB",
+  "catalog_import": "node scripts/import-catalog.mjs /ruta/Catalogo-visual-TNT.html",
+  "notes_plugin_id": "plugin_asdk_app_sites_a4f295ad37e08191a4be8cb956e234a1"
 }
