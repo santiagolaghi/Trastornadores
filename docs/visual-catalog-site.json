@@ -1,0 +1,8 @@
+{
+  "project_id": "appgprj_6ae2b38b4eac8191981831fef999022f",
+  "url": "https://catalogo-visual-tnt.tangyteal130.chatgpt.site",
+  "static_directory": "dist",
+  "entrypoint": "dist/index.html",
+  "access": "owner-private",
+  "registry": "tests/visual-catalog.cjs"
+}
