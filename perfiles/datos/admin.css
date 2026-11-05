@@ -1211,3 +1211,5 @@ body.perfiles-admin #baseTnt .profile-delete-status:not(:empty){margin:14px 0 0;
 body.perfiles-admin #baseTnt [hidden]{display:none!important}
 body.perfiles-admin #baseTnt .manage-btn.edit-btn{color:var(--tnt-on-color)!important;background:var(--accent)!important}
 body.perfiles-admin #baseTnt .manage-btn.delete-btn{color:var(--text)!important;background:var(--surface-3)!important;border-color:var(--line)!important}
+
+.tnt-purge-confirm{display:grid;gap:8px;margin:16px 0;font-weight:650}.tnt-purge-confirm[hidden]{display:none}.tnt-purge-confirm input{box-sizing:border-box;width:100%;min-height:44px;border:2px solid var(--border,#777);border-radius:12px;padding:10px;font:inherit;background:var(--surface,#fff);color:inherit}

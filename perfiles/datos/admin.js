@@ -37,7 +37,7 @@
   let linkedProfileOpened = false;
   let profileState = ['archived','trash'].includes(new URLSearchParams(location.search).get('state'))
     ? new URLSearchParams(location.search).get('state') : 'active';
-  let deleteMode = "archive", deleting = false;
+  let deleteMode = "archive", deleting = false, purgeSupported=false;
   const deletedProfiles = new Set(), selectedProfiles=new Set();
   let bulkBusy=false;
   const canEdit = () => window.TNT.canAction('perfiles', 'edit');
@@ -517,12 +517,13 @@
 
   async function openDetail(id) {
  const record=records.find(item=>String(item.id)===String(id));if(!record)return;
- currentDetailId=String(record.id);
+ currentDetailId=String(record.id);purgeSupported=false;
+ if(profileState==='trash'&&TNT.isAdmin)TNT.sb.rpc('tnt_profile_purge_available').then(result=>{if(currentDetailId!==String(record.id)||profileState!=='trash')return;purgeSupported=!result.error&&result.data===true;$('removeProfileBtn').hidden=!purgeSupported;});
  $('detailName').textContent=[record.nombre,record.apellido].filter(Boolean).join(' ');
  $('detailData').innerHTML='<div class="tnt-profile-loading" role="status">Cargando perfil…</div>';
  $('detailActions').innerHTML='';$('editProfileBtn').hidden=true;
  $('deleteProfileBtn').hidden=!canArchive();$('deleteProfileBtn').textContent=profileState==='trash'?'Restaurar desde Papelera':profileState==='archived'?'Desarchivar perfil':'Archivar perfil';
- $('removeProfileBtn').hidden=!canArchive()||profileState==='trash'||String(record.id)===String(TNT.person.id);
+ $('removeProfileBtn').hidden=!canArchive()||(profileState==='trash'&&!purgeSupported)||String(record.id)===String(TNT.person.id);$('removeProfileBtn').textContent=profileState==='trash'?'Eliminar definitivamente':'Mover a Papelera';
  detailBackdrop.hidden=true;detailSheet.classList.add('open');detailSheet.setAttribute('aria-hidden','false');
  if(detailSheet.showModal)detailSheet.showModal();else detailSheet.setAttribute('open','');
  TNTUI.trackOverlay(detailSheet,()=>{detailSheet.close?.();detailSheet.removeAttribute('open');detailSheet.classList.remove('open');detailSheet.setAttribute('aria-hidden','true');detailBackdrop.hidden=true;document.body.style.overflow='';});
@@ -617,15 +618,18 @@
       restoreProfile(record);
       return;
     }
-    if (mode === 'delete' && profileState === 'trash') return;
+    if(mode==='delete'&&profileState==='trash')mode='purge';
+    if(mode==='purge'&&(!TNT.isAdmin||!purgeSupported||profileState!=='trash'))return;
     deleteMode = mode;
-    $('deleteTitle').textContent = mode === 'delete' ? '¿Eliminar este perfil?' : '¿Archivar perfil?';
-    $('deleteActionVerb').textContent = mode === 'delete' ? 'Vas a eliminar de la base a' : 'Vas a archivar a';
-    $('deleteActionDescription').textContent = mode === 'delete'
+    $('deleteTitle').textContent=mode==='purge'?'¿Eliminar definitivamente?':mode==='delete'?'¿Mover este perfil a Papelera?':'¿Archivar perfil?';
+    $('deleteActionVerb').textContent=mode==='purge'?'Vas a eliminar definitivamente a':mode==='delete'?'Vas a mover a Papelera a':'Vas a archivar a';
+    $('deleteActionDescription').textContent = mode==='purge'?'El perfil, sus respuestas y asistencias se borran para siempre. Los pagos y registros compartidos conservan el historial como «Perfil eliminado». Esta acción no se puede deshacer.':mode === 'delete'
       ? 'El perfil irá a la Papelera. Sus asistencias, pagos y responsabilidades se conservan. Podés restaurarlo desde allí.'
       : 'Su historial de EFE y sábados se conserva. Podés restaurarlo desde Archivados.';
     $('deleteStatus').textContent = '';
     $('deleteProfileName').textContent = [record.nombre,record.apellido].filter(Boolean).join(' ');
+    let confirm=$('purgeConfirmation');if(!confirm){confirm=document.createElement('label');confirm.id='purgeConfirmation';confirm.className='tnt-purge-confirm';confirm.innerHTML='Escribí ELIMINAR para confirmar<input id="purgeConfirmationInput" autocomplete="off" spellcheck="false" aria-label="Escribí ELIMINAR para confirmar">';$('deleteStatus').before(confirm);confirm.querySelector('input').oninput=()=>setDeleteLoading(deleting);}
+    confirm.hidden=mode!=='purge';confirm.querySelector('input').value='';
     setDeleteLoading(false);
     $('deleteBackdrop').hidden = true;
     $('deleteSheet').classList.add('open');
@@ -640,9 +644,9 @@
   }
 
   function setDeleteLoading(active) {
-    $('confirmDeleteBtn').disabled = active;
+    $('confirmDeleteBtn').disabled = active||(deleteMode==='purge'&&$('purgeConfirmationInput')?.value.trim()!=='ELIMINAR');
     $('cancelDeleteBtn').disabled = active;
-    $('confirmDeleteText').textContent = active ? (deleteMode === 'delete' ? 'Eliminando…' : 'Archivando…') : (deleteMode === 'delete' ? 'Eliminar perfil' : 'Sí, archivar');
+    $('confirmDeleteText').textContent = deleteMode==='purge'?(active?'Eliminando…':'Eliminar definitivamente'):active ? (deleteMode === 'delete' ? 'Eliminando…' : 'Archivando…') : (deleteMode === 'delete' ? 'Eliminar perfil' : 'Sí, archivar');
     $('deleteSpinner').hidden = !active;
   }
 
@@ -730,7 +734,7 @@
       const {data,error}=profiles;profileAccounts=photos.error?[]:photos.data||[];
       if (error) throw error;
 
-      records = Array.isArray(data) ? data.map(record=>({...record,nombre:TNTUI.personName(record.nombre),apellido:TNTUI.personName(record.apellido)})).filter(p => !p.data_notes?.linked_to && (profileState === 'trash' ? Boolean(p.data_notes?.deleted_at) : !p.data_notes?.deleted_at && !deletedProfiles.has(String(p.id)))) : [];
+      records = Array.isArray(data) ? data.map(record=>({...record,nombre:TNTUI.personName(record.nombre),apellido:TNTUI.personName(record.apellido)})).filter(p => !p.data_notes?.system_history && !p.data_notes?.linked_to && (profileState === 'trash' ? Boolean(p.data_notes?.deleted_at) : !p.data_notes?.deleted_at && !deletedProfiles.has(String(p.id)))) : [];
       renderStats();
       renderList();
 
@@ -932,18 +936,19 @@
   $('confirmDeleteBtn').addEventListener('click', async () => {
     const record = currentRecord(), mode = deleteMode;
     if (!record || !accessToken || !canArchive() || deleting) return;
+    if(mode==='purge'&&(!TNT.isAdmin||$('purgeConfirmationInput')?.value.trim()!=='ELIMINAR'))return;
     deleting = true;
     setDeleteLoading(true);
     $('deleteStatus').textContent = '';
     try {
       const sb = window.TNT?.sb;
       if (!sb) throw new Error('No se pudo conectar con la base.');
-      const result = mode === 'delete'
+      const result = mode==='purge'?await sb.rpc('tnt_purge_profile',{p_person:record.id,p_confirmation:$('purgeConfirmationInput').value.trim()}):mode === 'delete'
         ? await sb.rpc('tnt_delete_profile', {p_person:record.id})
         : await sb.rpc('tnt_set_profile_active', {p_person:record.id,p_active:false});
       if (result.error) throw result.error;
       const name = [record.nombre,record.apellido].filter(Boolean).join(' ');
-      if (mode === 'delete') deletedProfiles.add(String(record.id));
+      if (mode === 'delete'||mode==='purge') deletedProfiles.add(String(record.id));
       records = records.filter(item => String(item.id) !== String(record.id));
       renderStats();renderList();
       deleting = false;
@@ -953,7 +958,7 @@
         currentDetailId = '';
         $('detailData').innerHTML = '';
       }
-      showToast(name + (mode === 'delete' ? ' se eliminó de la base y está en la Papelera.' : ' fue archivado sin perder su historial.'));
+      showToast(name + (mode==='purge'?' se eliminó definitivamente.':mode === 'delete' ? ' se eliminó de la base y está en la Papelera.' : ' fue archivado sin perder su historial.'));
     } catch(error) {
       $('deleteStatus').textContent = error.message || 'No se pudo guardar el cambio. Reintentá.';
       showToast(error.message || 'No se pudo guardar el cambio.');

@@ -1,6 +1,6 @@
 (() => {
  'use strict';
- const VERSION='20261026r3';
+ const VERSION='20261104r1';
  const isEmbedded=window.parent!==window&&!!window.frameElement?.matches('.tnt-module-frame');
  const PUBLIC_KEY='BF3EVnNKTFBmSHImqA-PpYPylaHMG9L-A-gomiSB20084j_mNWWAT_Gm282-ovE5fXBN6fkPT_QyuXSx4H8r1hI';
  const ICON='/icons/dynamite-app-192.png?v='+VERSION,BADGE='/icons/notification-badge.png?v='+VERSION;
@@ -62,7 +62,7 @@
   maybePrompt
  };
  async function closeSetup(){const panel=document.getElementById('tnt-phone-setup');if(!panel)return;setupClosing=true;try{await TNTUI.closeModal(panel);}finally{setupClosing=false;}}
- function refreshSetup(){const panel=document.getElementById('tnt-phone-setup');if(panel?.dataset.step==='install'&&!installState().installed){const button=panel.querySelector('[data-setup-install]');if(button)button.hidden=!installPrompt;return;}maybePrompt();}
+ function refreshSetup(){const panel=document.getElementById('tnt-phone-setup');if(panel?.dataset.step==='install'&&!installState().installed){const button=panel.querySelector('[data-setup-install]'),guide=panel.querySelector('[data-install-fallback]');if(button)button.hidden=!installPrompt;if(guide)guide.hidden=!!installPrompt;return;}maybePrompt();}
  function showSetup(step){
   if(setupClosing)return;
   const existing=document.getElementById('tnt-phone-setup');
@@ -75,14 +75,14 @@
   const progress='<ol class="tnt-setup-steps" aria-label="Preparar TNT"><li '+(install?'aria-current="step"':'class="is-done"')+'><b>1</b>Instalar</li><li class="'+(install?'':'is-done')+'"><b>2</b>Google</li><li '+(!install?'aria-current="step"':'')+'><b>3</b>Avisos</li></ol>';
   const recovery=ios?'En Ajustes → Notificaciones → TNT, activá Permitir notificaciones. Después volvé a TNT.':'En la información del sitio, entrá en Permisos → Notificaciones y elegí Permitir. Revisá también los ajustes del teléfono.';
   const help=blocked?recovery:'Tocá el botón y elegí Permitir cuando el teléfono te lo pregunte.';
-  const content=install?'<button type="button" class="tnt-button primary" data-setup-install '+(!installPrompt?'hidden':'')+'>Instalar TNT</button>'+installInstructions():'<div class="tnt-setup-notice">'+TNTUI.icon('bell')+'<p>'+(available?help:'Este dispositivo no admite notificaciones web. Podés consultar tus avisos dentro de TNT.')+'</p></div><button type="button" class="tnt-button primary" data-setup-enable>'+(available?(blocked?'Ya los habilité · comprobar':'Activar notificaciones'):'Continuar en este dispositivo')+'</button>'+(available?'':'<p class="tnt-setup-small">Los avisos del teléfono seguirán desactivados.</p>')+'<button type="button" class="tnt-setup-exit" data-setup-logout>Cambiar de cuenta</button>';
+  const content=install?'<button type="button" class="tnt-button primary" data-setup-install '+(!installPrompt?'hidden':'')+'>Instalar TNT</button><div data-install-fallback '+(installPrompt?'hidden':'')+'>'+installInstructions()+'</div>':'<div class="tnt-setup-notice">'+TNTUI.icon('bell')+'<p>'+(available?help:'Este dispositivo no admite notificaciones web. Podés consultar tus avisos dentro de TNT.')+'</p></div><button type="button" class="tnt-button primary" data-setup-enable>'+(available?(blocked?'Ya los habilité · comprobar':'Activar notificaciones'):'Continuar en este dispositivo')+'</button>'+(available?'':'<p class="tnt-setup-small">Los avisos del teléfono seguirán desactivados.</p>')+'<button type="button" class="tnt-setup-exit" data-setup-logout>Cambiar de cuenta</button>';
   const panel=TNTUI.modal(title,progress+'<div class="tnt-setup-hero"><img src="'+ICON+'" width="72" height="72" alt=""><span>HACEMOS TNT.</span></div><p class="tnt-setup-intro">'+intro+'</p>'+content+'<p class="tnt-setup-status" role="status" aria-live="polite" data-setup-status></p>',false,{required:true});
   panel.id='tnt-phone-setup';panel.classList.add('tnt-setup');panel.dataset.step=step;panel.dataset.owner=owner();
   if(install){bindInstallGuide(panel);panel.querySelector('[data-setup-install]').onclick=async event=>{
    const prompt=installPrompt,status=panel.querySelector('[data-setup-status]');if(!prompt)return;
    installPrompt=null;event.currentTarget.hidden=true;
    try{await prompt.prompt();const choice=await prompt.userChoice;status.textContent=choice.outcome==='accepted'?'Listo. Abrí TNT desde el nuevo ícono para continuar.':'Podés instalarla desde el menú del navegador cuando quieras continuar.';}
-   catch{status.textContent='Abrí el menú del navegador y elegí Instalar app o Agregar a pantalla de inicio.';}
+   catch{const guide=panel.querySelector('[data-install-fallback]');if(guide)guide.hidden=false;status.textContent='Podés instalar TNT desde el menú del navegador.';}
   };return;}
   panel.querySelector('[data-setup-logout]').onclick=()=>window.TNT?.logout?.();
   panel.querySelector('[data-setup-enable]').onclick=async event=>{

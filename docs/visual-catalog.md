@@ -18,6 +18,14 @@ El catálogo registra pantallas representativas; no pretende enumerar cada combi
 
 Cada pantalla tiene «Agregar nota» y el visor ofrece «Notas de esta pantalla». Se pueden guardar varios comentarios, precisar una variante, editar, resolver y volver a pendiente. «Ver notas» reúne los pendientes por referencia. Se guardan en D1 del catálogo y se conservan al actualizar las capturas; los borradores sin guardar viven sólo en la pestaña.
 
-Antes de preparar una revisión, leer `list_screen_notes` con estado `pending` del plugin del catálogo. Leer las páginas adicionales si `nextOffset` no es nulo. Si la conexión no aparece, obtener sus datos mediante Sites `get_site` con `include_mcp_connection: true`. La alternativa de servicio usa GET `/api/notes?status=pending` con el token que devuelve `get_site`, únicamente en la cabecera `OAI-Sites-Authorization`; mantenerlo en memoria, nunca en archivos, argumentos o resultados. El catálogo sigue siendo privado del propietario.
+Antes de preparar una revisión, leer `list_screen_notes` con estado `all`, separar resueltas de pendientes y revisar el resumen de la última verificación del plugin del catálogo. Leer las páginas adicionales si `nextOffset` no es nulo. Si la conexión no aparece, obtener sus datos mediante Sites `get_site` con `include_mcp_connection: true`. La alternativa de servicio usa GET `/api/notes?status=pending` con el token que devuelve `get_site`, únicamente en la cabecera `OAI-Sites-Authorization`; mantenerlo en memoria, nunca en archivos, argumentos o resultados. El catálogo sigue siendo privado del propietario.
 
 Agrupar las solicitudes por pantalla y revisar todo el conjunto. Marcar una nota resuelta sólo después de implementar y verificar su cambio, conservando su texto y usando la revisión actual para no sobrescribir otra edición. No incluir notas reales en las capturas sintéticas ni en el repositorio. Una publicación nueva conserva la base existente y sus migraciones.
+
+Las notas admiten un resumen de revisión con su alcance y versión. Una limitación o habilitación pendiente se conserva como pendiente con su motivo. Editar el texto de una nota resuelta la vuelve a pendiente e invalida la revisión anterior.
+
+## Verificación de la revisión actual
+
+La consulta `tests/active-rosters-live.sql` verifica, con una cuenta temporal y rollback, el guardado de asistencia en EFE y Sábados sin membresías manuales. La prueba PostgreSQL aislada `tests/notes-review-database.cjs` comprueba además el alta automática del staff y la eliminación definitiva con conservación de registros compartidos. La segunda migración se aplica sólo después de aprobar su habilitación; la interfaz consulta esa capacidad y no ofrece una acción sin servidor disponible.
+
+El historial de cada pedido y su estado viven en el catálogo privado. Mantener los textos del usuario allí y no copiarlos a este repositorio. Antes de dar por terminada una revisión, volver a leer las notas para no sobrescribir ediciones posteriores.

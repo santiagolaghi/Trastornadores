@@ -56,6 +56,12 @@ add('BUF-01','Buffet','Caja y pedidos','/buffet',{ready:'#app'});
 add('GLO-01','Glosario','Prédicas y glosario','/glosario',{ready:'#app'});
 add('DAT-01','Perfiles','Datos de la comunidad','/perfiles/datos',{ready:'body'});
 add('DAT-02','Perfiles','Formulario público de perfil','/perfiles',{ready:'#profileForm',public:true});
+add('DAT-03','Perfiles','Papelera de perfiles','/perfiles/datos?state=trash',{ready:'#cardsList [data-view-id]'});
+add('DAT-04','Perfiles','Eliminar un perfil definitivamente','/perfiles/datos?state=trash',{eval:`
+ const waitFor=predicate=>new Promise((resolve,reject)=>{const end=Date.now()+6000;const check=()=>{if(predicate())return resolve();if(Date.now()>end)return reject(Error('La ventana de Papelera no está disponible.'));requestAnimationFrame(check)};check()});
+ await waitFor(()=>document.querySelector('#cardsList [data-view-id]'));document.querySelector('#cardsList [data-view-id]').click();
+ await waitFor(()=>document.querySelector('#removeProfileBtn')&&!document.querySelector('#removeProfileBtn').hidden);document.querySelector('#removeProfileBtn').click();`,ready:'#purgeConfirmationInput'});
+
 for(const [id,module,title] of [['EXT-01','Sistema','Ingreso y selección de cuenta de Google'],['EXT-02','Sistema','Permiso nativo de notificaciones'],['EXT-03','Sistema','Instalación desde Android o iPhone']])add(id,module,title,'/',{pending:'Ventana del sistema operativo o del proveedor. Requiere captura del dispositivo y no se simula como pantalla verificada.'});
 module.exports=async({page,actorPage,visit,base,browser,context,pg,pid,serial})=>{
  const dir=process.env.TNT_CATALOG_OUTPUT||path.resolve(__dirname,'../../tnt-tools/catalogo');fs.mkdirSync(dir,{recursive:true});const imgDir=path.join(dir,'capturas');fs.mkdirSync(imgDir,{recursive:true});

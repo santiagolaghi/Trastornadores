@@ -34,7 +34,7 @@ const age=(birthday,at=new Date())=>{if(!birthday)return null;let b=new Date(bir
 const toast=(message,error=false)=>U.toast(message,error);
 const errMsg=e=>e?.message||String(e||'Error');
 const pBy=id=>S.people.find(p=>p.id===id); const aByPid=id=>S.accounts.find(a=>a.person_id===id);
-const staffPeople=()=>S.people.filter(p=>p.active!==false&&aByPid(p.id)?.enabled!==false&&aByPid(p.id)?.staff_status==='approved');
+const staffPeople=()=>S.people.filter(p=>p.active!==false&&aByPid(p.id)?.enabled!==false&&(aByPid(p.id)?.staff_status==='approved'||aByPid(p.id)?.system_role==='admin'));
 const displayName=id=>{let p=pBy(id),a=aByPid(id);return U.personName(a?.nickname||p?.full_name||'Persona')};
 const avatarHtml=id=>TNTUI.avatar(pBy(id)||{},aByPid(id)||{});
 const currentPersonId=()=>S.person?.id||null;
@@ -307,13 +307,13 @@ function eventMembersModal(eventId){
  const e=eventBy(eventId),current=eventMembers(eventId),map=new Map(current.map(m=>[m.person_id,m]));
  const organizers=current.filter(m=>m.event_role==='organizer'),lockSelf=organizers.length===1&&organizers[0]?.person_id===currentPersonId()&&!isAdmin()&&!TNT.canAction?.('organizacion','manage_people','*');
  const showGroups=e.kind!=='saturday';
- modal(`${sheetHead(e.kind==='saturday'?'Personas del sábado':'Personas del evento',e.kind==='saturday'?'Elegí quién forma parte y quién coordina. Puede haber más de un coordinador.':'Elegí participantes y coordinadores.')}`
+ modal(`${sheetHead(e.kind==='saturday'?'Personas del sábado':'Personas del evento',e.kind==='saturday'?'Todo el staff participa de los sábados. Elegí quién coordina; puede haber más de una persona.':'Elegí participantes y coordinadores.')}`
    +`<form class="form member-manager" id="membersForm">
-      <div class="member-role-guide"><b>Cómo funciona</b><span>Primero incluís a la persona. Después elegís si <strong>participa</strong> o <strong>coordina</strong>. Si no está incluida, su función no se guarda.</span></div>
-      <div class="checkList">${staffPeople().map(p=>{const m=map.get(p.id),locked=lockSelf&&p.id===currentPersonId(),label=esc(displayName(p.id)),included=!!m||locked,role=(locked?'organizer':m?.event_role)||'participant';return `
+      <div class="member-role-guide"><b>Cómo funciona</b><span>${e.kind==='saturday'?'El staff ya está incluido. Marcá a quienes coordinan este sábado.':'Primero incluís a la persona. Después elegís si participa o coordina.'}</span></div>
+      <div class="checkList">${staffPeople().map(p=>{const m=map.get(p.id),locked=lockSelf&&p.id===currentPersonId(),label=esc(displayName(p.id)),included=e.kind==='saturday'||!!m||locked,role=(locked?'organizer':m?.event_role)||'participant';return `
         <article class="member-card ${included?'is-included':''}" data-member-row="${p.id}">
           <label class="member-main">
-            <input type="checkbox" name="person" value="${p.id}" ${included?'checked':''} ${locked?'disabled':''} aria-label="Incluir a ${label}">
+            <input type="checkbox" name="person" value="${p.id}" ${included?'checked':''} ${locked||e.kind==='saturday'?'disabled':''} aria-label="Incluir a ${label}">
             ${avatarHtml(p.id)}
             <span><b>${label}</b><small>${esc(aByPid(p.id)?.ministry_role||'Equipo TNT')}</small></span>
           </label>
@@ -336,7 +336,7 @@ function eventMembersModal(eventId){
  form.onsubmit=async ev=>{
    ev.preventDefault();
    const submit=ev.target.querySelector('[type=submit]');submit.disabled=true;
-   const fd=new FormData(ev.target),ids=fd.getAll('person');if(lockSelf&&!ids.includes(currentPersonId()))ids.push(currentPersonId());
+   const fd=new FormData(ev.target),ids=e.kind==='saturday'?staffPeople().map(p=>p.id):fd.getAll('person');if(lockSelf&&!ids.includes(currentPersonId()))ids.push(currentPersonId());
    const rows=ids.map(person_id=>({event_id:eventId,person_id,event_role:(lockSelf&&person_id===currentPersonId())?'organizer':(fd.get('role_'+person_id)||'participant'),include_in_groups:showGroups?fd.get('games_'+person_id)==='on':false}));
    try{
      const r=await sb.rpc('tnt_save_event_members',{p_event:eventId,p_members:rows});if(r.error)throw r.error;
