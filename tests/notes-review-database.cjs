@@ -16,8 +16,10 @@ test('Notas: asistencia activa, sábados automáticos y papelera definitiva en P
  create function tnt_is_admin() returns boolean language sql stable security definer set search_path=public as $$select coalesce((select a.system_role='admin' and a.enabled and p.active and a.profile_complete from tnt_accounts a join tnt_people p on p.id=a.person_id where a.auth_user_id=auth.uid()),false)$$;
  create function tnt_can_action(m text,a text,s text) returns boolean language sql stable security definer set search_path=public as $$select s<>'denied' and coalesce((select ac.enabled and p.active and ac.profile_complete and (ac.system_role='admin' or ac.staff_status='approved') from tnt_accounts ac join tnt_people p on p.id=ac.person_id where ac.auth_user_id=auth.uid()),false)$$;
  create function tnt_event_can_action(e uuid,a text) returns boolean language sql stable as $$select tnt_can_action('organizacion',a,'*')$$;
- create table tnt_events(id uuid primary key,kind text,start_date date,end_date date,status text default 'planning');
+ create table tnt_events(id uuid primary key default gen_random_uuid(),kind text,start_date date,end_date date,status text default 'planning',
+   name text,created_by uuid references tnt_people,auto_generated boolean,created_at timestamptz default now(),updated_at timestamptz default now());
  create table tnt_event_members(event_id uuid references tnt_events,person_id uuid references tnt_people on delete cascade,event_role text,include_in_groups boolean,primary key(event_id,person_id));
+ create table tnt_schedule_days(event_id uuid references tnt_events,label text,date date,sort_order integer);
  create table tnt_efe_groups(id uuid primary key,code text);
  create table tnt_efe_meetings(group_id uuid references tnt_efe_groups,meeting_date date,active boolean);
  create table tnt_efe_memberships(person_id uuid references tnt_people on delete cascade,group_id uuid,active boolean);
@@ -46,7 +48,7 @@ test('Notas: asistencia activa, sábados automáticos y papelera definitiva en P
  insert into tnt_efe_groups values('${id(30)}','varones'),('${id(31)}','denied');
  insert into tnt_efe_meetings values('${id(30)}',current_date,true),('${id(31)}',current_date,true);
  `);
- for(const migration of ['20261104235349_active_account_rosters_and_saturday_defaults.sql','20261104235755_guarded_permanent_profile_trash_ready.sql'])await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations',migration),'utf8'));
+ for(const migration of ['20261104235349_active_account_rosters_and_saturday_defaults.sql','20261104235755_guarded_permanent_profile_trash_ready.sql','20261108221112_prepare_saturday_with_existing_staff.sql'])await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations',migration),'utf8'));
  await db.exec('begin');
  await t.test('una cuenta activa se marca sin altas manuales; permisos y deshabilitados se respetan',async()=>{
   await login(1);
@@ -68,6 +70,22 @@ test('Notas: asistencia activa, sábados automáticos y papelera definitiva en P
   await login(1);
   assert.equal((await scalar(`select count(*)::int n from tnt_event_members where event_id='${id(20)}'`)).n,3);
   assert.equal((await scalar(`select event_role from tnt_event_members where event_id='${id(20)}' and person_id='${id(1)}'`)).event_role,'organizer');
+ });
+ await t.test('Preparar un sábado convierte al creador ya incluido en coordinador y permite reintentar',async()=>{
+  const date=(await scalar("select (current_date+14+((6-extract(dow from current_date)::int+7)%7))::text as value")).value;
+  await login(4);
+  await rejects(`select tnt_create_saturday('${date}','Sábado ficticio')`,/No tenés permiso/);
+  await login(1);
+  const create=()=>scalar('select tnt_create_saturday($1,$2) as id',[date,'Sábado ficticio']);
+  const event=(await create()).id;
+  assert.equal((await create()).id,event);
+  const members=(await db.query('select person_id,event_role from tnt_event_members where event_id=$1 order by person_id',[event])).rows;
+  assert.deepEqual(members,[
+   {person_id:id(1),event_role:'organizer'},
+   {person_id:id(2),event_role:'participant'},
+   {person_id:id(3),event_role:'participant'},
+  ]);
+  assert.equal((await scalar('select count(*)::int as n from tnt_schedule_days where event_id=$1 and date=$2',[event,date])).n,1);
  });
  await t.test('borrado definitivo exige admin, papelera y confirmación; conserva pagos y datos de otras personas',async()=>{
   await login(1);await rejects(`select tnt_purge_profile('${id(4)}','ELIMINAR')`,/Primero mové/);
