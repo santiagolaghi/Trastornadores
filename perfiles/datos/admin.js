@@ -37,11 +37,50 @@
   let linkedProfileOpened = false;
   let profileState = ['archived','trash'].includes(new URLSearchParams(location.search).get('state'))
     ? new URLSearchParams(location.search).get('state') : 'active';
-  let deleteMode = "archive", deleting = false, purgeSupported=false;
+  let deleteMode = "archive", deleting = false;
+  let purgeAvailability = 'idle', pendingPurgeIds = [];
   const deletedProfiles = new Set(), selectedProfiles=new Set();
+  const purgedProfiles = new Set();
   let bulkBusy=false;
   const canEdit = () => window.TNT.canAction('perfiles', 'edit');
   const canArchive = () => window.TNT.canAction('perfiles', 'delete');
+  const canCheckPurge = () => profileState === 'trash' && TNT.isAdmin && canArchive();
+  const isPurgeTarget = record => Boolean(record?.data_notes?.deleted_at) &&
+    String(record.id) !== String(TNT.person?.id);
+
+  function renderPurgeAvailability() {
+    const allowed = canCheckPurge();
+    const ready = allowed && purgeAvailability === 'ready';
+    const notice = $('profilePurgeNotice');
+    notice.hidden = profileState !== 'trash' || !records.length || ready;
+    $('profilePurgeMessage').textContent = !allowed
+      ? 'Sólo Administración puede eliminar perfiles definitivamente.'
+      : purgeAvailability === 'error'
+        ? 'No se pudo verificar el borrado definitivo. Reintentá.'
+        : purgeAvailability === 'unavailable'
+          ? 'El borrado definitivo no está disponible para esta cuenta.'
+          : 'Verificando si se puede eliminar definitivamente…';
+    $('retryProfilePurge').hidden = !allowed || !['error','unavailable'].includes(purgeAvailability);
+    const bulkButton = document.querySelector('[data-profile-bulk-purge]');
+    if (bulkButton) bulkButton.hidden = !ready;
+    if (profileState === 'trash' && detailSheet.classList.contains('open')) {
+      $('removeProfileBtn').hidden = !ready || !isPurgeTarget(currentRecord());
+    }
+  }
+
+  async function checkPurgeAvailability() {
+    if (!canCheckPurge() || purgeAvailability === 'checking') return;
+    purgeAvailability = 'checking';
+    renderPurgeAvailability();
+    try {
+      const {data, error} = await TNT.sb.rpc('tnt_profile_purge_available');
+      if (error) throw error;
+      purgeAvailability = data === true ? 'ready' : 'unavailable';
+    } catch {
+      purgeAvailability = 'error';
+    }
+    renderPurgeAvailability();
+  }
 
   const SESSION_KEY = "tnt_base_admin_session_v1";
   const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
@@ -426,6 +465,7 @@
     renderActiveFilters();
     const duplicatePanel = $('profileDuplicates'); duplicatePanel.hidden = true; duplicatePanel.replaceChildren();
     renderBulkControls(filtered);
+    renderPurgeAvailability();
   }
 
   function syncChoiceButtons() {
@@ -517,16 +557,16 @@
 
   async function openDetail(id) {
  const record=records.find(item=>String(item.id)===String(id));if(!record)return;
- currentDetailId=String(record.id);purgeSupported=false;
- if(profileState==='trash'&&TNT.isAdmin)TNT.sb.rpc('tnt_profile_purge_available').then(result=>{if(currentDetailId!==String(record.id)||profileState!=='trash')return;purgeSupported=!result.error&&result.data===true;$('removeProfileBtn').hidden=!purgeSupported;});
+ currentDetailId=String(record.id);
  $('detailName').textContent=[record.nombre,record.apellido].filter(Boolean).join(' ');
  $('detailData').innerHTML='<div class="tnt-profile-loading" role="status">Cargando perfil…</div>';
  $('detailActions').innerHTML='';$('editProfileBtn').hidden=true;
  $('deleteProfileBtn').hidden=!canArchive();$('deleteProfileBtn').textContent=profileState==='trash'?'Restaurar desde Papelera':profileState==='archived'?'Desarchivar perfil':'Archivar perfil';
- $('removeProfileBtn').hidden=!canArchive()||(profileState==='trash'&&!purgeSupported)||String(record.id)===String(TNT.person.id);$('removeProfileBtn').textContent=profileState==='trash'?'Eliminar definitivamente':'Mover a Papelera';
+ $('removeProfileBtn').hidden=!canArchive()||profileState==='trash'||String(record.id)===String(TNT.person.id);$('removeProfileBtn').textContent=profileState==='trash'?'Eliminar definitivamente':'Mover a Papelera';
  detailBackdrop.hidden=true;detailSheet.classList.add('open');detailSheet.setAttribute('aria-hidden','false');
  if(detailSheet.showModal)detailSheet.showModal();else detailSheet.setAttribute('open','');
  TNTUI.trackOverlay(detailSheet,()=>{detailSheet.close?.();detailSheet.removeAttribute('open');detailSheet.classList.remove('open');detailSheet.setAttribute('aria-hidden','true');detailBackdrop.hidden=true;document.body.style.overflow='';});
+ renderPurgeAvailability();
  document.body.style.overflow='hidden';
  try {
   const result=await TNT.sb.rpc('tnt_profile_detail',{p_person:record.id});if(result.error)throw result.error;
@@ -590,8 +630,34 @@
 
 
   function renderBulkControls(filtered){
-    $('profileBulkActions')?.remove();if(!canArchive())return;const available=new Set(filtered.map(r=>String(r.id)));for(const id of selectedProfiles)if(!records.some(r=>String(r.id)===id))selectedProfiles.delete(id);
-    const bar=document.createElement('div');bar.id='profileBulkActions';bar.className='tnt-profile-bulk'+(selectedProfiles.size?' has-selection':'');bar.setAttribute('aria-label','Acciones de perfiles seleccionados');bar.innerHTML=`<label><input type="checkbox" data-profile-all ${filtered.length&&filtered.every(r=>selectedProfiles.has(String(r.id)))?'checked':''}> Seleccionar todos</label><b>${selectedProfiles.size?selectedProfiles.size+(selectedProfiles.size===1?' seleccionado':' seleccionados'):''}</b>${selectedProfiles.size?`${profileState==='active'?'<button data-profile-bulk="archive">Archivar</button>':''}${profileState==='trash'?'<button data-profile-bulk="restore_deleted">Restaurar</button>':profileState==='archived'?'<button data-profile-bulk="activate">Restaurar</button>':''}${profileState!=='trash'?'<button data-profile-bulk="delete">Eliminar</button>':''}<button data-profile-clear>Cancelar selección</button>`:''}`;cardsList.before(bar);
+    $('profileBulkActions')?.remove();
+    if (!canArchive()) return;
+    for (const id of selectedProfiles) {
+      if (!records.some(record => String(record.id) === id)) selectedProfiles.delete(id);
+    }
+    const purgeIds = canCheckPurge() ? filtered.filter(record =>
+      selectedProfiles.has(String(record.id)) && isPurgeTarget(record)
+    ).map(record => String(record.id)) : [];
+    const bar = document.createElement('div');
+    bar.id = 'profileBulkActions';
+    bar.className = 'tnt-profile-bulk';
+    bar.classList.toggle('has-selection', selectedProfiles.size > 0);
+    bar.classList.toggle('is-trash', profileState === 'trash');
+    bar.setAttribute('aria-label', 'Acciones de perfiles seleccionados');
+    const allSelected = filtered.length && filtered.every(record => selectedProfiles.has(String(record.id)));
+    const selectionCount = selectedProfiles.size;
+    const restoreAction = profileState === 'trash' ? 'restore_deleted' : 'activate';
+    const action = profileState === 'active'
+      ? '<button type="button" data-profile-bulk="archive">Archivar</button>'
+      : `<button type="button" data-profile-bulk="${restoreAction}">Restaurar</button>`;
+    bar.innerHTML = `<label><input type="checkbox" data-profile-all ${allSelected ? 'checked' : ''}> Seleccionar todos</label>${selectionCount ? `
+      <b>${selectionCount} ${selectionCount === 1 ? 'seleccionado' : 'seleccionados'}</b>${action}
+      ${profileState !== 'trash' ? '<button type="button" data-profile-bulk="delete">Eliminar</button>' : ''}
+      ${purgeIds.length ? '<button type="button" data-profile-bulk-purge hidden>Eliminar definitivamente</button>' : ''}
+      <button type="button" data-profile-clear>Cancelar selección</button>` : ''}`;
+    if (profileState === 'trash') $('profileDuplicates').after(bar);
+    else cardsList.before(bar);
+    bar.querySelector('[data-profile-bulk-purge]')?.addEventListener('click', () => openDelete('purge', purgeIds));
     bar.querySelector('[data-profile-all]').onchange=e=>{for(const record of filtered){if(e.target.checked)selectedProfiles.add(String(record.id));else selectedProfiles.delete(String(record.id));}renderList();};bar.querySelector('[data-profile-clear]')?.addEventListener('click',()=>{selectedProfiles.clear();renderList();});bar.querySelectorAll('[data-profile-bulk]').forEach(b=>b.onclick=()=>bulkProfiles([...selectedProfiles],b.dataset.profileBulk));
     for(const [list,selector] of [[cardsList,'.person-card'],[rowsBody,'tr']])list.querySelectorAll(selector).forEach((node,i)=>{
       const record=filtered[i];if(!record)return;const id=String(record.id),name=record.nombre+' '+record.apellido;
@@ -610,26 +676,42 @@
     if(bulkBusy||!canArchive()||!ids.length)return;bulkBusy=true;const previous=records.filter(r=>ids.includes(String(r.id)));try{const r=await TNT.sb.rpc('tnt_bulk_profiles',{p_ids:ids,p_action:action});if(r.error)throw r.error;const rows=Array.isArray(r.data)?r.data:[],success=rows.filter(r=>r.ok).map(r=>String(r.id)),failed=rows.filter(r=>!r.ok);if(!success.length)throw Error(failed.map(r=>r.error).join(' · ')||'No se pudieron cambiar los perfiles.');for(const id of success){selectedProfiles.delete(id);if(action==='delete')deletedProfiles.add(id);if(action==='restore_deleted')deletedProfiles.delete(id);}records=records.filter(r=>!success.includes(String(r.id)));renderStats();renderList();if(success.includes(currentDetailId)){await closeDetail();currentDetailId='';}await loadData('central',{silent:true});const message=success.length+' '+(success.length===1?'perfil':'perfiles')+' '+({archive:'archivado',delete:'eliminado',activate:'restaurado',restore_deleted:'restaurado'}[action])+(success.length===1?'':'s');if(action==='archive'||action==='delete')TNTExperience.undo(message,async()=>{const undo=await TNT.sb.rpc('tnt_bulk_profiles',{p_ids:success,p_action:action==='archive'?'activate':'restore_deleted'});if(undo.error)throw undo.error;const errors=(undo.data||[]).filter(r=>!r.ok);for(const id of success)if(!errors.some(r=>String(r.id)===id))deletedProfiles.delete(id);await loadData('central',{silent:true});if(errors.length)throw Error(errors.map(r=>r.error).join(' · '));});else showToast(message);if(failed.length)showToast(failed.length+' no se pudieron cambiar: '+failed.map(r=>r.error).join(' · '));}catch(e){showToast(e.message);}finally{bulkBusy=false;}
   }
 
-  function openDelete(mode = 'archive') {
+  function setPurgeTargetText() {
+    const count = pendingPurgeIds.length;
+    const record = records.find(item => String(item.id) === pendingPurgeIds[0]);
+    $('deleteTitle').textContent = count === 1 ? '¿Eliminar definitivamente?' : `¿Eliminar ${count} perfiles definitivamente?`;
+    $('deleteActionVerb').textContent = count === 1 ? 'Vas a eliminar definitivamente a' : 'Vas a eliminar definitivamente';
+    $('deleteProfileName').textContent = count === 1 && record
+      ? [record.nombre, record.apellido].filter(Boolean).join(' ')
+      : `${count} perfiles seleccionados`;
+  }
+
+  function openDelete(mode = 'archive', selectedIds = []) {
     const record = currentRecord();
-    if (!record || !canArchive() || deleting) return;
+    if ((!record && !selectedIds.length) || !canArchive() || deleting || bulkBusy) return;
     if(mode==='archive'&&profileState==='active'){bulkProfiles([String(record.id)],'archive');return;}
     if (mode === 'archive' && profileState !== 'active') {
       restoreProfile(record);
       return;
     }
     if(mode==='delete'&&profileState==='trash')mode='purge';
-    if(mode==='purge'&&(!TNT.isAdmin||!purgeSupported||profileState!=='trash'))return;
+    if (mode === 'purge') {
+      if (!canCheckPurge() || purgeAvailability !== 'ready') return;
+      const ids = selectedIds.length ? selectedIds : [String(record.id)];
+      pendingPurgeIds = ids.filter(id => records.some(item => String(item.id) === id && isPurgeTarget(item)));
+      if (!pendingPurgeIds.length) return;
+    }
     deleteMode = mode;
     $('deleteTitle').textContent=mode==='purge'?'¿Eliminar definitivamente?':mode==='delete'?'¿Mover este perfil a Papelera?':'¿Archivar perfil?';
     $('deleteActionVerb').textContent=mode==='purge'?'Vas a eliminar definitivamente a':mode==='delete'?'Vas a mover a Papelera a':'Vas a archivar a';
-    $('deleteActionDescription').textContent = mode==='purge'?'El perfil, sus respuestas y asistencias se borran para siempre. Los pagos y registros compartidos conservan el historial como «Perfil eliminado». Esta acción no se puede deshacer.':mode === 'delete'
+    $('deleteActionDescription').textContent = mode==='purge'?'Se borrarán los perfiles indicados, sus respuestas y asistencias. Los pagos y registros compartidos conservan el historial como «Perfil eliminado». Esta acción no se puede deshacer.':mode === 'delete'
       ? 'El perfil irá a la Papelera. Sus asistencias, pagos y responsabilidades se conservan. Podés restaurarlo desde allí.'
       : 'Su historial de EFE y sábados se conserva. Podés restaurarlo desde Archivados.';
     $('deleteStatus').textContent = '';
-    $('deleteProfileName').textContent = [record.nombre,record.apellido].filter(Boolean).join(' ');
-    let confirm=$('purgeConfirmation');if(!confirm){confirm=document.createElement('label');confirm.id='purgeConfirmation';confirm.className='tnt-purge-confirm';confirm.innerHTML='Escribí ELIMINAR para confirmar<input id="purgeConfirmationInput" autocomplete="off" spellcheck="false" aria-label="Escribí ELIMINAR para confirmar">';$('deleteStatus').before(confirm);confirm.querySelector('input').oninput=()=>setDeleteLoading(deleting);}
-    confirm.hidden=mode!=='purge';confirm.querySelector('input').value='';
+    if (mode === 'purge') setPurgeTargetText();
+    else $('deleteProfileName').textContent = [record.nombre,record.apellido].filter(Boolean).join(' ');
+    $('purgeConfirmation').hidden = mode !== 'purge';
+    $('purgeConfirmationInput').value = '';
     setDeleteLoading(false);
     $('deleteBackdrop').hidden = true;
     $('deleteSheet').classList.add('open');
@@ -638,16 +720,87 @@
       $('deleteSheet').close?.();$('deleteSheet').removeAttribute('open');$('deleteSheet').classList.remove('open');
       $('deleteSheet').setAttribute('aria-hidden','true');
       $('deleteBackdrop').hidden = true;
+      pendingPurgeIds = [];
       document.body.style.overflow = document.querySelector('.bottom-sheet.open') ? 'hidden' : '';
     });
     document.body.style.overflow = 'hidden';
   }
 
   function setDeleteLoading(active) {
-    $('confirmDeleteBtn').disabled = active||(deleteMode==='purge'&&$('purgeConfirmationInput')?.value.trim()!=='ELIMINAR');
+    $('confirmDeleteBtn').disabled = active || (deleteMode === 'purge' &&
+      (!pendingPurgeIds.length || !purgeConfirmed()));
     $('cancelDeleteBtn').disabled = active;
+    $('purgeConfirmationInput').disabled = active;
+    $('deleteStatus').dataset.progress = String(active);
     $('confirmDeleteText').textContent = deleteMode==='purge'?(active?'Eliminando…':'Eliminar definitivamente'):active ? (deleteMode === 'delete' ? 'Eliminando…' : 'Archivando…') : (deleteMode === 'delete' ? 'Eliminar perfil' : 'Sí, archivar');
     $('deleteSpinner').hidden = !active;
+  }
+
+  function purgeConfirmed() {
+    return $('purgeConfirmationInput').value.trim().toUpperCase() === 'ELIMINAR';
+  }
+
+  async function purgeSelectedProfiles() {
+    if (!canCheckPurge() || purgeAvailability !== 'ready' || !purgeConfirmed() ||
+        !pendingPurgeIds.length || !accessToken || deleting || bulkBusy) return;
+    const targets = [...pendingPurgeIds];
+    const removed = new Set(), remaining = [];
+    let errorMessage = '';
+    deleting = bulkBusy = true;
+    setDeleteLoading(true);
+    try {
+      // Each request uses the same guarded deletion as the single-profile flow.
+      for (let start = 0; start < targets.length; start += 3) {
+        $('deleteStatus').textContent = `Eliminados ${removed.size} de ${targets.length}…`;
+        const outcomes = await Promise.all(targets.slice(start, start + 3).map(async id => {
+          try {
+            const result = await TNT.sb.rpc('tnt_purge_profile', {p_person:id, p_confirmation:'ELIMINAR'});
+            if (result.error) throw result.error;
+            if (result.data?.removed !== true) throw new Error('No se pudo confirmar el borrado.');
+            return {id};
+          } catch (error) {
+            return {id, error};
+          }
+        }));
+        for (const {id, error} of outcomes) {
+          if (error) {
+            remaining.push(id);
+            errorMessage ||= error.message || 'No se pudo eliminar el perfil.';
+          } else {
+            removed.add(id);
+            purgedProfiles.add(id);
+            selectedProfiles.delete(id);
+          }
+        }
+        // Leave unattempted profiles selected if the session or connection fails.
+        if (outcomes.some(({error}) => error && (!error.code || error.code === '42501' || String(error.code).startsWith('PGRST')))) {
+          remaining.push(...targets.slice(start + 3));
+          break;
+        }
+      }
+      records = records.filter(record => !removed.has(String(record.id)));
+      pendingPurgeIds = remaining;
+      renderStats();
+      renderList();
+      const summary = removed.size === 1 ? 'Se eliminó 1 perfil definitivamente.' : `Se eliminaron ${removed.size} perfiles definitivamente.`;
+      if (remaining.length) {
+        setPurgeTargetText();
+        const pending = remaining.length === 1 ? 'Queda 1 perfil por eliminar.' : `Quedan ${remaining.length} perfiles por eliminar.`;
+        $('deleteStatus').textContent = [removed.size ? summary : '', pending, errorMessage].filter(Boolean).join(' ');
+        return;
+      }
+      deleting = false;
+      await closeDelete();
+      if (removed.has(currentDetailId)) {
+        await closeDetail();
+        currentDetailId = '';
+        $('detailData').innerHTML = '';
+      }
+      showToast(summary);
+    } finally {
+      deleting = bulkBusy = false;
+      setDeleteLoading(false);
+    }
   }
 
   async function copyPhone(phone) {
@@ -734,9 +887,10 @@
       const {data,error}=profiles;profileAccounts=photos.error?[]:photos.data||[];
       if (error) throw error;
 
-      records = Array.isArray(data) ? data.map(record=>({...record,nombre:TNTUI.personName(record.nombre),apellido:TNTUI.personName(record.apellido)})).filter(p => !p.data_notes?.system_history && !p.data_notes?.linked_to && (profileState === 'trash' ? Boolean(p.data_notes?.deleted_at) : !p.data_notes?.deleted_at && !deletedProfiles.has(String(p.id)))) : [];
+      records = Array.isArray(data) ? data.map(record=>({...record,nombre:TNTUI.personName(record.nombre),apellido:TNTUI.personName(record.apellido)})).filter(p => !purgedProfiles.has(String(p.id)) && !p.data_notes?.system_history && !p.data_notes?.linked_to && (profileState === 'trash' ? Boolean(p.data_notes?.deleted_at) : !p.data_notes?.deleted_at && !deletedProfiles.has(String(p.id)))) : [];
       renderStats();
       renderList();
+      if (purgeAvailability === 'idle') void checkPurgeAvailability();
 
       const linkedProfile = new URLSearchParams(location.search).get('person');
       if (linkedProfile && !linkedProfileOpened && records.some(p => String(p.id) === linkedProfile)) {
@@ -784,6 +938,7 @@
     const controls = [...document.querySelectorAll('[data-profile-state]')];
     controls.forEach(b => b.disabled = true);
     profileState = button.dataset.profileState;
+    if (profileState === 'trash' && purgeAvailability !== 'checking') purgeAvailability = 'idle';
     try {
       await loadData('central');
       controls.forEach(b => b.classList.toggle('active', b.dataset.profileState === profileState));
@@ -932,23 +1087,26 @@
 
   $("cancelDeleteBtn").addEventListener("click", closeDelete);
   $("deleteBackdrop").addEventListener("click", closeDelete);
+  $('retryProfilePurge').addEventListener('click', checkPurgeAvailability);
+  $('purgeConfirmationInput').addEventListener('input', () => setDeleteLoading(deleting));
+  $('deleteSheet').addEventListener('cancel', event => { if (deleting) event.preventDefault(); });
 
   $('confirmDeleteBtn').addEventListener('click', async () => {
+    if (deleteMode === 'purge') return purgeSelectedProfiles();
     const record = currentRecord(), mode = deleteMode;
     if (!record || !accessToken || !canArchive() || deleting) return;
-    if(mode==='purge'&&(!TNT.isAdmin||$('purgeConfirmationInput')?.value.trim()!=='ELIMINAR'))return;
     deleting = true;
     setDeleteLoading(true);
     $('deleteStatus').textContent = '';
     try {
       const sb = window.TNT?.sb;
       if (!sb) throw new Error('No se pudo conectar con la base.');
-      const result = mode==='purge'?await sb.rpc('tnt_purge_profile',{p_person:record.id,p_confirmation:$('purgeConfirmationInput').value.trim()}):mode === 'delete'
+      const result = mode === 'delete'
         ? await sb.rpc('tnt_delete_profile', {p_person:record.id})
         : await sb.rpc('tnt_set_profile_active', {p_person:record.id,p_active:false});
       if (result.error) throw result.error;
       const name = [record.nombre,record.apellido].filter(Boolean).join(' ');
-      if (mode === 'delete'||mode==='purge') deletedProfiles.add(String(record.id));
+      if (mode === 'delete') deletedProfiles.add(String(record.id));
       records = records.filter(item => String(item.id) !== String(record.id));
       renderStats();renderList();
       deleting = false;
@@ -958,7 +1116,7 @@
         currentDetailId = '';
         $('detailData').innerHTML = '';
       }
-      showToast(name + (mode==='purge'?' se eliminó definitivamente.':mode === 'delete' ? ' se eliminó de la base y está en la Papelera.' : ' fue archivado sin perder su historial.'));
+      showToast(name + (mode === 'delete' ? ' se eliminó de la base y está en la Papelera.' : ' fue archivado sin perder su historial.'));
     } catch(error) {
       $('deleteStatus').textContent = error.message || 'No se pudo guardar el cambio. Reintentá.';
       showToast(error.message || 'No se pudo guardar el cambio.');
@@ -1022,7 +1180,10 @@
       dashboardView.hidden=false;
       $("newProfileBtn").hidden = !canEdit();
       $("mobileNewProfileBtn").hidden = !canEdit();
-      document.querySelectorAll('[data-profile-state]').forEach(b => b.disabled = b.dataset.profileState !== 'active' && !canArchive());
+      document.querySelectorAll('[data-profile-state]').forEach(b => {
+        b.disabled = b.dataset.profileState !== 'active' && !canArchive();
+        b.classList.toggle('active', b.dataset.profileState === profileState);
+      });
     } catch (error) { console.error("No se pudieron cargar los perfiles",error); loginMessage.textContent="No se pudo cargar la base. Reintentá."; loginView.hidden=false; }
   }
 

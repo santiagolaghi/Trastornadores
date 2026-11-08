@@ -1195,3 +1195,56 @@ test('Papelera pide confirmación escrita para borrar definitivamente y conserva
   a.d.querySelector('#confirmDeleteBtn').click();await until(()=>!a.d.querySelector('#detailSheet').classList.contains('open'));assert.equal(attempts,2);assert.equal(a.d.querySelector('[data-view-id="duplicate-profile"]'),null);assert(a.w.__fixtureDB.tnt_profiles_central.some(p=>p.id==='keep-profile'));assert.deepEqual(a.errors,[]);
  }finally{a.close();}
 });
+
+test('Seleccionar todos en Papelera permite borrar el lote y reintentar sólo el perfil que falló', async () => {
+  const attempts = [];
+  let checks = 0;
+  const a = await inlinePage('perfiles/datos/index.html', w => {
+    profileDeletionFixture(w);
+    const first = w.__fixtureDB.tnt_profiles_central.find(profile => profile.id === 'duplicate-profile');
+    first.active = false;
+    first.data_notes = {deleted_at:'2026-11-04'};
+    w.__fixtureDB.tnt_profiles_central.push({...first, id:'second-trash-profile', nombre:'Otra prueba'});
+    const rpc = w.TNT.sb.rpc;
+    w.TNT.sb.rpc = async (name, args) => {
+      if (name === 'tnt_profile_purge_available') {
+        return ++checks === 1 ? {error:{code:'PGRST202'}} : {data:true};
+      }
+      if (name !== 'tnt_purge_profile') return rpc(name,args);
+      assert.equal(args.p_confirmation,'ELIMINAR');
+      attempts.push(args.p_person);
+      if (args.p_person === 'second-trash-profile' && attempts.filter(id => id === args.p_person).length === 1) {
+        return {error:{code:'23503', message:'Fallo de prueba'}};
+      }
+      w.__fixtureDB.tnt_profiles_central = w.__fixtureDB.tnt_profiles_central.filter(profile => profile.id !== args.p_person);
+      return {data:{removed:true}};
+    };
+  });
+  try {
+    a.w.eval(fs.readFileSync(path.join(root,'perfiles/datos/admin.js'),'utf8'));
+    await until(() => a.d.querySelector('[data-view-id="keep-profile"]'));
+    a.d.querySelector('[data-profile-state=trash]').click();
+    await until(() => !a.d.querySelector('#retryProfilePurge').hidden);
+    a.d.querySelector('[data-profile-all]').click();
+    assert(a.d.querySelector('[data-profile-bulk-purge]').hidden);
+    a.d.querySelector('#retryProfilePurge').click();
+    await until(() => !a.d.querySelector('[data-profile-bulk-purge]').hidden);
+    a.d.querySelector('[data-profile-bulk-purge]').click();
+    assert.equal(a.d.querySelector('#deleteTitle').textContent,'¿Eliminar 2 perfiles definitivamente?');
+    assert(a.d.querySelector('#confirmDeleteBtn').disabled);
+    assert.deepEqual(attempts,[]);
+    const input = a.d.querySelector('#purgeConfirmationInput');
+    input.value = 'eliminar';
+    input.dispatchEvent(new a.w.Event('input'));
+    a.d.querySelector('#confirmDeleteBtn').click();
+    await until(() => a.d.querySelector('#deleteStatus').textContent.includes('Queda 1 perfil por eliminar.'));
+    assert.equal(a.d.querySelector('[data-view-id="duplicate-profile"]'),null);
+    assert(a.d.querySelector('[data-view-id="second-trash-profile"]'));
+    assert.deepEqual(attempts,['duplicate-profile','second-trash-profile']);
+    a.d.querySelector('#confirmDeleteBtn').click();
+    await until(() => !a.d.querySelector('#deleteSheet').open);
+    assert.deepEqual(attempts,['duplicate-profile','second-trash-profile','second-trash-profile']);
+    assert.deepEqual(a.w.__fixtureDB.tnt_profiles_central.map(profile => profile.id),['keep-profile']);
+    assert.deepEqual(a.errors,[]);
+  } finally { a.close(); }
+});

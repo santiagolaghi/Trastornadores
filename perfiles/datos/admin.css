@@ -1213,3 +1213,25 @@ body.perfiles-admin #baseTnt .manage-btn.edit-btn{color:var(--tnt-on-color)!impo
 body.perfiles-admin #baseTnt .manage-btn.delete-btn{color:var(--text)!important;background:var(--surface-3)!important;border-color:var(--line)!important}
 
 .tnt-purge-confirm{display:grid;gap:8px;margin:16px 0;font-weight:650}.tnt-purge-confirm[hidden]{display:none}.tnt-purge-confirm input{box-sizing:border-box;width:100%;min-height:44px;border:2px solid var(--border,#777);border-radius:12px;padding:10px;font:inherit;background:var(--surface,#fff);color:inherit}
+body.perfiles-admin #baseTnt [data-profile-bulk-purge] {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--line));
+  font-weight: 750;
+  max-width: 100%;
+  white-space: normal;
+}
+body.perfiles-admin #baseTnt .profile-delete-status[data-progress="true"] {
+  color: var(--text);
+}
+body.perfiles-admin #baseTnt #profileBulkActions.is-trash {
+  position: static !important;
+  inset: auto !important;
+  width: auto !important;
+  max-width: none !important;
+  transform: none !important;
+  background: var(--surface-3) !important;
+  color: var(--text) !important;
+}
+body.perfiles-admin #baseTnt #profileBulkActions.is-trash button {
+  min-height: 44px !important;
+}

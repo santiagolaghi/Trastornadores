@@ -5,6 +5,7 @@ const {chromium}=require('playwright-core');
 const {database}=require('./fixtures/community-db.cjs');let pg,transaction=Promise.resolve();const serial=fn=>{const next=transaction.then(fn);transaction=next.catch(()=>{});return next;};
 const root=path.resolve(__dirname,'..'),servedRoot=process.env.TNT_TEST_ROOT||path.join(root,'public'),out=process.env.TNT_TEST_OUTPUT||path.resolve(root,'../tnt-tools/screenshots');
 const phoneMode=process.env.TNT_TEST_PHONE==='1';
+const profileTrashFixture=process.env.TNT_TEST_PROFILE_TRASH_ONLY==='1'||process.env.TNT_VISUAL_CATALOG==='1';
 const mockPhoneOS=process.env.TNT_TEST_MOCK_NOTIFICATIONS==='1',displayed=[];
 const pid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 function fixtureScript(){return fs.readFileSync(path.join(__dirname,'fixtures/runtime.js'),'utf8').replace("if(!location.pathname.includes('/hub'))","if(false)");}
@@ -38,7 +39,14 @@ async function mockAPI(page,actor=1){
    }
 
    const personal=name==='tnt_startup_context'?await serial(async()=>{await pg.db.exec(`reset role;set request.jwt.claim.sub='${pid(99+actor)}';set role authenticated;`);return(await pg.db.query('select public.tnt_personal_context() result')).rows[0].result.preferences;}):null;
-   const r=await page.evaluate(async({name,args,personal})=>{
+   const r=await page.evaluate(async({name,args,personal,profileTrashFixture,actor})=>{
+    if(profileTrashFixture&&name==='tnt_profile_purge_available')return{data:actor===1};
+    if(profileTrashFixture&&name==='tnt_purge_profile'){
+     const profile=__fixtureDB.tnt_profiles_central.find(row=>row.id===args.p_person);
+     if(actor!==1||args.p_confirmation!=='ELIMINAR'||!profile?.data_notes?.deleted_at)return{error:{message:'El perfil de prueba no se puede eliminar.'}};
+     __fixtureDB.tnt_profiles_central=__fixtureDB.tnt_profiles_central.filter(row=>row.id!==args.p_person);
+     return{data:{removed:true}};
+    }
     if(name==='tnt_set_profile_photo'){__fixtureCalls.push({rpc:name,args});if(__fixtureFailures['rpc:'+name])return{error:{message:__fixtureFailures['rpc:'+name]}};const photo=args.p_source==='google'?'https://lh3.googleusercontent.com/synthetic-photo':'https://oeodnnomgiddkblnlzay.supabase.co/storage/v1/object/public/tnt-profile-photos/'+args.p_path;const result={avatar_url:photo,avatar_source:args.p_source,avatar_sync:!!args.p_sync,avatar_google_url:'https://lh3.googleusercontent.com/synthetic-photo'};Object.assign(__fixtureDB.tnt_accounts[0],result);return{data:result,error:null};}if(name==='tnt_push_test'){__fixtureCalls.push({rpc:name,args});window.__phoneTest={id:'00000000-0000-4000-8000-000000009900',status:'sent',attempts:1};return{data:__phoneTest,error:null};}
     if(name==='tnt_push_test_status')return{data:__phoneTest,error:null};
     if(name==='tnt_save_org_template'){
@@ -46,13 +54,18 @@ async function mockAPI(page,actor=1){
      __fixtureCalls.push({rpc:name,args});const db=__fixtureDB,id=args.p_id||crypto.randomUUID();let t=db.tnt_templates.find(t=>t.id===id);if(t)Object.assign(t,args.p_values,{version:(t.version||0)+1});else db.tnt_templates.push({id,...args.p_values,version:1});db.tnt_template_items=db.tnt_template_items.filter(i=>i.template_id!==id).concat(args.p_items.map((i,n)=>({...i,template_id:id,sort_order:n})));return{data:id,error:null};
     }
     const result=await __fixtureSB.rpc(name,args);if(name==='tnt_startup_context'&&result.data)result.data.personal=personal;return result;
-   },{name,args,personal});
+   },{name,args,personal,profileTrashFixture,actor});
    await route.fulfill({status:r.error?400:200,json:r.error?{code:'P0001',message:r.error.message}:r.data??null});return;
   }
   if(name==='tnt_reader_marks'&&req.method()==='GET'){
    const rows=await serial(async()=>{await pg.db.exec(`reset role;set request.jwt.claim.sub='${pid(99+actor)}';set role authenticated;`);return(await pg.db.query('select book,chapter,verse,color from public.tnt_reader_marks order by updated_at desc limit 200')).rows;});await route.fulfill({json:rows});return;
   }
-  const result=await page.evaluate(({name,method,args,params,object})=>{
+  const result=await page.evaluate(({name,method,args,params,object,profileTrashFixture})=>{
+   if(profileTrashFixture&&name==='tnt_profiles_central'&&!window.__profileTrashSeeded){
+    window.__profileTrashSeeded=true;
+    const trash={apellido:'de prueba',fecha_nacimiento:'2002-01-12',genero:'Mujer',active:false,data_notes:{deleted_at:'2026-11-04'}};
+    __fixtureDB.tnt_profiles_central.push({...trash,id:'trash-fixture-one',nombre:'Ana'},{...trash,id:'trash-fixture-two',nombre:'Bruna'});
+   }
    const db=__fixtureDB;__fixtureCalls.push({table:name,action:method,value:args});const failure=__fixtureFailures[name]||__fixtureFailures[name+':'+({GET:'read',POST:'insert',PATCH:'update',DELETE:'delete'}[method])];if(failure)return{error:{message:failure}};
    let all=db[name]||[],rows=all.filter(row=>params.every(([key,value])=>{
     if(['select','order','limit','offset','on_conflict'].includes(key))return true;
@@ -65,7 +78,7 @@ async function mockAPI(page,actor=1){
    if(method==='PATCH')rows.forEach(r=>Object.assign(r,args));
    if(method==='DELETE')db[name]=all.filter(r=>!rows.includes(r));
    return{data:object?rows[0]||null:rows,error:null};
-  },{name,method:req.method(),args,params:[...url.searchParams],object:req.headers().accept?.includes('object')});
+  },{name,method:req.method(),args,params:[...url.searchParams],object:req.headers().accept?.includes('object'),profileTrashFixture});
   await route.fulfill({status:result.error?403:200,json:result.error?{code:'42501',message:result.error.message}:result.data});
  // A pending mock request may outlive navigation and reach the next document before its SDK fixture.
  }catch(error){if(/Execution context was destroyed|has been closed|Target page|__fixtureDB is not defined|__fixtureSB is not defined/.test(error.message)){await route.abort('aborted').catch(()=>{});return;}throw error;}
@@ -482,6 +495,29 @@ async function mockAPI(page,actor=1){
  async function inlineLicenseFlow(){licensed=false;await visit('/biblia?ref=GEN.1&v=128','[data-reading]');await page.locator('.reader-unavailable').waitFor();licensed=true;await page.locator('[data-reader-retry]').click();await page.getByText('Lectura sintética GEN.1',{exact:false}).waitFor();revoked=128;await page.locator('[data-next]').click();await page.locator('.reader-unavailable').waitFor();revoked=0;}
 
  try{
+  if(process.env.TNT_TEST_PROFILE_TRASH_ONLY==='1'){
+   await visit('/perfiles/datos?state=trash','#cardsList [data-view-id]');
+   await page.locator('[data-profile-all]').click();
+   const purge=page.locator('[data-profile-bulk-purge]');
+   await purge.waitFor({state:'visible'});
+   for(const [width,height] of [[320,570],[360,720],[390,844],[412,915],[768,1024],[844,390],[1280,720],[1366,593],[1440,900],[1920,1080]]){
+    await page.setViewportSize({width,height});
+    const box=await purge.boundingBox();
+    assert(box&&box.height>=44&&box.x>=0&&box.x+box.width<=width+1,`La acción debe caber en ${width}×${height}`);
+   }
+   await page.setViewportSize({width:390,height:844});
+   await purge.click();
+   assert.match(await page.locator('#deleteTitle').textContent(),/Eliminar 2 perfiles/);
+   const confirm=page.locator('#confirmDeleteBtn');
+   assert(await confirm.isDisabled());
+   await page.locator('#purgeConfirmationInput').fill('eliminar');
+   await confirm.click();
+   await page.getByText('Se eliminaron 2 perfiles definitivamente.',{exact:true}).waitFor();
+   assert.equal(await page.locator('#cardsList [data-view-id]').count(),0);
+   assert.deepEqual(errors,[]);
+   console.log('Papelera: selección múltiple verificada en 10 tamaños y 2 perfiles ficticios eliminados.');
+   return;
+  }
   if(process.env.TNT_VISUAL_CATALOG==='1'){await require('./visual-catalog.cjs')({page,actorPage,visit,base,browser,context,pg,pid,serial});return;}
   if(process.env.TNT_TEST_COMMUNITY_SAVE_ONLY==='1'){await communitySavedRefreshFlow();assert.deepEqual(errors,[]);return;}
   if(process.env.TNT_TEST_COMMUNITY_FOCUS_ONLY==='1'){await communityFocusRefreshFlow();assert.deepEqual(errors,[]);return;}
