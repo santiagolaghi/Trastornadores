@@ -1,5 +1,6 @@
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import "../../../assets/tnt-bible-games.js";
 
 const VAPID_PUBLIC = "BF3EVnNKTFBmSHImqA-PpYPylaHMG9L-A-gomiSB20084j_mNWWAT_Gm282-ovE5fXBN6fkPT_QyuXSx4H8r1hI";
 const APP_ORIGIN = "https://trastornadores.vercel.app";
@@ -8,6 +9,33 @@ const BADGE = APP_ORIGIN + "/icons/notification-badge.png?v=20261014";
 const escapeHtml = (s: string) => String(s || "").replace(/[&<>\"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c] || c));
 const fullUrl = (href: string) => href?.startsWith("http") ? href : APP_ORIGIN + (href || "/campamento/");
 const portraitUrl = (value: unknown) => { try { const url = new URL(String(value || "")); return url.protocol === "https:" ? url.href : ICON; } catch { return ICON; } };
+
+type BibleBook = { id: string; name: string; chapters: number };
+type BibleVerse = { verse: number; text: string };
+const bibleBooks = (globalThis as typeof globalThis & { TNTBibleGames: { books: BibleBook[] } }).TNTBibleGames.books;
+
+async function dailyVerse(reference: string) {
+  const match = reference.match(/^([1-3]?[A-Z]{2,3})\.([1-9]\d{0,2})(?:\.([1-9]\d{0,2})(?:-([1-9]\d{0,2}))?)?$/);
+  if (!match) throw new Error("Invalid daily reference");
+  const [, id, chapter, first, last] = match;
+  const book = bibleBooks.find(book => book.id === id);
+  if (!book || Number(chapter) > book.chapters) throw new Error("Unknown daily chapter");
+  const response = await fetch(APP_ORIGIN + "/assets/bible/rvr1909/" + id + ".json", {
+    redirect: "error", signal: AbortSignal.timeout(8000),
+  });
+  if (!response.ok) throw new Error("Daily Bible text unavailable");
+  const data = await response.json();
+  if (data.book !== id) throw new Error("Unexpected daily Bible book");
+  const readable: BibleVerse[] = (data.chapters?.[chapter] ?? []).filter((v: BibleVerse) => v.text.trim());
+  const verses = first
+    ? readable.filter(v => v.verse >= Number(first) && v.verse <= Number(last || first))
+    : readable.slice(0, 1);
+  if (!verses.length) throw new Error("Daily verses not found");
+  const text = verses.map(verse => verse.text.trim()).join(" ");
+  const body = text.length > 900 ? text.slice(0, 900).replace(/\s+\S*$/, "").trimEnd() + "…" : text;
+  const label = book.name + " " + chapter + ":" + (first || verses[0].verse) + (last ? "–" + last : "");
+  return { label, body };
+}
 
 Deno.serve(async (req: Request) => {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -22,7 +50,21 @@ Deno.serve(async (req: Request) => {
   }
   try { await sb.rpc("tnt_camp_prepare_notifications"); } catch (_) {}
   let communityReady = true;
-  try { const prepared = await sb.rpc("tnt_community_prepare_notifications"); if (prepared.error) { communityReady=false; console.error("Community preparation failed", prepared.error.code); } } catch (_) { communityReady=false; }
+  try {
+    const prepared = await sb.rpc("tnt_community_prepare_notifications");
+    if (prepared.error) throw prepared.error;
+    const day = prepared.data;
+    if (day?.verse_reference) {
+      const { label, body } = await dailyVerse(day.verse_reference);
+      const published = await sb.rpc("tnt_publish_daily_verse_notice", {
+        p_day: day.day, p_reference: day.verse_reference, p_label: label, p_body: body,
+      });
+      if (published.error) throw published.error;
+    }
+  } catch (error: any) {
+    communityReady = false;
+    console.error("Community preparation failed", error?.code || error?.message);
+  }
 
   const resendKey = Deno.env.get("RESEND_API_KEY") || "";
   const emailFrom = Deno.env.get("TNT_EMAIL_FROM") || "";
@@ -116,7 +158,7 @@ Deno.serve(async (req: Request) => {
       const account=await sb.from("tnt_accounts").select("enabled,staff_status").eq("person_id",row.person_id).maybeSingle();
       if(account.error)throw account.error;
       let skip = !subscription.data || !account.data || account.data.enabled===false;
-      const payload=row.payload||{};
+      const payload={...row.payload};
       if (payload.notification_id) {
         const note=await sb.from("tnt_notifications").select("*").eq("id",payload.notification_id).maybeSingle();
         if (note.error) throw note.error;
@@ -131,6 +173,11 @@ Deno.serve(async (req: Request) => {
             .eq("notification_id",payload.notification_id).eq("person_id",row.person_id).maybeSingle();
           if (state.error) throw state.error;
           skip ||= Boolean(resolved.data || state.data?.dismissed_at || state.data?.read_at || note.data.read_at);
+          const module = note.data.data?.community_module;
+          if (module === "birthdays" || module === "daily" && note.data.data?.verse_reference) {
+            // Use the current notice when an older copy is already queued.
+            Object.assign(payload, { title: note.data.title, body: note.data.body, url: note.data.href });
+          }
         }
       }
       if (payload.message_id) {

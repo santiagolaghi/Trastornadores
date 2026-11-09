@@ -1,10 +1,10 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const {stripTypeScriptTypes}=require('node:module');
 const original=fs.readFileSync(require('node:path').join(__dirname,'../supabase/functions/camp-notifications/index.ts'),'utf8');
-function worker({authorized=true,notes={},states={},messages={},comments=[],members=[],accounts=[],subscriptions=[],queue=[],resolved=false,expired=false,queueError=false}={}){
+function worker({authorized=true,notes={},states={},messages={},comments=[],members=[],accounts=[],subscriptions=[],queue=[],resolved=false,expired=false,queueError=false,daily=null,readBible}={}){
  let handler;const calls=[],delivered=[],updates=[],removed=[];
  class Query{constructor(t){this.t=t;this.filters=[];}select(){return this;}eq(k,v){this.filters.push([k,v]);return this;}update(v){this.value=v;return this;}delete(){this.remove=true;return this;}maybeSingle(){this.single=true;return this;}then(resolve,reject){return Promise.resolve().then(()=>{let rows=({tnt_notifications:Object.values(notes),tnt_notification_state:Object.values(states),tnt_chat_messages:Object.values(messages),tnt_task_comments:comments,tnt_chat_members:members,tnt_accounts:accounts,tnt_push_subscriptions:subscriptions}[this.t]||[]).filter(r=>this.filters.every(([k,v])=>r[k]===v));if(this.value)updates.push({table:this.t,filters:this.filters,value:this.value});if(this.remove)removed.push({table:this.t,filters:this.filters});return{data:this.single?rows[0]||null:rows,error:null};}).then(resolve,reject)}}
- const sb={from:t=>new Query(t),rpc:async(name,args)=>{calls.push({name,args});return{error:queueError&&name==='tnt_claim_push'?{message:'Queue unavailable'}:null,data:name==='tnt_worker_secret'?(args.p_name==='tnt_worker_dispatch'?'test-dispatch-secret':'test-vapid'):name==='tnt_claim_push'?queue:name==='tnt_camp_claim_outbox'?[]:name==='tnt_notification_resolved'?resolved:['tnt_notification_visible_for','tnt_recipient_has_module'].includes(name)?true:null};}};
- const code=stripTypeScriptTypes(original.replace(/^import .*;\n/gm,''));vm.runInNewContext(code,{createClient:()=>sb,webpush:{setVapidDetails(){},async sendNotification(sub,payload,options){if(expired)throw{statusCode:410};delivered.push({sub,payload:JSON.parse(payload),options});}},Deno:{env:{get:n=>({SUPABASE_URL:'https://test.invalid',SUPABASE_SERVICE_ROLE_KEY:'test-key'}[n]||'')},serve(fn){handler=fn;}},Response,URL,Date,JSON,fetch:()=>{throw Error('Este ensayo no envía emails.');}});
+ const sb={from:t=>new Query(t),rpc:async(name,args)=>{calls.push({name,args});return{error:queueError&&name==='tnt_claim_push'?{message:'Queue unavailable'}:null,data:name==='tnt_worker_secret'?(args.p_name==='tnt_worker_dispatch'?'test-dispatch-secret':'test-vapid'):name==='tnt_community_prepare_notifications'?daily:name==='tnt_claim_push'?queue:name==='tnt_camp_claim_outbox'?[]:name==='tnt_notification_resolved'?resolved:['tnt_notification_visible_for','tnt_recipient_has_module'].includes(name)?true:null};}};
+ const code=stripTypeScriptTypes(original.replace(/^import .*;\n/gm,''));vm.runInNewContext(code,{createClient:()=>sb,webpush:{setVapidDetails(){},async sendNotification(sub,payload,options){if(expired)throw{statusCode:410};delivered.push({sub,payload:JSON.parse(payload),options});}},Deno:{env:{get:n=>({SUPABASE_URL:'https://test.invalid',SUPABASE_SERVICE_ROLE_KEY:'test-key'}[n]||'')},serve(fn){handler=fn;}},TNTBibleGames:require('../assets/tnt-bible-games.js'),Response,URL,Date,JSON,AbortSignal,fetch:readBible||(()=>{throw Error('Este ensayo no usa servicios externos.');})});
  return{run:()=>handler({headers:new Headers(authorized?{authorization:'Bearer test-dispatch-secret'}:{})}),calls,delivered,updates,removed};
 }
 const base=()=>({accounts:[{person_id:'person',enabled:true,staff_status:'approved'}],subscriptions:[{person_id:'person',endpoint:'endpoint',subscription:{endpoint:'endpoint'}}],queue:[{id:'outbox',person_id:'person',endpoint:'endpoint',attempts:1,payload:{notification_id:'note',title:'Aviso',url:'/organizacion/',tag:'tnt-notification-note'}}],notes:{note:{id:'note',person_id:'person'}}});
@@ -18,3 +18,28 @@ test('Un error al reclamar la cola no se anuncia como un envío correcto',async(
 test('Un mensaje conserva la foto del autor y la identidad de la conversación en el envío al teléfono',async()=>{const b=base();Object.assign(b.queue[0].payload,{message_id:'message',thread_id:'thread',sender_id:'sender',sender_avatar:'https://photos.example.test/sender.jpg'});b.messages={message:{id:'message',thread_id:'thread',created_at:'2026-10-21T18:00:00Z'}};b.members=[{thread_id:'thread',person_id:'person'}];const w=worker(b);await w.run();assert.equal(w.delivered[0].payload.icon,'https://photos.example.test/sender.jpg');assert.equal(w.delivered[0].payload.sender_id,'sender');assert.equal(w.delivered[0].payload.thread_id,'thread');assert.equal(w.delivered[0].options.urgency,'high');});
 test('Las consultas usan la foto y no se envían si el mensaje fue eliminado o pertenece a otra actividad',async()=>{for(const exists of [false,true]){const b=base();Object.assign(b.queue[0].payload,{comment_id:'comment',task_id:'task',sender_avatar:'https://photos.example.test/author.jpg'});if(exists)b.comments=[{id:'comment',task_id:'task'}];const w=worker(b);await w.run();assert.equal(w.delivered.length,exists?1:0);if(exists)assert.equal(w.delivered[0].payload.icon,'https://photos.example.test/author.jpg');}const b=base();Object.assign(b.queue[0].payload,{comment_id:'comment',task_id:'another-task'});b.comments=[{id:'comment',task_id:'task'}];const w=worker(b);await w.run();assert.equal(w.delivered.length,0);});
 test('Una foto inválida conserva el icono de TNT',async()=>{const b=base();b.queue[0].payload.sender_avatar='javascript:alert(1)';const w=worker(b);await w.run();assert(w.delivered[0].payload.icon.includes('/icons/dynamite-app-192.png'));});
+test('El teléfono recibe el pasaje programado completo y abre su cita en TNT',async()=>{
+ const book=require('../assets/bible/rvr1909/MAT.json'),ref='MAT.5.14-16';
+ const body=book.chapters[5].filter(v=>v.verse>=14&&v.verse<=16).map(v=>v.text.trim()).join(' ');
+ assert(body.length>300);
+ const b=base();
+ Object.assign(b.notes.note,{title:'Versículo del día · Mateo 5:14–16 · RVR 1909',body,href:'/biblia?ref='+ref+'&v=1909',
+   data:{community_module:'daily',verse_reference:ref}});
+ const w=worker({...b,daily:{day:'2026-11-09',verse_reference:ref},readBible:async url=>{
+  assert.equal(url,'https://trastornadores.vercel.app/assets/bible/rvr1909/MAT.json');return Response.json(book);
+ }});
+ const result=await (await w.run()).json();
+ assert.equal(result.community_ready,true);
+ const prepared=w.calls.find(call=>call.name==='tnt_publish_daily_verse_notice');
+ assert.equal(prepared.args.p_reference,ref);assert.equal(prepared.args.p_label,'Mateo 5:14–16');
+ assert.equal(prepared.args.p_body,body);
+ assert.equal(w.delivered[0].payload.body,body);
+ assert.equal(w.delivered[0].payload.url,'https://trastornadores.vercel.app/biblia?ref='+ref+'&v=1909');
+});
+test('Un cumpleaños que ya estaba en cola se envía con el nombre y la ruta corregidos',async()=>{
+ const b=base();
+ Object.assign(b.notes.note,{title:'🎂 Cumpleaños TNT',body:'Hoy cumple Persona de prueba.',href:'/comunidad?module=birthdays',data:{community_module:'birthdays'}});
+ const w=worker(b);await w.run();
+ assert.equal(w.delivered[0].payload.body,b.notes.note.body);
+ assert.equal(w.delivered[0].payload.url,'https://trastornadores.vercel.app/comunidad?module=birthdays');
+});
